@@ -9,6 +9,7 @@ struct WorkspaceDetailView: View {
                 .frame(maxWidth: .infinity)
                 .containerRelativeFrame(.vertical)
         }
+        .navigationTitle(workspace.name)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .backgroundExtensionEffect()
         .scrollClipDisabled()
