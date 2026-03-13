@@ -12,3 +12,13 @@ final class TerminalTab: Identifiable {
         localProcessTerminalView = nil
     }
 }
+
+extension TerminalTab: Hashable {
+    static func == (lhs: TerminalTab, rhs: TerminalTab) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+}

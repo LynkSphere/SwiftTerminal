@@ -25,7 +25,7 @@ struct WorkspaceDetailView: View {
         } else {
             TerminalContainerRepresentable(
                 tabs: workspace.tabs,
-                selectedTabID: workspace.selectedTabID
+                selectedTab: workspace.selectedTab
             )
         }
     }

@@ -27,7 +27,7 @@ struct DocumentTabBar: View {
     }
 
     private func tabItem(_ tab: TerminalTab) -> some View {
-        let isSelected = workspace.selectedTabID == tab.id
+        let isSelected = workspace.selectedTab === tab
 
         return HStack(spacing: 6) {
             Text(tab.title)
@@ -56,7 +56,7 @@ struct DocumentTabBar: View {
         )
         .contentShape(Capsule())
         .onTapGesture {
-            workspace.selectedTabID = tab.id
+            workspace.selectedTab = tab
         }
     }
 

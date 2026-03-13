@@ -5,10 +5,10 @@ struct SidebarView: View {
     @Bindable var appState: AppState
 
     var body: some View {
-        List(selection: $appState.selectedWorkspaceID) {
+        List(selection: $appState.selectedWorkspace) {
             ForEach(appState.workspaces) { workspace in
                 Label(workspace.name, systemImage: "folder")
-                    .tag(workspace.id)
+                    .tag(workspace)
                     .contextMenu {
                         Button("Rename...") {
                             // TODO: rename

@@ -7,7 +7,7 @@ import SwiftTerm
 /// by toggling `isHidden` instead of destroying/recreating views.
 struct TerminalContainerRepresentable: NSViewRepresentable {
     let tabs: [TerminalTab]
-    let selectedTabID: UUID?
+    let selectedTab: TerminalTab?
 
     func makeNSView(context: Context) -> NSView {
         let container = NSView(frame: .zero)
@@ -54,7 +54,7 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
                 ])
             }
 
-            terminalView.isHidden = (tab.id != selectedTabID)
+            terminalView.isHidden = (tab !== selectedTab)
         }
     }
 
@@ -85,7 +85,6 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
             var env = ProcessInfo.processInfo.environment
             env["TERM"] = "xterm-256color"
             env["COLORTERM"] = "truecolor"
-            env["LANG"] = env["LANG"] ?? "en_US.UTF-8"
             let environment = env.map { "\($0.key)=\($0.value)" }
 
             tv.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
