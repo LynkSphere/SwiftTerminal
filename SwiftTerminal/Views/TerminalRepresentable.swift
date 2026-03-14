@@ -79,11 +79,19 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
             register(tv, for: tab)
 
             let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-            let shellName = "-" + (shell as NSString).lastPathComponent  // e.g. "-zsh" for login shell
+            let shellBasename = (shell as NSString).lastPathComponent
+            let shellName = "-" + shellBasename  // e.g. "-zsh" for login shell
             let home = FileManager.default.homeDirectoryForCurrentUser.path
+            let startingDirectory = resolvedWorkingDirectoryPath(from: tab.currentDirectory) ?? home
             var env = ProcessInfo.processInfo.environment
             env["TERM"] = "xterm-256color"
             env["COLORTERM"] = "truecolor"
+
+            if shellBasename == "zsh", let integration = ShellIntegration.prepare(using: env) {
+                env["ZDOTDIR"] = integration.integrationDirectory.path
+                env["SWIFTTERMINAL_USER_ZDOTDIR"] = integration.userConfigDirectory.path
+            }
+
             let environment = env.map { "\($0.key)=\($0.value)" }
 
             tv.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
@@ -94,7 +102,7 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
                 args: [],
                 environment: environment,
                 execName: shellName,
-                currentDirectory: home
+                currentDirectory: startingDirectory
             )
 
             return tv
@@ -111,7 +119,24 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
             }
         }
 
-        func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {}
+        func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {
+            guard let localProcessView = source as? LocalProcessTerminalView else { return }
+            let entry = viewMap[ObjectIdentifier(localProcessView)]
+            Task { @MainActor in
+                entry?.tab.currentDirectory = resolvedWorkingDirectoryPath(from: directory)
+            }
+        }
+
         func processTerminated(source: TerminalView, exitCode: Int32?) {}
+
+        private func resolvedWorkingDirectoryPath(from directory: String?) -> String? {
+            guard let directory, !directory.isEmpty else { return nil }
+
+            if let url = URL(string: directory), url.isFileURL {
+                return url.path(percentEncoded: false)
+            }
+
+            return directory
+        }
     }
 }

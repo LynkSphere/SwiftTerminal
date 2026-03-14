@@ -2,8 +2,44 @@ import SwiftUI
 
 @Observable
 final class AppState {
-    var workspaces: [Workspace] = []
-    var selectedWorkspace: Workspace?
+    var workspaces: [Workspace] = [] {
+        didSet {
+            configureWorkspacePersistence()
+            persist()
+        }
+    }
+    var selectedWorkspace: Workspace? {
+        didSet {
+            guard selectedWorkspace?.id != oldValue?.id else { return }
+            persist()
+        }
+    }
+
+    private let store: AppStateStore
+
+    init(store: AppStateStore = .default) {
+        self.store = store
+
+        if let snapshot = store.load() {
+            workspaces = snapshot.workspaces.map { workspaceSnapshot in
+                Workspace(
+                    id: workspaceSnapshot.id,
+                    name: workspaceSnapshot.name,
+                    tabs: workspaceSnapshot.tabs.map {
+                        TerminalTab(
+                            id: $0.id,
+                            title: $0.title,
+                            currentDirectory: $0.currentDirectory
+                        )
+                    },
+                    selectedTabID: workspaceSnapshot.selectedTabID
+                )
+            }
+            selectedWorkspace = workspaces.first { $0.id == snapshot.selectedWorkspaceID } ?? workspaces.first
+        }
+
+        configureWorkspacePersistence()
+    }
 
     @discardableResult
     func addWorkspace(name: String? = nil) -> Workspace {
@@ -19,6 +55,36 @@ final class AppState {
         workspaces.removeAll { $0.id == workspace.id }
         if selectedWorkspace === workspace {
             selectedWorkspace = workspaces.first
+        }
+    }
+
+    func persist() {
+        store.save(
+            AppStateSnapshot(
+                workspaces: workspaces.map { workspace in
+                    WorkspaceSnapshot(
+                        id: workspace.id,
+                        name: workspace.name,
+                        tabs: workspace.tabs.map { tab in
+                            TerminalTabSnapshot(
+                                id: tab.id,
+                                title: tab.title,
+                                currentDirectory: tab.currentDirectory
+                            )
+                        },
+                        selectedTabID: workspace.selectedTab?.id
+                    )
+                },
+                selectedWorkspaceID: selectedWorkspace?.id
+            )
+        )
+    }
+
+    private func configureWorkspacePersistence() {
+        for workspace in workspaces {
+            workspace.onPersistChange = { [weak self] in
+                self?.persist()
+            }
         }
     }
 }
