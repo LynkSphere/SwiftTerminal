@@ -1,8 +1,10 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct DocumentTabBar: View {
     let workspace: Workspace
     @State private var hoveredTabID: UUID?
+    @State private var draggedTabID: UUID?
     @State private var renamingTab: TerminalTab?
     @State private var renameDraft = ""
 
@@ -27,15 +29,27 @@ struct DocumentTabBar: View {
     }
 
     private var tabStrip: some View {
-        HStack(spacing: 0) {
-            ForEach(Array(workspace.tabs.enumerated()), id: \.element.id) { index, tab in
-                if index > 0 {
-                    separator(before: index)
+        GeometryReader { proxy in
+            let layout = tabLayout(for: proxy.size.width)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 0) {
+                    ForEach(Array(workspace.tabs.enumerated()), id: \.element.id) { index, tab in
+                        if index > 0 {
+                            separator(before: index)
+                        }
+                        tabItem(tab, width: layout.tabWidth)
+                    }
                 }
-                tabItem(tab)
+                .frame(minWidth: layout.contentWidth, alignment: .leading)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
         }
-        .padding(2)
+        .frame(height: 26)
+        .padding(.top, 2)
+        .padding(.horizontal, 2)
+        .padding(.bottom, 0)
         .background(
             Capsule()
                 .fill(.background.secondary)
@@ -43,9 +57,10 @@ struct DocumentTabBar: View {
     }
 
     @ViewBuilder
-    private func tabItem(_ tab: TerminalTab) -> some View {
+    private func tabItem(_ tab: TerminalTab, width: CGFloat) -> some View {
         let isSelected = workspace.selectedTab === tab
         let isHovered = hoveredTabID == tab.id
+        let isDragged = draggedTabID == tab.id
 
         Button {
             workspace.selectedTab = tab
@@ -65,6 +80,7 @@ struct DocumentTabBar: View {
             }
             .padding(.vertical, 5)
             .padding(.horizontal, 10)
+            .frame(width: width)
             .background(
                 Capsule()
                     .fill(backgroundStyle(isSelected: isSelected, isHovered: isHovered))
@@ -72,6 +88,8 @@ struct DocumentTabBar: View {
             )
             .contentShape(.capsule)
         }
+        .opacity(isDragged ? 0.65 : 1)
+        .animation(.snappy, value: workspace.tabs.map(\.id))
         .overlay(alignment: .leading) {
             closeButton(for: tab, isVisible: isHovered && workspace.tabs.count > 1)
                 .padding(.leading, 10)
@@ -82,6 +100,18 @@ struct DocumentTabBar: View {
                 beginRenaming(tab)
             }
         }
+        .onDrag {
+            draggedTabID = tab.id
+            return NSItemProvider(object: tab.id.uuidString as NSString)
+        }
+        .onDrop(
+            of: [UTType.text],
+            delegate: TabDropDelegate(
+                targetTab: tab,
+                workspace: workspace,
+                draggedTabID: $draggedTabID
+            )
+        )
         .onHover { isHovering in
             hoveredTabID = isHovering ? tab.id : (hoveredTabID == tab.id ? nil : hoveredTabID)
         }
@@ -183,4 +213,47 @@ struct DocumentTabBar: View {
             }
         )
     }
+
+    private func tabLayout(for availableWidth: CGFloat) -> (tabWidth: CGFloat, contentWidth: CGFloat) {
+        let tabCount = max(workspace.tabs.count, 1)
+        let separatorCount = max(workspace.tabs.count - 1, 0)
+        let separatorWidth: CGFloat = 5
+        let minimumTabWidth: CGFloat = 140
+        let availableTabWidth = max(availableWidth - CGFloat(separatorCount) * separatorWidth, 0)
+        let tabWidth = max(availableTabWidth / CGFloat(tabCount), minimumTabWidth)
+        let contentWidth = CGFloat(tabCount) * tabWidth + CGFloat(separatorCount) * separatorWidth
+        return (tabWidth, contentWidth)
+    }
 }
+
+private struct TabDropDelegate: DropDelegate {
+    let targetTab: TerminalTab
+    let workspace: Workspace
+    @Binding var draggedTabID: UUID?
+
+    func dropEntered(info: DropInfo) {
+        guard let draggedTab = draggedTab,
+              let targetIndex = workspace.tabs.firstIndex(of: targetTab) else { return }
+
+        withAnimation(.snappy) {
+            workspace.moveTab(draggedTab, to: targetIndex)
+        }
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggedTabID = nil
+        return true
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func dropExited(info: DropInfo) {}
+
+    private var draggedTab: TerminalTab? {
+        guard let draggedTabID else { return nil }
+        return workspace.tabs.first { $0.id == draggedTabID }
+    }
+}
+

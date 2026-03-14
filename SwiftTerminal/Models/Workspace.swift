@@ -66,6 +66,28 @@ final class Workspace: Identifiable {
         closeTab(selectedTab)
     }
 
+    func moveTab(_ tab: TerminalTab, before destinationTab: TerminalTab) {
+        guard tab !== destinationTab,
+              let sourceIndex = tabs.firstIndex(of: tab),
+              let destinationIndex = tabs.firstIndex(of: destinationTab) else {
+            return
+        }
+
+        moveTab(tab, to: sourceIndex < destinationIndex ? destinationIndex - 1 : destinationIndex)
+    }
+
+    func moveTab(_ tab: TerminalTab, to destinationIndex: Int) {
+        guard let sourceIndex = tabs.firstIndex(of: tab) else {
+            return
+        }
+
+        var reorderedTabs = tabs
+        let movingTab = reorderedTabs.remove(at: sourceIndex)
+        let clampedDestinationIndex = max(0, min(destinationIndex, reorderedTabs.count))
+        reorderedTabs.insert(movingTab, at: clampedDestinationIndex)
+        tabs = reorderedTabs
+    }
+
     func rename(to name: String) {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else { return }
