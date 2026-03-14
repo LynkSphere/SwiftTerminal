@@ -6,12 +6,11 @@ struct WorkspaceDetailView: View {
     var body: some View {
         ScrollView {
             terminalContent
-                .frame(maxWidth: .infinity)
                 .containerRelativeFrame(.vertical)
         }
         .navigationTitle(workspace.name)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .backgroundExtensionEffect()
+//        .backgroundExtensionEffect()
         .scrollClipDisabled()
         .safeAreaBar(edge: .top, spacing: 0) {
             DocumentTabBar(workspace: workspace)

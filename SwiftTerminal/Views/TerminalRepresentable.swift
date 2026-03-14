@@ -95,6 +95,9 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
             let environment = env.map { "\($0.key)=\($0.value)" }
 
             tv.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+            tv.nativeBackgroundColor = NSColor(red: 30.0/255, green: 30.0/255, blue: 30.0/255, alpha: 1)
+            tv.nativeForegroundColor = NSColor(red: 203.0/255, green: 204.0/255, blue: 205.0/255, alpha: 1)
+            
             tv.processDelegate = self
 
             tv.startProcess(

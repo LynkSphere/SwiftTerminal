@@ -9,6 +9,7 @@ struct DocumentTabBar: View {
             addButton
         }
         .padding(.horizontal, 8)
+        .padding(.bottom, 3)
     }
 
     private var tabStrip: some View {
