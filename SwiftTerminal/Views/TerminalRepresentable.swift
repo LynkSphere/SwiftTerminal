@@ -39,6 +39,7 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
 
             // Ensure delegate points to current coordinator
             terminalView.processDelegate = coordinator
+            coordinator.configureAppearance(for: terminalView)
 
             // Add to container if not already a subview
             if terminalView.superview !== container {
@@ -53,6 +54,7 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
                 ])
             }
 
+            coordinator.configureScrollbars(for: terminalView)
             terminalView.isHidden = (tab !== selectedTab)
         }
     }
@@ -95,8 +97,8 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
             let environment = env.map { "\($0.key)=\($0.value)" }
 
             tv.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
-            tv.nativeBackgroundColor = NSColor(red: 30.0/255, green: 30.0/255, blue: 30.0/255, alpha: 1)
-            tv.nativeForegroundColor = NSColor(red: 203.0/255, green: 204.0/255, blue: 205.0/255, alpha: 1)
+            configureAppearance(for: tv)
+            configureScrollbars(for: tv)
             
             tv.processDelegate = self
 
@@ -109,6 +111,38 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
             )
 
             return tv
+        }
+
+        func configureAppearance(for terminalView: LocalProcessTerminalView) {
+            let isDarkMode = terminalView.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+
+            terminalView.nativeBackgroundColor = isDarkMode
+                ? NSColor(red: 30.0 / 255.0, green: 30.0 / 255.0, blue: 30.0 / 255.0, alpha: 1.0)
+                : .white
+            terminalView.nativeForegroundColor = isDarkMode
+                ? NSColor(red: 203.0 / 255.0, green: 204.0 / 255.0, blue: 205.0 / 255.0, alpha: 1.0)
+                : NSColor(calibratedWhite: 0.1, alpha: 1.0)
+        }
+
+        func configureScrollbars(for terminalView: LocalProcessTerminalView) {
+            for scroller in scrollers(in: terminalView) {
+                scroller.scrollerStyle = .overlay
+                scroller.controlSize = .small
+            }
+        }
+
+        private func scrollers(in rootView: NSView) -> [NSScroller] {
+            var collectedScrollers: [NSScroller] = []
+
+            if let scroller = rootView as? NSScroller {
+                collectedScrollers.append(scroller)
+            }
+
+            for subview in rootView.subviews {
+                collectedScrollers.append(contentsOf: scrollers(in: subview))
+            }
+
+            return collectedScrollers
         }
 
         // MARK: - LocalProcessTerminalViewDelegate
