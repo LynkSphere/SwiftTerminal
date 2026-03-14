@@ -120,7 +120,7 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
                 ? NSColor(red: 30.0 / 255.0, green: 30.0 / 255.0, blue: 30.0 / 255.0, alpha: 1.0)
                 : .white
             terminalView.nativeForegroundColor = isDarkMode
-                ? NSColor(red: 203.0 / 255.0, green: 204.0 / 255.0, blue: 205.0 / 255.0, alpha: 1.0)
+                ? NSColor(red: 223.0 / 255.0, green: 224.0 / 255.0, blue: 225.0 / 255.0, alpha: 1.0)
                 : NSColor(calibratedWhite: 0.1, alpha: 1.0)
         }
 
