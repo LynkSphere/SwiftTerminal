@@ -203,7 +203,7 @@ struct DocumentTabBar: View {
     private func closeTab(_ tab: TerminalTab) {
         appState.selectedWorkspace = workspace
         appState.tabToClose = tab
-        if tab.isProcessActive {
+        if tab.hasChildProcess {
             appState.showCloseConfirmation = true
         } else {
             withAnimation {

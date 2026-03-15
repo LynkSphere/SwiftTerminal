@@ -19,7 +19,27 @@ final class TerminalTab: Identifiable {
     var hasBellNotification = false
     var workspaceID: UUID?
     var localProcessTerminalView: LocalProcessTerminalView?
-    var isProcessActive = false
+    var hasChildProcess: Bool {
+        guard let tv = localProcessTerminalView else { return false }
+        let shellPid = tv.process.shellPid
+        guard shellPid > 0 else { return false }
+
+        var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0]
+        var size: Int = 0
+        sysctl(&mib, 3, nil, &size, nil, 0)
+        let count = size / MemoryLayout<kinfo_proc>.stride
+        let procs = UnsafeMutablePointer<kinfo_proc>.allocate(capacity: count)
+        defer { procs.deallocate() }
+        sysctl(&mib, 3, procs, &size, nil, 0)
+        let actualCount = size / MemoryLayout<kinfo_proc>.stride
+
+        for i in 0..<actualCount {
+            if procs[i].kp_eproc.e_ppid == shellPid {
+                return true
+            }
+        }
+        return false
+    }
     var onPersistChange: (() -> Void)?
 
     init(

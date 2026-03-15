@@ -119,10 +119,6 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
                 currentDirectory: startingDirectory
             )
 
-            Task { @MainActor in
-                tab.isProcessActive = true
-            }
-
             return tv
         }
 
@@ -172,13 +168,7 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
             }
         }
 
-        func processTerminated(source: TerminalView, exitCode: Int32?) {
-            guard let localProcessView = source as? LocalProcessTerminalView else { return }
-            let entry = viewMap[ObjectIdentifier(localProcessView)]
-            Task { @MainActor in
-                entry?.tab.isProcessActive = false
-            }
-        }
+        func processTerminated(source: TerminalView, exitCode: Int32?) {}
 
         private func resolvedWorkingDirectoryPath(from directory: String?) -> String? {
             guard let directory, !directory.isEmpty else { return nil }

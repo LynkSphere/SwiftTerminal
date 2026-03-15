@@ -63,7 +63,7 @@ final class AppState {
 
     func closeSelectedTabWithConfirmation() {
         guard let selectedTab = selectedWorkspace?.selectedTab else { return }
-        if selectedTab.isProcessActive {
+        if selectedTab.hasChildProcess {
             tabToClose = selectedTab
             showCloseConfirmation = true
         } else {
