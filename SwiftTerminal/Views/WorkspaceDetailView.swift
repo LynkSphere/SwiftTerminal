@@ -3,6 +3,7 @@ import SwiftUI
 struct WorkspaceDetailView: View {
     @Bindable var workspace: Workspace
     @FocusState private var isTerminalFocused: Bool
+    @State private var showingInfo = false
 
     var body: some View {
         ScrollView {
@@ -18,6 +19,18 @@ struct WorkspaceDetailView: View {
         .scrollClipDisabled()
         .task(id: workspace.selectedTab?.id) {
             focusTerminal()
+        }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingInfo.toggle()
+                } label: {
+                    Image(systemName: "info")
+                }
+                .popover(isPresented: $showingInfo) {
+                    WorkspaceInfoView(workspace: workspace)
+                }
+            }
         }
         .safeAreaBar(edge: .top, spacing: 0) {
             if workspace.tabs.count > 1 {

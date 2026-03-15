@@ -10,6 +10,7 @@ struct ContentView: View {
         } detail: {
             if let workspace = appState.selectedWorkspace {
                 WorkspaceDetailView(workspace: workspace)
+                    .id(workspace.id)
             } else {
                 ContentUnavailableView(
                     "No Workspace Selected",

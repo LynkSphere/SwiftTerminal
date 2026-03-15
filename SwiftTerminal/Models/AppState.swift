@@ -61,6 +61,12 @@ final class AppState {
         }
     }
 
+    func moveWorkspaces(from source: IndexSet, to destination: Int) {
+        withAnimation {
+            workspaces.move(fromOffsets: source, toOffset: destination)
+        }
+    }
+
     func closeSelectedTabWithConfirmation() {
         guard let selectedTab = selectedWorkspace?.selectedTab else { return }
         if selectedTab.hasChildProcess {

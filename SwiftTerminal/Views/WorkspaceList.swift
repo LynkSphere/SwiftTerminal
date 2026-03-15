@@ -15,6 +15,9 @@ struct WorkspaceList: View {
                 )
                 .tag(workspace)
             }
+            .onMove { source, destination in
+                appState.moveWorkspaces(from: source, to: destination)
+            }
         }
         .safeAreaInset(edge: .bottom) {
             Button {
