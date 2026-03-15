@@ -67,6 +67,22 @@ final class TerminalTab: Identifiable {
         localProcessTerminalView = nil
     }
 
+    func increaseFontSize() {
+        guard let tv = localProcessTerminalView else { return }
+        tv.font = NSFont(descriptor: tv.font.fontDescriptor, size: tv.font.pointSize + 1) ?? tv.font
+    }
+
+    func decreaseFontSize() {
+        guard let tv = localProcessTerminalView else { return }
+        let newSize = max(tv.font.pointSize - 1, 8)
+        tv.font = NSFont(descriptor: tv.font.fontDescriptor, size: newSize) ?? tv.font
+    }
+
+    func resetFontSize() {
+        guard let tv = localProcessTerminalView else { return }
+        tv.font = .monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+    }
+
     func rename(to name: String) {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else { return }
