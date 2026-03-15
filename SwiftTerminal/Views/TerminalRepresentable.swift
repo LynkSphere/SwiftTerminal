@@ -84,6 +84,7 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
                     // Find workspace ID by walking up — tab knows its own ID
                     // Use NotificationCenter to find workspace, or just pass IDs
                     AppDelegate.bounceDockIcon()
+                    AppDelegate.updateBadge(count: 1)
                     AppDelegate.sendNotification(
                         workspaceID: tab.workspaceID ?? UUID(),
                         tabID: tab.id

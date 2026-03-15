@@ -11,6 +11,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         center.requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
     }
 
+    func applicationDidBecomeActive(_ notification: Notification) {
+        AppDelegate.updateBadge(count: 0)
+    }
+
     // Show notifications even when the app is in the foreground
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
@@ -36,6 +40,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         completionHandler()
     }
 
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        let alert = NSAlert()
+        alert.messageText = "Quit SwiftTerminal?"
+        alert.informativeText = "Are you sure you want to quit?"
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Quit")
+        alert.addButton(withTitle: "Cancel")
+
+        let response = alert.runModal()
+        return response == .alertFirstButtonReturn ? .terminateNow : .terminateCancel
+    }
+
     // MARK: - Helpers
 
     static func sendNotification(workspaceID: UUID, tabID: UUID) {
@@ -57,6 +73,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     static func bounceDockIcon() {
-        NSApplication.shared.requestUserAttention(.informationalRequest)
+        NSApplication.shared.requestUserAttention(.criticalRequest)
+    }
+
+    static func updateBadge(count: Int) {
+        if count > 0 {
+            NSApplication.shared.dockTile.badgeLabel = "\(count)"
+        } else {
+            NSApplication.shared.dockTile.badgeLabel = nil
+        }
     }
 }
