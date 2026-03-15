@@ -15,6 +15,8 @@ final class AppState {
             persist()
         }
     }
+    var tabToClose: TerminalTab?
+    var showCloseConfirmation = false
 
     private let store: AppStateStore
 
@@ -57,6 +59,29 @@ final class AppState {
         if selectedWorkspace === workspace {
             selectedWorkspace = workspaces.first
         }
+    }
+
+    func closeSelectedTabWithConfirmation() {
+        guard let selectedTab = selectedWorkspace?.selectedTab else { return }
+        if selectedTab.isProcessActive {
+            tabToClose = selectedTab
+            showCloseConfirmation = true
+        } else {
+            selectedWorkspace?.closeSelectedTab()
+        }
+    }
+
+    func confirmCloseTab() {
+        if let tabToClose, let workspace = selectedWorkspace {
+            workspace.closeTab(tabToClose)
+        }
+        tabToClose = nil
+        showCloseConfirmation = false
+    }
+
+    func cancelCloseTab() {
+        tabToClose = nil
+        showCloseConfirmation = false
     }
 
     func persist() {

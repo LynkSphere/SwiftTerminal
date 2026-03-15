@@ -17,16 +17,15 @@ struct WorkspaceList: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            HStack {
-                Button {
-                    appState.addWorkspace()
-                } label: {
-                    Label("New Workspace", systemImage: "plus")
-                }
-                .buttonStyle(.plain)
-                .padding(8)
-                Spacer()
+            Button {
+                appState.addWorkspace()
+            } label: {
+                Label("New Workspace", systemImage: "plus")
             }
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
         }
     }
 }

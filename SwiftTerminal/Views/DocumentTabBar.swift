@@ -2,6 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct DocumentTabBar: View {
+    @Environment(AppState.self) private var appState
     let workspace: Workspace
     @State private var hoveredTabID: UUID?
     @State private var draggedTabID: UUID?
@@ -52,7 +53,7 @@ struct DocumentTabBar: View {
         .padding(.bottom, 0)
         .background(
             Capsule()
-                .fill(.background.secondary)
+                .fill(.background.tertiary)
         )
     }
 
@@ -60,7 +61,6 @@ struct DocumentTabBar: View {
     private func tabItem(_ tab: TerminalTab, width: CGFloat) -> some View {
         let isSelected = workspace.selectedTab === tab
         let isHovered = hoveredTabID == tab.id
-        let isDragged = draggedTabID == tab.id
 
         Button {
             workspace.selectedTab = tab
@@ -99,8 +99,10 @@ struct DocumentTabBar: View {
         }
         .buttonStyle(.plain)
         .contextMenu {
-            Button("Rename") {
+            Button {
                 beginRenaming(tab)
+            } label: {
+                Label("Rename", systemImage: "pencil")
             }
         }
         .onDrag {
@@ -125,6 +127,7 @@ struct DocumentTabBar: View {
             openNewTab()
         } label: {
             Image(systemName: "plus")
+                .padding(1)
         }
         .help("New Tab")
         .controlSize(.large)
@@ -198,8 +201,14 @@ struct DocumentTabBar: View {
     }
 
     private func closeTab(_ tab: TerminalTab) {
-        withAnimation {
-            workspace.closeTab(tab)
+        appState.selectedWorkspace = workspace
+        appState.tabToClose = tab
+        if tab.isProcessActive {
+            appState.showCloseConfirmation = true
+        } else {
+            withAnimation {
+                workspace.closeTab(tab)
+            }
         }
     }
 

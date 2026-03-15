@@ -23,6 +23,19 @@ struct ContentView: View {
                 appState.addWorkspace(name: "Default")
             }
         }
+        .alert("Close Tab?", isPresented: Binding(
+            get: { appState.showCloseConfirmation },
+            set: { appState.showCloseConfirmation = $0 }
+        )) {
+            Button("Cancel", role: .cancel) {
+                appState.cancelCloseTab()
+            }
+            Button("Close", role: .confirm) {
+                appState.confirmCloseTab()
+            }
+        } message: {
+            Text("This tab has an active process. Are you sure you want to close it?")
+        }
     }
 }
 

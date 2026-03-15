@@ -19,6 +19,7 @@ final class TerminalTab: Identifiable {
     var hasBellNotification = false
     var workspaceID: UUID?
     var localProcessTerminalView: LocalProcessTerminalView?
+    var isProcessActive = false
     var onPersistChange: (() -> Void)?
 
     init(
@@ -29,6 +30,16 @@ final class TerminalTab: Identifiable {
         self.id = id
         self.title = title
         self.currentDirectory = currentDirectory
+    }
+
+    var displayDirectory: String {
+        guard let currentDirectory else { return "" }
+        let homeDirectory = FileManager.default.homeDirectoryForCurrentUser.path
+        if currentDirectory.hasPrefix(homeDirectory) {
+            let relativePath = String(currentDirectory.dropFirst(homeDirectory.count))
+            return "~" + relativePath
+        }
+        return currentDirectory
     }
 
     func terminate() {

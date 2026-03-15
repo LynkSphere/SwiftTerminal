@@ -12,7 +12,7 @@ struct WorkspaceDetailView: View {
                 .padding(.trailing, -6)
         }
         .navigationTitle(workspace.name)
-        .navigationSubtitle(workspace.selectedTab?.currentDirectory ?? "")
+        .navigationSubtitle(workspace.selectedTab?.displayDirectory ?? "")
         .frame(maxWidth: .infinity, maxHeight: .infinity)
 //        .backgroundExtensionEffect()
         .scrollClipDisabled()

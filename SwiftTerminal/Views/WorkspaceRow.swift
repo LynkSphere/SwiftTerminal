@@ -42,8 +42,10 @@ struct WorkspaceRow: View {
         .contextMenu {
             RenameButton()
             Divider()
-            Button("Delete", role: .destructive) {
+            Button(role: .destructive) {
                 appState.removeWorkspace(workspace)
+            } label: {
+                Label("Delet", systemImage: "trash")
             }
         }
         .renameAction(beginRenaming)

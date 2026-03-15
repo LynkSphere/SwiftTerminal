@@ -27,9 +27,7 @@ struct AppCommands: Commands {
             .disabled(appState.selectedWorkspace == nil)
 
             Button("Close Tab") {
-                withAnimation {
-                    appState.selectedWorkspace?.closeSelectedTab()
-                }
+                appState.closeSelectedTabWithConfirmation()
             }
             .keyboardShortcut("w", modifiers: .command)
             .disabled((appState.selectedWorkspace?.tabs.count ?? 0) < 2)
