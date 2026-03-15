@@ -92,8 +92,7 @@ struct DocumentTabBar: View {
             )
             .contentShape(.capsule)
         }
-        .opacity(isDragged ? 0.65 : 1)
-        .animation(.snappy, value: workspace.tabs.map(\.id))
+        .animation(.default, value: workspace.tabs.map(\.id))
         .overlay(alignment: .leading) {
             closeButton(for: tab, isVisible: isHovered && workspace.tabs.count > 1)
                 .padding(.leading, 10)
@@ -246,7 +245,7 @@ private struct TabDropDelegate: DropDelegate {
         guard let draggedTab = draggedTab,
               let targetIndex = workspace.tabs.firstIndex(of: targetTab) else { return }
 
-        withAnimation(.snappy) {
+        withAnimation {
             workspace.moveTab(draggedTab, to: targetIndex)
         }
     }

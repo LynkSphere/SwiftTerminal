@@ -77,7 +77,7 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
 
         func createTerminalView(for tab: TerminalTab) -> LocalProcessTerminalView {
             let tv = BellNotifyingTerminalView(frame: .zero)
-            tv.onAttention = { [weak tab] title, body in
+            tv.onAttention = { [weak tab] in
                 Task { @MainActor in
                     tab?.hasBellNotification = true
                     guard let tab else { return }
@@ -85,8 +85,6 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
                     // Use NotificationCenter to find workspace, or just pass IDs
                     AppDelegate.bounceDockIcon()
                     AppDelegate.sendNotification(
-                        title: title,
-                        body: body,
                         workspaceID: tab.workspaceID ?? UUID(),
                         tabID: tab.id
                     )
@@ -105,14 +103,8 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
             env["TERM"] = "xterm-256color"
             env["COLORTERM"] = "truecolor"
 
-            if shellBasename == "zsh", let integration = ShellIntegration.prepare(using: env) {
-                env["ZDOTDIR"] = integration.integrationDirectory.path
-                env["SWIFTTERMINAL_USER_ZDOTDIR"] = integration.userConfigDirectory.path
-            }
-
             let environment = env.map { "\($0.key)=\($0.value)" }
 
-            tv.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
             configureAppearance(for: tv)
             configureScrollbars(for: tv)
             

@@ -38,10 +38,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     // MARK: - Helpers
 
-    static func sendNotification(title: String, body: String, workspaceID: UUID, tabID: UUID) {
+    static func sendNotification(workspaceID: UUID, tabID: UUID) {
         let content = UNMutableNotificationContent()
-        content.title = title.isEmpty ? "Terminal" : title
-        content.body = body.isEmpty ? "Terminal needs attention" : body
+        content.title = "Terminal"
+        content.body = "Terminal needs attention"
         content.sound = .default
         content.userInfo = [
             "tabID": tabID.uuidString,
