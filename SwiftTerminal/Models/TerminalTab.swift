@@ -97,7 +97,18 @@ final class TerminalTab: Identifiable {
     }
 
     func terminate() {
-        // LocalProcessTerminalView cleans up its process on dealloc
+        if let tv = localProcessTerminalView {
+            let shellPid = tv.process.shellPid
+            if shellPid > 0 {
+                // SIGHUP child processes first (hangup signal, standard for terminal close)
+                for child in childProcesses() {
+                    kill(child.pid, SIGHUP)
+                }
+            }
+            // LocalProcess.terminate() sends SIGTERM to the shell and closes file descriptors/DispatchIO.
+            // No deinit in LocalProcessTerminalView calls this, so we must do it explicitly.
+            tv.process.terminate()
+        }
         localProcessTerminalView = nil
     }
 
