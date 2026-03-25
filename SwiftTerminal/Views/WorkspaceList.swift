@@ -4,12 +4,20 @@ import AppKit
 struct WorkspaceList: View {
     @Environment(AppState.self) private var appState
     @State private var renamingWorkspace: Workspace?
+    @State private var searchText = ""
+
+    private var filteredWorkspaces: [Workspace] {
+        guard !searchText.isEmpty else { return appState.workspaces }
+        return appState.workspaces.filter {
+            $0.name.localizedCaseInsensitiveContains(searchText)
+        }
+    }
 
     var body: some View {
         @Bindable var appState = appState
 
         List(selection: $appState.selectedWorkspace) {
-            ForEach(appState.workspaces) { workspace in
+            ForEach(filteredWorkspaces) { workspace in
                 WorkspaceRow(
                     workspace: workspace,
                     renamingWorkspace: $renamingWorkspace
@@ -20,6 +28,7 @@ struct WorkspaceList: View {
                 appState.moveWorkspaces(from: source, to: destination)
             }
         }
+        .searchable(text: $searchText, placement: .sidebar, prompt: "Filter workspaces")
         .safeAreaInset(edge: .bottom) {
             Button {
                 chooseDirectoryForNewWorkspace()
