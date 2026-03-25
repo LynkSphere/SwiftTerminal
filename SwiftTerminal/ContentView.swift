@@ -19,11 +19,6 @@ struct ContentView: View {
                 )
             }
         }
-        .onAppear {
-            if appState.workspaces.isEmpty {
-                appState.addWorkspace(name: "Default")
-            }
-        }
         .alert("Close Tab?", isPresented: Binding(
             get: { appState.showCloseConfirmation },
             set: { appState.showCloseConfirmation = $0 }

@@ -108,7 +108,7 @@ struct DocumentTabBar: View {
         .animation(.default, value: workspace.tabs.map(\.id))
         .overlay(alignment: .leading) {
             closeButton(for: tab, isVisible: isHovered && workspace.tabs.count > 1)
-                .padding(.leading, 10)
+                .padding(.leading, 5)
         }
         .buttonStyle(.plain)
         .contextMenu {
@@ -170,21 +170,19 @@ struct DocumentTabBar: View {
 
     @ViewBuilder
     private func closeButton(for tab: TerminalTab, isVisible: Bool) -> some View {
-        ZStack {
-            if isVisible {
-                Button {
-                    closeTab(tab)
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            } else {
-                Color.clear
+        if isVisible {
+            Button {
+                closeTab(tab)
+            } label: {
+                Image(systemName: "xmark")
+                    .foregroundStyle(.secondary)
             }
+            .controlSize(.small)
+            .buttonBorderShape(.circle)
+            .buttonStyle(.bordered)
+        } else {
+            Color.clear
         }
-        .frame(width: 10, height: 10)
     }
 
     private func shouldShowSeparator(before index: Int) -> Bool {
