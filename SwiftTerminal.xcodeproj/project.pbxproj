@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		08D10C5A2F648D2100754649 /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 08D10C592F648D2100754649 /* SwiftTerm */; };
+		08BEFC282F74722D009C370D /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 08BEFC272F74722D009C370D /* SwiftTerm */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -27,7 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				08D10C5A2F648D2100754649 /* SwiftTerm in Frameworks */,
+				08BEFC282F74722D009C370D /* SwiftTerm in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -70,7 +70,7 @@
 			);
 			name = SwiftTerminal;
 			packageProductDependencies = (
-				08D10C592F648D2100754649 /* SwiftTerm */,
+				08BEFC272F74722D009C370D /* SwiftTerm */,
 			);
 			productName = SwiftTerminal;
 			productReference = 08D10C4A2F64897100754649 /* SwiftTerminal.app */;
@@ -101,7 +101,7 @@
 			mainGroup = 08D10C412F64897100754649;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				08D10C582F648D2100754649 /* XCRemoteSwiftPackageReference "SwiftTerm" */,
+				08BEFC262F74722D009C370D /* XCLocalSwiftPackageReference "../SwiftTerm" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 08D10C4B2F64897100754649 /* Products */;
@@ -387,21 +387,16 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		08D10C582F648D2100754649 /* XCRemoteSwiftPackageReference "SwiftTerm" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/migueldeicaza/SwiftTerm";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.5.0;
-			};
+/* Begin XCLocalSwiftPackageReference section */
+		08BEFC262F74722D009C370D /* XCLocalSwiftPackageReference "../SwiftTerm" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../SwiftTerm;
 		};
-/* End XCRemoteSwiftPackageReference section */
+/* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		08D10C592F648D2100754649 /* SwiftTerm */ = {
+		08BEFC272F74722D009C370D /* SwiftTerm */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 08D10C582F648D2100754649 /* XCRemoteSwiftPackageReference "SwiftTerm" */;
 			productName = SwiftTerm;
 		};
 /* End XCSwiftPackageProductDependency section */

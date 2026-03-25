@@ -7,16 +7,17 @@ struct WorkspaceDetailView: View {
 
     var body: some View {
         ScrollView {
-            terminalContent
+            TerminalContainerRepresentable(
+                tabs: workspace.tabs,
+                selectedTab: workspace.selectedTab
+            )
+            .focusable()
+            .focused($isTerminalFocused)
                 .containerRelativeFrame(.vertical)
-                .padding(6)
-                .padding(.trailing, -6)
         }
         .navigationTitle(workspace.name)
         .navigationSubtitle(workspace.selectedTab?.displayDirectory ?? "")
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-//        .backgroundExtensionEffect()
-        .scrollClipDisabled()
         .task(id: workspace.selectedTab?.id) {
             focusTerminal()
         }
@@ -36,20 +37,6 @@ struct WorkspaceDetailView: View {
             if workspace.tabs.count > 1 {
                 DocumentTabBar(workspace: workspace)
             }
-        }
-    }
-
-    @ViewBuilder
-    private var terminalContent: some View {
-        if workspace.tabs.isEmpty {
-            ContentUnavailableView("No Terminal", systemImage: "terminal")
-        } else {
-            TerminalContainerRepresentable(
-                tabs: workspace.tabs,
-                selectedTab: workspace.selectedTab
-            )
-            .focusable()
-            .focused($isTerminalFocused)
         }
     }
 
