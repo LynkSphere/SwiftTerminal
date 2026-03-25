@@ -1,54 +1,27 @@
 import SwiftUI
+import SwiftData
 
 @Observable
 final class AppState {
-    var workspaces: [Workspace] = [] {
-        didSet {
-            configureWorkspacePersistence()
-            persist()
-        }
-    }
-    var selectedWorkspace: Workspace? {
-        didSet {
-            guard selectedWorkspace?.id != oldValue?.id else { return }
-            selectedWorkspace?.selectedTab?.hasBellNotification = false
-            persist()
-        }
-    }
+    var workspaces: [Workspace] = []
+    var selectedWorkspace: Workspace?
     var tabToClose: TerminalTab?
     var showCloseConfirmation = false
 
-    private let store: AppStateStore
+    let modelContext: ModelContext
 
-    init(store: AppStateStore = .default) {
-        self.store = store
-
-        if let snapshot = store.load() {
-            workspaces = snapshot.workspaces.map { workspaceSnapshot in
-                Workspace(
-                    id: workspaceSnapshot.id,
-                    name: workspaceSnapshot.name,
-                    directory: workspaceSnapshot.directory,
-                    tabs: workspaceSnapshot.tabs.map {
-                        TerminalTab(
-                            id: $0.id,
-                            title: $0.title,
-                            currentDirectory: $0.currentDirectory
-                        )
-                    },
-                    selectedTabID: workspaceSnapshot.selectedTabID
-                )
-            }
-            selectedWorkspace = workspaces.first { $0.id == snapshot.selectedWorkspaceID } ?? workspaces.first
-        }
-
-        configureWorkspacePersistence()
+    init(modelContext: ModelContext) {
+        self.modelContext = modelContext
+        let descriptor = FetchDescriptor<Workspace>(sortBy: [SortDescriptor(\.sortOrder)])
+        workspaces = (try? modelContext.fetch(descriptor)) ?? []
+        selectedWorkspace = workspaces.first
     }
 
     @discardableResult
     func addWorkspace(name: String? = nil, directory: String? = nil) -> Workspace {
         let resolvedName = name ?? directory.flatMap { URL(fileURLWithPath: $0).lastPathComponent } ?? "Workspace \(workspaces.count + 1)"
-        let workspace = Workspace(name: resolvedName, directory: directory)
+        let workspace = Workspace(name: resolvedName, directory: directory, sortOrder: workspaces.count)
+        modelContext.insert(workspace)
         workspace.addTab(currentDirectory: directory)
         workspaces.append(workspace)
         selectedWorkspace = workspace
@@ -58,6 +31,7 @@ final class AppState {
     func removeWorkspace(_ workspace: Workspace) {
         workspace.terminateAll()
         workspaces.removeAll { $0.id == workspace.id }
+        modelContext.delete(workspace)
         if selectedWorkspace === workspace {
             selectedWorkspace = workspaces.first
         }
@@ -66,59 +40,8 @@ final class AppState {
     func moveWorkspaces(from source: IndexSet, to destination: Int) {
         withAnimation {
             workspaces.move(fromOffsets: source, toOffset: destination)
-        }
-    }
-
-    func closeSelectedTabWithConfirmation() {
-        guard let selectedTab = selectedWorkspace?.selectedTab else { return }
-        if selectedTab.hasChildProcess {
-            tabToClose = selectedTab
-            showCloseConfirmation = true
-        } else {
-            selectedWorkspace?.closeSelectedTab()
-        }
-    }
-
-    func confirmCloseTab() {
-        if let tabToClose, let workspace = selectedWorkspace {
-            workspace.closeTab(tabToClose)
-        }
-        tabToClose = nil
-        showCloseConfirmation = false
-    }
-
-    func cancelCloseTab() {
-        tabToClose = nil
-        showCloseConfirmation = false
-    }
-
-    func persist() {
-        store.save(
-            AppStateSnapshot(
-                workspaces: workspaces.map { workspace in
-                    WorkspaceSnapshot(
-                        id: workspace.id,
-                        name: workspace.name,
-                        directory: workspace.directory,
-                        tabs: workspace.tabs.map { tab in
-                            TerminalTabSnapshot(
-                                id: tab.id,
-                                title: tab.title,
-                                currentDirectory: tab.liveCurrentDirectory ?? tab.currentDirectory
-                            )
-                        },
-                        selectedTabID: workspace.selectedTab?.id
-                    )
-                },
-                selectedWorkspaceID: selectedWorkspace?.id
-            )
-        )
-    }
-
-    private func configureWorkspacePersistence() {
-        for workspace in workspaces {
-            workspace.onPersistChange = { [weak self] in
-                self?.persist()
+            for (i, ws) in workspaces.enumerated() {
+                ws.sortOrder = i
             }
         }
     }

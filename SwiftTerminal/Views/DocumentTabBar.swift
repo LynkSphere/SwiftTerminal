@@ -7,13 +7,23 @@ struct DocumentTabBar: View {
     @State private var hoveredTabID: UUID?
     @State private var draggedTabID: UUID?
     @State private var renamingTab: TerminalTab?
-    @State private var renameDraft = ""
     @State private var processNames: [UUID: String] = [:]
 
     var body: some View {
         HStack(spacing: 5) {
             tabStrip
-            addButton
+            Button {
+                withAnimation {
+                    _ = workspace.addTab(currentDirectory: workspace.selectedTab?.liveCurrentDirectory)
+                }
+            } label: {
+                Image(systemName: "plus")
+                    .padding(1)
+            }
+            .help("New Tab")
+            .controlSize(.large)
+            .buttonStyle(.glass)
+            .buttonBorderShape(.circle)
         }
         .padding(.horizontal, 8)
         .padding(.bottom, 3)
@@ -29,33 +39,33 @@ struct DocumentTabBar: View {
                 try? await Task.sleep(for: .seconds(2))
             }
         }
-        .alert("Rename Tab", isPresented: isRenameAlertPresented) {
-            TextField("Tab Name", text: $renameDraft)
-            Button("Cancel", role: .cancel) {
-                renamingTab = nil
-            }
-            Button("Rename") {
-                commitRename()
-            }
-        } message: {
+        .alert("Rename Tab", isPresented: Binding(get: { renamingTab != nil }, set: { if !$0 { renamingTab = nil } }), presenting: renamingTab) { tab in
+            TextField("Tab Name", text: Bindable(tab).title)
+            Button("Cancel", role: .cancel) { renamingTab = nil }
+            Button("Done", role: .confirm) { renamingTab = nil }
+        } message: { _ in
             Text("Set a custom name for this terminal tab.")
         }
     }
 
     private var tabStrip: some View {
         GeometryReader { proxy in
-            let layout = tabLayout(for: proxy.size.width)
+            let tabCount = max(workspace.tabs.count, 1)
+            let separatorWidth: CGFloat = 5
+            let totalSeparators = CGFloat(max(tabCount - 1, 0)) * separatorWidth
+            let tabWidth = max((proxy.size.width - totalSeparators) / CGFloat(tabCount), 140)
+            let contentWidth = CGFloat(tabCount) * tabWidth + totalSeparators
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 0) {
-                    ForEach(Array(workspace.tabs.enumerated()), id: \.element.id) { index, tab in
+                    ForEach(Array(workspace.sortedTabs.enumerated()), id: \.element.id) { index, tab in
                         if index > 0 {
                             separator(before: index)
                         }
-                        tabItem(tab, width: layout.tabWidth)
+                        tabItem(tab, width: tabWidth)
                     }
                 }
-                .frame(minWidth: layout.contentWidth, alignment: .leading)
+                .frame(minWidth: contentWidth, alignment: .leading)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
@@ -79,9 +89,9 @@ struct DocumentTabBar: View {
             workspace.selectedTab = tab
         } label: {
             HStack(spacing: 0) {
-                tabAccessoryPlaceholder
+                Color.clear.frame(width: 10, height: 10)
 
-                Text(tabDisplayTitle(for: tab))
+                Text(processNames[tab.id].map { "\(tab.title) \u{2014} \($0)" } ?? tab.title)
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundStyle(isSelected ? .primary : .secondary)
@@ -90,9 +100,12 @@ struct DocumentTabBar: View {
                     .frame(maxWidth: .infinity, alignment: .center)
 
                 if !isSelected && tab.hasBellNotification {
-                    bellBadge
+                    Circle()
+                        .fill(.orange)
+                        .frame(width: 6, height: 6)
+                        .frame(width: 10, height: 10)
                 } else {
-                    tabAccessoryPlaceholder
+                    Color.clear.frame(width: 10, height: 10)
                 }
             }
             .padding(.vertical, 5)
@@ -100,20 +113,30 @@ struct DocumentTabBar: View {
             .frame(width: width)
             .background(
                 Capsule()
-                    .fill(backgroundStyle(isSelected: isSelected, isHovered: isHovered))
+                    .fill(isSelected ? AnyShapeStyle(.quaternary) : isHovered ? AnyShapeStyle(.quinary) : AnyShapeStyle(.clear))
                     .strokeBorder(isSelected ? AnyShapeStyle(.separator) : AnyShapeStyle(.clear))
             )
             .contentShape(.capsule)
         }
-        .animation(.default, value: workspace.tabs.map(\.id))
+        .animation(.default, value: workspace.sortedTabs.map(\.id))
         .overlay(alignment: .leading) {
-            closeButton(for: tab, isVisible: isHovered && workspace.tabs.count > 1)
+            if isHovered && workspace.tabs.count > 1 {
+                Button {
+                    closeTab(tab)
+                } label: {
+                    Image(systemName: "xmark")
+                        .foregroundStyle(.secondary)
+                }
+                .controlSize(.small)
+                .buttonBorderShape(.circle)
+                .buttonStyle(.bordered)
                 .padding(.leading, 5)
+            }
         }
         .buttonStyle(.plain)
         .contextMenu {
             Button {
-                beginRenaming(tab)
+                renamingTab = tab
             } label: {
                 Label("Rename", systemImage: "pencil")
             }
@@ -135,131 +158,28 @@ struct DocumentTabBar: View {
         }
     }
 
-    private var addButton: some View {
-        Button {
-            openNewTab()
-        } label: {
-            Image(systemName: "plus")
-                .padding(1)
-        }
-        .help("New Tab")
-        .controlSize(.large)
-        .buttonStyle(.glass)
-        .buttonBorderShape(.circle)
-    }
-
-    private var tabAccessoryPlaceholder: some View {
-        Color.clear
-            .frame(width: 10, height: 10)
-    }
-
-    private var bellBadge: some View {
-        Circle()
-            .fill(.orange)
-            .frame(width: 6, height: 6)
-            .frame(width: 10, height: 10)
-    }
-
     private func separator(before index: Int) -> some View {
-        Rectangle()
+        let ordered = workspace.sortedTabs
+        let show = index > 0 && index < ordered.count
+            && workspace.selectedTab !== ordered[index - 1]
+            && workspace.selectedTab !== ordered[index]
+
+        return Rectangle()
             .fill(.separator)
             .frame(width: 1, height: 16)
             .padding(.horizontal, 2)
-            .opacity(shouldShowSeparator(before: index) ? 1 : 0)
-    }
-
-    @ViewBuilder
-    private func closeButton(for tab: TerminalTab, isVisible: Bool) -> some View {
-        if isVisible {
-            Button {
-                closeTab(tab)
-            } label: {
-                Image(systemName: "xmark")
-                    .foregroundStyle(.secondary)
-            }
-            .controlSize(.small)
-            .buttonBorderShape(.circle)
-            .buttonStyle(.bordered)
-        } else {
-            Color.clear
-        }
-    }
-
-    private func shouldShowSeparator(before index: Int) -> Bool {
-        guard index > 0, index < workspace.tabs.count else { return false }
-
-        let previousTab = workspace.tabs[index - 1]
-        let currentTab = workspace.tabs[index]
-        return workspace.selectedTab !== previousTab && workspace.selectedTab !== currentTab
-    }
-
-    private func backgroundStyle(isSelected: Bool, isHovered: Bool) -> AnyShapeStyle {
-        if isSelected {
-            return AnyShapeStyle(.quaternary)
-        }
-
-        if isHovered {
-            return AnyShapeStyle(.quinary)
-        }
-
-        return AnyShapeStyle(.clear)
-    }
-
-    private func openNewTab() {
-        withAnimation {
-            _ = workspace.addTabFromSelectedDirectory()
-        }
+            .opacity(show ? 1 : 0)
     }
 
     private func closeTab(_ tab: TerminalTab) {
-        appState.selectedWorkspace = workspace
-        appState.tabToClose = tab
         if tab.hasChildProcess {
+            appState.tabToClose = tab
             appState.showCloseConfirmation = true
         } else {
             withAnimation {
                 workspace.closeTab(tab)
             }
         }
-    }
-
-    private func beginRenaming(_ tab: TerminalTab) {
-        renamingTab = tab
-        renameDraft = tab.title
-    }
-
-    private func commitRename() {
-        renamingTab?.rename(to: renameDraft)
-        renamingTab = nil
-    }
-
-    private var isRenameAlertPresented: Binding<Bool> {
-        Binding(
-            get: { renamingTab != nil },
-            set: { isPresented in
-                if !isPresented {
-                    renamingTab = nil
-                }
-            }
-        )
-    }
-
-    private func tabDisplayTitle(for tab: TerminalTab) -> String {
-        if let processName = processNames[tab.id] {
-            return "\(tab.title) \u{2014} \(processName)"
-        }
-        return tab.title
-    }
-
-    private func tabLayout(for availableWidth: CGFloat) -> (tabWidth: CGFloat, contentWidth: CGFloat) {
-        let tabCount = max(workspace.tabs.count, 1)
-        let separatorCount = max(workspace.tabs.count - 1, 0)
-        let separatorWidth: CGFloat = 5
-        let minimumTabWidth: CGFloat = 140
-        let availableTabWidth = max(availableWidth - CGFloat(separatorCount) * separatorWidth, 0)
-        let tabWidth = max(availableTabWidth / CGFloat(tabCount), minimumTabWidth)
-        let contentWidth = CGFloat(tabCount) * tabWidth + CGFloat(separatorCount) * separatorWidth
-        return (tabWidth, contentWidth)
     }
 }
 
@@ -269,8 +189,9 @@ private struct TabDropDelegate: DropDelegate {
     @Binding var draggedTabID: UUID?
 
     func dropEntered(info: DropInfo) {
-        guard let draggedTab = draggedTab,
-              let targetIndex = workspace.tabs.firstIndex(of: targetTab) else { return }
+        guard let draggedTabID,
+              let draggedTab = workspace.sortedTabs.first(where: { $0.id == draggedTabID }),
+              let targetIndex = workspace.sortedTabs.firstIndex(of: targetTab) else { return }
 
         withAnimation {
             workspace.moveTab(draggedTab, to: targetIndex)
@@ -287,9 +208,4 @@ private struct TabDropDelegate: DropDelegate {
     }
 
     func dropExited(info: DropInfo) {}
-
-    private var draggedTab: TerminalTab? {
-        guard let draggedTabID else { return nil }
-        return workspace.tabs.first { $0.id == draggedTabID }
-    }
 }

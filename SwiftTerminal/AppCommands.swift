@@ -47,7 +47,9 @@ struct AppCommands: Commands {
         CommandMenu("Tabs") {
             Button {
                 withAnimation {
-                    _ = appState.selectedWorkspace?.addTabFromSelectedDirectory()
+                    _ = appState.selectedWorkspace?.addTab(
+                        currentDirectory: appState.selectedWorkspace?.selectedTab?.liveCurrentDirectory
+                    )
                 }
             } label: {
                 Label("New Tab", systemImage: "plus.square")
@@ -57,7 +59,9 @@ struct AppCommands: Commands {
 
             Button {
                 withAnimation {
-                    _ = appState.selectedWorkspace?.addTabFromWorkspaceDirectory()
+                    _ = appState.selectedWorkspace?.addTab(
+                        currentDirectory: appState.selectedWorkspace?.directory
+                    )
                 }
             } label: {
                 Label("New Tab in Workspace Directory", systemImage: "plus.square.on.square")
@@ -66,7 +70,13 @@ struct AppCommands: Commands {
             .disabled(appState.selectedWorkspace == nil)
 
             Button {
-                appState.closeSelectedTabWithConfirmation()
+                guard let tab = appState.selectedWorkspace?.selectedTab else { return }
+                if tab.hasChildProcess {
+                    appState.tabToClose = tab
+                    appState.showCloseConfirmation = true
+                } else {
+                    appState.selectedWorkspace?.closeTab(tab)
+                }
             } label: {
                 Label("Close Tab", systemImage: "xmark.square")
             }

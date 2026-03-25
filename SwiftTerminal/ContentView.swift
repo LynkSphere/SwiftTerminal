@@ -4,6 +4,8 @@ struct ContentView: View {
     @Environment(AppState.self) private var appState
 
     var body: some View {
+        @Bindable var appState = appState
+
         NavigationSplitView {
             WorkspaceList()
                 .navigationSplitViewColumnWidth(min: 160, ideal: 200, max: 300)
@@ -19,23 +21,18 @@ struct ContentView: View {
                 )
             }
         }
-        .alert("Close Tab?", isPresented: Binding(
-            get: { appState.showCloseConfirmation },
-            set: { appState.showCloseConfirmation = $0 }
-        )) {
+        .alert("Close Tab?", isPresented: $appState.showCloseConfirmation) {
             Button("Cancel", role: .cancel) {
-                appState.cancelCloseTab()
+                appState.tabToClose = nil
             }
             Button("Close", role: .confirm) {
-                appState.confirmCloseTab()
+                if let tab = appState.tabToClose {
+                    appState.selectedWorkspace?.closeTab(tab)
+                }
+                appState.tabToClose = nil
             }
         } message: {
             Text("This tab has an active process. Are you sure you want to close it?")
         }
     }
-}
-
-#Preview {
-    ContentView()
-        .environment(AppState())
 }

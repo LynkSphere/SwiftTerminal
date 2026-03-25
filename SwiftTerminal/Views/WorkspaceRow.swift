@@ -6,7 +6,6 @@ struct WorkspaceRow: View {
     let workspace: Workspace
     @Binding var renamingWorkspace: Workspace?
 
-    @State private var renameDraft = ""
     @State private var runningProcessCount = 0
     @FocusState private var isNameFieldFocused: Bool
 
@@ -29,19 +28,12 @@ struct WorkspaceRow: View {
                 }
 
             if isRenaming {
-                TextField("Workspace Name", text: $renameDraft)
+                TextField("Workspace Name", text: Bindable(workspace).name)
                     .textFieldStyle(.plain)
                     .focused($isNameFieldFocused)
-                    .onSubmit(commitRename)
-                    .onExitCommand(perform: cancelRename)
-                    .onAppear {
-                        renameDraft = workspace.name
-                        isNameFieldFocused = true
-                    }
-                    .onChange(of: isNameFieldFocused) { _, isFocused in
-                        guard !isFocused else { return }
-                        commitRename()
-                    }
+                    .onSubmit { renamingWorkspace = nil }
+                    .onExitCommand { renamingWorkspace = nil }
+                    .onAppear { isNameFieldFocused = true }
             } else {
                 Text(workspace.name)
                     .lineLimit(1)
@@ -64,20 +56,9 @@ struct WorkspaceRow: View {
                 Label("Delete", systemImage: "trash")
             }
         }
-        .renameAction(beginRenaming)
-    }
-
-    private func beginRenaming() {
-        appState.selectedWorkspace = workspace
-        renamingWorkspace = workspace
-    }
-
-    private func commitRename() {
-        workspace.rename(to: renameDraft)
-        renamingWorkspace = nil
-    }
-
-    private func cancelRename() {
-        renamingWorkspace = nil
+        .renameAction {
+            appState.selectedWorkspace = workspace
+            renamingWorkspace = workspace
+        }
     }
 }

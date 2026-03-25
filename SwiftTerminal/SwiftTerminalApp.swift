@@ -1,14 +1,24 @@
 import SwiftUI
+import SwiftData
 
 @main
 struct SwiftTerminalApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @State private var appState = AppState()
+
+    let container: ModelContainer
+    @State private var appState: AppState
+
+    init() {
+        let container = try! ModelContainer(for: Workspace.self)
+        self.container = container
+        self._appState = State(initialValue: AppState(modelContext: container.mainContext))
+    }
 
     var body: some Scene {
         Window("main", id: "main") {
             ContentView()
                 .environment(appState)
+                .modelContainer(container)
                 .frame(minWidth: 600, minHeight: 400)
                 .onAppear {
                     appDelegate.navigateToTab = { [weak appState] workspaceID, tabID in

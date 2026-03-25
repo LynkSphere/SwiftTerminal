@@ -1,135 +1,86 @@
 import Foundation
+import SwiftData
 import SwiftTerm
 
-@Observable
-final class Workspace: Identifiable {
-    let id: UUID
-    var name: String {
-        didSet {
-            guard name != oldValue else { return }
-            onPersistChange?()
-        }
-    }
-    var directory: String? {
-        didSet {
-            guard directory != oldValue else { return }
-            onPersistChange?()
-        }
-    }
-    var tabs: [TerminalTab] = [] {
-        didSet {
-            configureTabPersistence()
-            onPersistChange?()
-        }
-    }
-    var selectedTab: TerminalTab? {
-        didSet {
-            guard selectedTab?.id != oldValue?.id else { return }
-            selectedTab?.hasBellNotification = false
-            onPersistChange?()
-        }
-    }
-    var onPersistChange: (() -> Void)? {
-        didSet {
-            configureTabPersistence()
-        }
-    }
+@Model
+final class Workspace {
+    var id = UUID()
+    var name: String = ""
+    var directory: String?
+    var sortOrder: Int = 0
+    var selectedTab: TerminalTab?
 
-    init(
-        id: UUID = UUID(),
-        name: String,
-        directory: String? = nil,
-        tabs: [TerminalTab] = [],
-        selectedTabID: UUID? = nil
-    ) {
-        self.id = id
+    @Relationship(deleteRule: .cascade, inverse: \TerminalTab.workspace)
+    var tabs: [TerminalTab] = []
+
+    init(name: String, directory: String? = nil, sortOrder: Int = 0) {
         self.name = name
         self.directory = directory
-        self.tabs = tabs
-        self.selectedTab = tabs.first { $0.id == selectedTabID } ?? tabs.first
-        for tab in tabs { tab.workspaceID = id }
-        configureTabPersistence()
+        self.sortOrder = sortOrder
+    }
+
+    var sortedTabs: [TerminalTab] {
+        tabs.sorted { $0.sortOrder < $1.sortOrder }
     }
 
     @discardableResult
     func addTab(currentDirectory: String? = nil) -> TerminalTab {
-        let tab = TerminalTab(currentDirectory: currentDirectory)
-        tab.workspaceID = id
+        let tab = TerminalTab(currentDirectory: currentDirectory, sortOrder: tabs.count)
         tabs.append(tab)
         selectedTab = tab
         return tab
     }
 
-    @discardableResult
-    func addTabFromSelectedDirectory() -> TerminalTab {
-        addTab(currentDirectory: selectedTab?.liveCurrentDirectory)
-    }
-
-    @discardableResult
-    func addTabFromWorkspaceDirectory() -> TerminalTab {
-        addTab(currentDirectory: directory)
-    }
-
     func closeTab(_ tab: TerminalTab) {
         tab.terminate()
         tabs.removeAll { $0.id == tab.id }
-        if selectedTab === tab {
-            selectedTab = tabs.last
+        tab.modelContext?.delete(tab)
+        if selectedTab?.id == tab.id {
+            selectedTab = sortedTabs.last
         }
-    }
-
-    func closeSelectedTab() {
-        guard let selectedTab, tabs.count > 1 else { return }
-        closeTab(selectedTab)
     }
 
     func moveTab(_ tab: TerminalTab, before destinationTab: TerminalTab) {
+        let ordered = sortedTabs
         guard tab !== destinationTab,
-              let sourceIndex = tabs.firstIndex(of: tab),
-              let destinationIndex = tabs.firstIndex(of: destinationTab) else {
+              let sourceIndex = ordered.firstIndex(of: tab),
+              let destinationIndex = ordered.firstIndex(of: destinationTab) else {
             return
         }
-
         moveTab(tab, to: sourceIndex < destinationIndex ? destinationIndex - 1 : destinationIndex)
     }
 
     func moveTab(_ tab: TerminalTab, to destinationIndex: Int) {
-        guard let sourceIndex = tabs.firstIndex(of: tab) else {
-            return
+        var ordered = sortedTabs
+        guard let sourceIndex = ordered.firstIndex(of: tab) else { return }
+        let movingTab = ordered.remove(at: sourceIndex)
+        let clamped = max(0, min(destinationIndex, ordered.count))
+        ordered.insert(movingTab, at: clamped)
+        for (i, t) in ordered.enumerated() {
+            t.sortOrder = i
         }
-
-        var reorderedTabs = tabs
-        let movingTab = reorderedTabs.remove(at: sourceIndex)
-        let clampedDestinationIndex = max(0, min(destinationIndex, reorderedTabs.count))
-        reorderedTabs.insert(movingTab, at: clampedDestinationIndex)
-        tabs = reorderedTabs
-    }
-
-    func rename(to name: String) {
-        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedName.isEmpty else { return }
-        guard self.name != trimmedName else { return }
-        self.name = trimmedName
     }
 
     func selectNextTab() {
-        selectTab(movingBy: 1)
+        let ordered = sortedTabs
+        guard ordered.count > 1,
+              let current = selectedTab,
+              let index = ordered.firstIndex(of: current) else { return }
+        selectedTab = ordered[(index + 1) % ordered.count]
     }
 
     func selectPreviousTab() {
-        selectTab(movingBy: -1)
-    }
-
-    var hasNotification: Bool {
-        tabs.contains { $0.hasBellNotification }
+        let ordered = sortedTabs
+        guard ordered.count > 1,
+              let current = selectedTab,
+              let index = ordered.firstIndex(of: current) else { return }
+        selectedTab = ordered[(index - 1 + ordered.count) % ordered.count]
     }
 
     var notificationCount: Int {
         tabs.filter { $0.hasBellNotification }.count
     }
 
-    /// Number of tabs that have at least one child process running under their shell.
-    /// Uses a single sysctl snapshot for efficiency.
     var runningProcessCount: Int {
         let shellPids: [pid_t] = tabs.compactMap { tab in
             guard let tv = tab.localProcessTerminalView else { return nil }
@@ -163,41 +114,5 @@ final class Workspace: Identifiable {
         for tab in tabs {
             tab.terminate()
         }
-    }
-
-    private func configureTabPersistence() {
-        for tab in tabs {
-            tab.onPersistChange = onPersistChange
-        }
-    }
-
-    private func selectTab(movingBy offset: Int) {
-        guard !tabs.isEmpty else { return }
-
-        guard let selectedTab,
-              let currentIndex = tabs.firstIndex(of: selectedTab) else {
-            self.selectedTab = tabs.first
-            return
-        }
-
-        let nextIndex = (currentIndex + offset).positiveModulo(tabs.count)
-        self.selectedTab = tabs[nextIndex]
-    }
-}
-
-extension Workspace: Hashable {
-    static func == (lhs: Workspace, rhs: Workspace) -> Bool {
-        lhs.id == rhs.id
-    }
-
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
-    }
-}
-
-private extension Int {
-    func positiveModulo(_ divisor: Int) -> Int {
-        let remainder = self % divisor
-        return remainder >= 0 ? remainder : remainder + divisor
     }
 }
