@@ -6,7 +6,9 @@ struct EditorPanelView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            Divider()
+            Rectangle()
+                .fill(Color(nsColor: .gridColor))
+                .frame(height: 1)
             content
         }
     }
