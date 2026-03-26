@@ -217,35 +217,20 @@ final class EditorTextView: NSTextView {
 
         // Create the HunkNSTextView-style popover
         let popoverWidth: CGFloat = 560
-        let maxPopoverHeight: CGFloat = 500
+        let maxPopoverHeight: CGFloat = 250
 
         let popoverTextView = DiffPopoverTextView()
-
-        // Measure wrapped height before configuring the view
-        let verticalInset: CGFloat = 6 // matches textContainerInset height in DiffPopoverTextView
-        let textWidth = max(1, popoverWidth - DiffPopoverConstants.gutterWidth)
-        let source = popoverLines.map(\.content).joined(separator: "\n")
-
-        // Create temp layout for accurate height measurement with wrapping
-        let tempTextStorage = NSTextStorage()
-        let tempLayoutManager = NSLayoutManager()
-        let tempTextContainer = NSTextContainer(containerSize: NSSize(width: textWidth, height: CGFloat.greatestFiniteMagnitude))
-
-        tempLayoutManager.addTextContainer(tempTextContainer)
-        tempTextStorage.addLayoutManager(tempLayoutManager)
-
-        let attributed = SyntaxHighlighter.highlight(source, fileExtension: fileExtension)
-        tempTextStorage.setAttributedString(attributed)
-
-        // Set the font for accurate measurement
-        tempTextStorage.addAttribute(.font, value: DiffPopoverConstants.font, range: NSRange(location: 0, length: tempTextStorage.length))
-
-        tempLayoutManager.ensureLayout(for: tempTextContainer)
-        let usedRect = tempLayoutManager.usedRect(for: tempTextContainer)
-        let contentHeight = usedRect.height + verticalInset * 2
-
-        // Now configure the actual popover view
         popoverTextView.configure(lines: popoverLines, fileExtension: fileExtension, width: popoverWidth)
+
+        // Get actual content height from layout manager after layout
+        let contentHeight: CGFloat
+        if let lm = popoverTextView.layoutManager, let tc = popoverTextView.textContainer {
+            lm.ensureLayout(for: tc)
+            let usedRect = lm.usedRect(for: tc)
+            contentHeight = usedRect.height + DiffPopoverConstants.verticalPadding * 2
+        } else {
+            contentHeight = CGFloat(popoverLines.count) * 17 + DiffPopoverConstants.verticalPadding * 2
+        }
 
         // Fit content but cap at max height
         let popoverHeight = min(contentHeight, maxPopoverHeight)
@@ -287,7 +272,7 @@ struct DiffPopoverLine {
 enum DiffPopoverConstants {
     static let font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
     static let lineHeight: CGFloat = 17
-    static let gutterWidth: CGFloat = 48
+    static let gutterWidth: CGFloat = 40
     static let lineNumFont = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular)
     static let verticalPadding: CGFloat = 8
 }
@@ -308,14 +293,13 @@ final class DiffPopoverTextView: NSTextView {
         backgroundColor = .windowBackgroundColor
         drawsBackground = true
         textColor = .labelColor
-        textContainerInset = NSSize(width: constants.gutterWidth, height: 6)
+        textContainerInset = NSSize(width: constants.gutterWidth, height: constants.verticalPadding)
 
-        // Line wrapping enabled
+        // No line wrapping — horizontal scroll if needed
         isVerticallyResizable = true
-        isHorizontallyResizable = false
-        let textWidth = max(1, width - constants.gutterWidth)
-        textContainer?.widthTracksTextView = true
-        textContainer?.containerSize = NSSize(width: textWidth, height: CGFloat.greatestFiniteMagnitude)
+        isHorizontallyResizable = true
+        textContainer?.widthTracksTextView = false
+        textContainer?.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         minSize = NSSize(width: width, height: 0)
         autoresizingMask = []

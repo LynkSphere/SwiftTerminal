@@ -10,6 +10,7 @@ enum GitAction {
     case discard([GitChangedFile], GitRepositoryStatusSnapshot)
     case discardAll(GitRepositoryStatusSnapshot)
     case commit
+    case openFile(URL)
 }
 
 // MARK: - Context Menus
@@ -50,6 +51,14 @@ struct GitFileContextMenu: View {
     let onAction: (GitAction) -> Void
 
     var body: some View {
+        if let file = files.first, files.count == 1 {
+            Button { onAction(.openFile(file.fileURL)) } label: {
+                Label("Open File", systemImage: "doc")
+            }
+
+            Divider()
+        }
+
         Button { onAction(.stage(files, snapshot)) } label: {
             Label("Stage Changes", systemImage: "tray.and.arrow.down")
         }

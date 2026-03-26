@@ -134,6 +134,8 @@ struct GitInspectorView: View {
         case .commit:
             commitMessage = ""
             showCommitSheet = true
+        case .openFile(let url):
+            editorPanel.openFile(url)
         }
     }
 

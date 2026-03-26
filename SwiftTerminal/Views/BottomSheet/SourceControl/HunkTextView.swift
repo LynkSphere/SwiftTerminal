@@ -4,7 +4,7 @@ import SwiftUI
 enum HunkTextViewConstants {
     static let font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
     static let lineHeight: CGFloat = 17
-    static let gutterWidth: CGFloat = 72
+    static let gutterWidth: CGFloat = 56
     static let lineNumFont = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular)
 }
 
@@ -19,35 +19,20 @@ struct HunkTextView: NSViewRepresentable {
     }
 
     func updateNSView(_ textView: HunkNSTextView, context: Context) {
-        // When the view scrolls into a lazy container, ensure appearance + redraw
         textView.appearance = textView.effectiveAppearance
         textView.needsDisplay = true
     }
 
-    /// Calculates the actual wrapped height for a hunk given a container width
-    static func calculateWrappedHeight(hunk: DiffHunk, fileExtension: String, containerWidth: CGFloat) -> CGFloat {
-        let constants = HunkTextViewConstants.self
-        let verticalInset: CGFloat = 6 // matches textContainerInset height
-        let source = hunk.lines.map(\.content).joined(separator: "\n")
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: HunkNSTextView, context: Context) -> CGSize? {
+        guard let lm = nsView.layoutManager, let tc = nsView.textContainer else { return nil }
+        let width = proposal.width ?? nsView.bounds.width
+        guard width > 0 else { return nil }
 
-        // Actual text rendering width after accounting for gutter
-        let textWidth = max(1, containerWidth - constants.gutterWidth)
-
-        // Create layout for measuring wrapped height
-        let textStorage = NSTextStorage()
-        let layoutManager = NSLayoutManager()
-        let textContainer = NSTextContainer(containerSize: NSSize(width: textWidth, height: CGFloat.greatestFiniteMagnitude))
-
-        layoutManager.addTextContainer(textContainer)
-        textStorage.addLayoutManager(layoutManager)
-
-        let attributed = SyntaxHighlighter.highlight(source, fileExtension: fileExtension)
-        textStorage.setAttributedString(attributed)
-
-        layoutManager.ensureLayout(for: textContainer)
-        let usedRect = layoutManager.usedRect(for: textContainer)
-
-        return usedRect.height + verticalInset * 2
+        let textWidth = max(width - HunkTextViewConstants.gutterWidth * 2, 50)
+        tc.containerSize = NSSize(width: textWidth, height: CGFloat.greatestFiniteMagnitude)
+        lm.ensureLayout(for: tc)
+        let height = lm.usedRect(for: tc).height
+        return CGSize(width: width, height: max(height, HunkTextViewConstants.lineHeight))
     }
 }
 
@@ -68,8 +53,8 @@ final class HunkNSTextView: NSTextView {
         backgroundColor = .windowBackgroundColor
         drawsBackground = true
         textColor = .labelColor
-        textContainerInset = NSSize(width: constants.gutterWidth, height: 6)
-        isVerticallyResizable = false
+        textContainerInset = NSSize(width: constants.gutterWidth, height: 0)
+        isVerticallyResizable = true
         isHorizontallyResizable = false
         textContainer?.widthTracksTextView = true
         autoresizingMask = [.width]
