@@ -438,27 +438,36 @@ final class EditorTextView: NSTextView {
         guard !popoverLines.isEmpty else { return }
 
         // Create the HunkNSTextView-style popover
-        let popoverTextView = DiffPopoverTextView()
-        popoverTextView.configure(lines: popoverLines, fileExtension: fileExtension)
-
-        let lineCount = popoverLines.count
-        let lineHeight: CGFloat = 17
+        let popoverWidth: CGFloat = 560
         let popoverHeight: CGFloat = 250
-        let contentHeight = CGFloat(lineCount) * lineHeight
+
+        let popoverTextView = DiffPopoverTextView()
+        popoverTextView.configure(lines: popoverLines, fileExtension: fileExtension, width: popoverWidth)
+
+        // Get actual content height from layout manager after layout
+        let contentHeight: CGFloat
+        if let lm = popoverTextView.layoutManager, let tc = popoverTextView.textContainer {
+            lm.ensureLayout(for: tc)
+            let usedRect = lm.usedRect(for: tc)
+            contentHeight = usedRect.height + popoverTextView.textContainerInset.height * 2
+        } else {
+            contentHeight = CGFloat(popoverLines.count) * 17
+        }
 
         let scrollView = NSScrollView()
         scrollView.documentView = popoverTextView
-        scrollView.hasVerticalScroller = contentHeight > popoverHeight
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = true
         scrollView.autohidesScrollers = true
         scrollView.borderType = .noBorder
         scrollView.translatesAutoresizingMaskIntoConstraints = false
 
-        popoverTextView.frame = NSRect(x: 0, y: 0, width: 420, height: max(contentHeight, popoverHeight))
+        popoverTextView.frame = NSRect(x: 0, y: 0, width: popoverWidth, height: max(contentHeight, popoverHeight))
         popoverTextView.isVerticallyResizable = false
 
         let viewController = NSViewController()
         viewController.view = scrollView
-        viewController.preferredContentSize = NSSize(width: 420, height: popoverHeight)
+        viewController.preferredContentSize = NSSize(width: popoverWidth, height: popoverHeight)
 
         let popover = NSPopover()
         popover.behavior = .transient
@@ -490,7 +499,7 @@ private enum DiffPopoverConstants {
 private final class DiffPopoverTextView: NSTextView {
     private var lineData: [(kind: GitDiffLineKind, oldNum: Int?, newNum: Int?)] = []
 
-    func configure(lines: [DiffPopoverLine], fileExtension: String) {
+    func configure(lines: [DiffPopoverLine], fileExtension: String, width: CGFloat) {
         let constants = DiffPopoverConstants.self
 
         appearance = NSApp.effectiveAppearance
@@ -503,10 +512,15 @@ private final class DiffPopoverTextView: NSTextView {
         drawsBackground = true
         textColor = .labelColor
         textContainerInset = NSSize(width: constants.gutterWidth, height: 0)
-        isVerticallyResizable = false
-        isHorizontallyResizable = false
-        textContainer?.widthTracksTextView = true
-        autoresizingMask = [.width]
+
+        // No line wrapping — horizontal scroll if needed
+        isVerticallyResizable = true
+        isHorizontallyResizable = true
+        textContainer?.widthTracksTextView = false
+        textContainer?.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        minSize = NSSize(width: width, height: 0)
+        autoresizingMask = []
 
         lineData = lines.map { (kind: $0.kind, oldNum: $0.oldLineNumber, newNum: $0.newLineNumber) }
 
