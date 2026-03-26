@@ -3,9 +3,10 @@ import SwiftTerm
 
 struct AppCommands: Commands {
     @Bindable var appState: AppState
+    @AppStorage("showHiddenFiles") var showHiddenFiles = false
 
     var body: some Commands {
-        CommandMenu("View") {
+        CommandGroup(replacing: .toolbar) {
             Button {
                 appState.selectedWorkspace?.selectedTab?.increaseFontSize()
             } label: {
@@ -29,40 +30,62 @@ struct AppCommands: Commands {
             }
             .keyboardShortcut("0", modifiers: .command)
             .disabled(appState.selectedWorkspace?.selectedTab?.localProcessTerminalView == nil)
-        }
 
-        CommandMenu("Editor") {
-            Button("Toggle Editor Panel") {
+            Divider()
+
+            Button {
                 appState.panelToggleToken = UUID()
+            } label: {
+                Label("Toggle Editor Panel", systemImage: "rectangle.bottomhalf.inset.filled")
             }
             .keyboardShortcut("j", modifiers: .command)
+
+            Divider()
+
+            Button {
+                showHiddenFiles.toggle()
+            } label: {
+                Label(
+                    showHiddenFiles ? "Hide Hidden Files" : "Show Hidden Files",
+                    systemImage: showHiddenFiles ? "eye.slash" : "eye"
+                )
+            }
+            .keyboardShortcut(".", modifiers: [.command, .shift])
         }
 
         CommandMenu("Inspector") {
-            Button("Files") {
+            Button {
                 appState.showingInspector = true
                 appState.selectedInspectorTab = .files
+            } label: {
+                Label("Files Navigator", systemImage: "folder")
             }
             .keyboardShortcut("1", modifiers: .command)
 
-            Button("Git") {
+            Button {
                 appState.showingInspector = true
                 appState.selectedInspectorTab = .git
+            } label: {
+                Label("Git Navigator", systemImage: "point.topleft.down.curvedto.point.bottomright.up")
             }
             .keyboardShortcut("2", modifiers: .command)
 
-            Button("Search") {
+            Button {
                 appState.showingInspector = true
                 appState.selectedInspectorTab = .search
+            } label: {
+                Label("Search Navigator", systemImage: "magnifyingglass")
             }
             .keyboardShortcut("3", modifiers: .command)
 
             Divider()
 
-            Button("Find in Files") {
+            Button {
                 appState.showingInspector = true
                 appState.selectedInspectorTab = .search
                 appState.searchFocusToken = UUID()
+            } label: {
+                Label("Find in Files", systemImage: "doc.text.magnifyingglass")
             }
             .keyboardShortcut("f", modifiers: [.command, .shift])
         }

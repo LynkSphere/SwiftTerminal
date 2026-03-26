@@ -12,5 +12,6 @@ struct FileRowView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .opacity(item.isHidden ? 0.5 : 1)
     }
 }

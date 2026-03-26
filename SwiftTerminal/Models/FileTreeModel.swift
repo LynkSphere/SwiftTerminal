@@ -8,6 +8,7 @@ final class FileTreeModel {
 
     var searchText = ""
     var showChangedOnly = false
+    var showHiddenFiles = false
 
     var changedURLs: Set<URL> { Set(gitStatuses.keys) }
 
@@ -25,7 +26,7 @@ final class FileTreeModel {
     }
 
     func load(directoryURL: URL) {
-        var tree = FileItem.buildTree(at: directoryURL)
+        var tree = FileItem.buildTree(at: directoryURL, showHiddenFiles: showHiddenFiles)
         applyStatuses(to: &tree)
         items = tree
     }
@@ -34,7 +35,7 @@ final class FileTreeModel {
         guard let statuses = try? await GitRepository.shared.changedFileStatuses(in: directoryURL)
         else { return }
         gitStatuses = statuses
-        var tree = FileItem.buildTree(at: directoryURL)
+        var tree = FileItem.buildTree(at: directoryURL, showHiddenFiles: showHiddenFiles)
         applyStatuses(to: &tree)
         items = tree
     }

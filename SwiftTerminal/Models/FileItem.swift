@@ -9,6 +9,10 @@ struct FileItem: Identifiable, Hashable {
     var children: [FileItem]?
     var gitStatus: GitChangeKind?
 
+    var isHidden: Bool {
+        name.hasPrefix(".")
+    }
+
     var icon: NSImage {
         url.fileIcon
     }
@@ -62,11 +66,11 @@ struct FileItem: Identifiable, Hashable {
         }
     }
 
-    static func buildTree(at directoryURL: URL) -> [FileItem] {
+    static func buildTree(at directoryURL: URL, showHiddenFiles: Bool = false) -> [FileItem] {
         guard let contents = try? FileManager.default.contentsOfDirectory(
             at: directoryURL,
             includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles]
+            options: showHiddenFiles ? [] : [.skipsHiddenFiles]
         ) else { return [] }
 
         return contents
@@ -78,7 +82,7 @@ struct FileItem: Identifiable, Hashable {
                     name: url.lastPathComponent,
                     url: url,
                     isDirectory: isDir,
-                    children: isDir ? buildTree(at: url) : nil
+                    children: isDir ? buildTree(at: url, showHiddenFiles: showHiddenFiles) : nil
                 )
             }
             .sorted { lhs, rhs in

@@ -88,7 +88,7 @@ struct GitInspectorView: View {
     private func repoHeader(_ snapshot: GitRepositoryStatusSnapshot) -> some View {
         Label {
             Text(snapshot.repositoryRootURL.lastPathComponent)
-                .fontWeight(.medium)
+//                .fontWeight(.medium)
             Text(snapshot.branchName ?? "branch")
                 .foregroundStyle(.secondary)
         } icon: {

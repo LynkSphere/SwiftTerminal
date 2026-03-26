@@ -8,28 +8,38 @@ struct FileTreeView: View {
     @State private var selectedID: FileItem.ID?
     @State private var expandedIDs: Set<String> = []
     @State private var savedExpandedIDs: Set<String>?
+    @AppStorage("showHiddenFiles") private var showHiddenFiles = false
 
     var body: some View {
         List(selection: $selectedID) {
             ForEach(model.displayItems) { item in
-                FileNodeView(item: item, expandedIDs: $expandedIDs)
+                FileNodeView(item: item, expandedIDs: $expandedIDs, onAction: handleAction)
                     .tag(item.id)
             }
         }
         .scrollContentBackground(.hidden)
+        .contextMenu {
+            Toggle("Show Hidden Files", isOn: $showHiddenFiles)
+        }
         .safeAreaBar(edge: .bottom) {
             FileTreeFilterBar(
                 searchText: $model.searchText,
                 showChangedOnly: $model.showChangedOnly,
+                showHiddenFiles: $showHiddenFiles,
                 onToggleChanged: toggleChangedFilter
             )
         }
         .task(id: directoryURL) {
+            model.showHiddenFiles = showHiddenFiles
             model.load(directoryURL: directoryURL)
             await model.refreshGit(directoryURL: directoryURL)
         }
         .task(id: directoryURL, priority: .low) {
             await pollGitStatus()
+        }
+        .onChange(of: showHiddenFiles) {
+            model.showHiddenFiles = showHiddenFiles
+            model.load(directoryURL: directoryURL)
         }
         .onChange(of: selectedID) { _, newID in
             guard let id = newID,
@@ -67,6 +77,58 @@ struct FileTreeView: View {
                     expandAllFolders(in: children)
                 }
             }
+        }
+    }
+
+    // MARK: - Context Menu Actions
+
+    private func handleAction(_ action: FileTreeAction) {
+        switch action {
+        case .revealInFinder(let url):
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+
+        case .moveToTrash(let url):
+            try? FileManager.default.trashItem(at: url, resultingItemURL: nil)
+            model.load(directoryURL: directoryURL)
+
+        case .duplicate(let url):
+            let fm = FileManager.default
+            let directory = url.deletingLastPathComponent()
+            let name = url.deletingPathExtension().lastPathComponent
+            let ext = url.pathExtension
+            var suffix = 2
+            var destination: URL
+            repeat {
+                let newName = ext.isEmpty ? "\(name) \(suffix)" : "\(name) \(suffix).\(ext)"
+                destination = directory.appendingPathComponent(newName)
+                suffix += 1
+            } while fm.fileExists(atPath: destination.path)
+            try? fm.copyItem(at: url, to: destination)
+            model.load(directoryURL: directoryURL)
+
+        case .newFile(let parentURL):
+            let fm = FileManager.default
+            var destination = parentURL.appendingPathComponent("Untitled")
+            var suffix = 2
+            while fm.fileExists(atPath: destination.path) {
+                destination = parentURL.appendingPathComponent("Untitled \(suffix)")
+                suffix += 1
+            }
+            fm.createFile(atPath: destination.path, contents: nil)
+            model.load(directoryURL: directoryURL)
+            expandedIDs.insert(parentURL.path)
+
+        case .newFolder(let parentURL):
+            let fm = FileManager.default
+            var destination = parentURL.appendingPathComponent("New Folder")
+            var suffix = 2
+            while fm.fileExists(atPath: destination.path) {
+                destination = parentURL.appendingPathComponent("New Folder \(suffix)")
+                suffix += 1
+            }
+            try? fm.createDirectory(at: destination, withIntermediateDirectories: false)
+            model.load(directoryURL: directoryURL)
+            expandedIDs.insert(parentURL.path)
         }
     }
 }
