@@ -49,9 +49,10 @@ struct WorkspaceDetailView: View {
 
     @ViewBuilder
     private var editorPanelView: some View {
+        let dir = workspace.directory.map { URL(fileURLWithPath: $0) } ?? URL(fileURLWithPath: "/")
         switch editorPanel.content {
         case .file(let url):
-            FileEditorPanel(fileURL: url)
+            FileEditorPanel(fileURL: url, directoryURL: dir)
         case .diff(let reference):
             DiffPanel(reference: reference)
         case .none:
