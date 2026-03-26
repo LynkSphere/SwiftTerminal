@@ -4,9 +4,14 @@ struct FileEditorPanel: View {
     let fileURL: URL
     @Environment(EditorPanel.self) private var panel
     @State private var content: String = ""
+    @State private var savedContent: String = ""
     @State private var isLoaded = false
     @State private var isSaving = false
     @State private var errorMessage: String?
+
+    private var hasUnsavedChanges: Bool {
+        isLoaded && content != savedContent
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,6 +34,26 @@ struct FileEditorPanel: View {
             }
         }
         .task(id: fileURL) { loadFile() }
+        .onChange(of: hasUnsavedChanges) { _, dirty in
+            panel.isDirty = dirty
+        }
+        .alert("Unsaved Changes", isPresented: Binding(
+            get: { panel.showUnsavedAlert },
+            set: { if !$0 { panel.cancelDiscard() } }
+        )) {
+            Button("Save") {
+                saveFile()
+                panel.confirmDiscard()
+            }
+            Button("Discard", role: .destructive) {
+                panel.confirmDiscard()
+            }
+            Button("Cancel", role: .cancel) {
+                panel.cancelDiscard()
+            }
+        } message: {
+            Text("Do you want to save changes to \"\(fileURL.lastPathComponent)\"?")
+        }
     }
 
     private var header: some View {
@@ -39,6 +64,13 @@ struct FileEditorPanel: View {
             Text(fileURL.lastPathComponent)
                 .font(.subheadline.weight(.medium))
                 .lineLimit(1)
+
+            if hasUnsavedChanges {
+                Circle()
+                    .fill(.secondary)
+                    .frame(width: 6, height: 6)
+                    .help("Unsaved changes")
+            }
 
             Spacer()
 
@@ -52,7 +84,7 @@ struct FileEditorPanel: View {
             }
             .buttonStyle(.borderless)
             .keyboardShortcut("s", modifiers: .command)
-            .disabled(!isLoaded || isSaving)
+            .disabled(!hasUnsavedChanges || isSaving)
             .help("Save")
 
             Button { panel.close() } label: {
@@ -67,8 +99,10 @@ struct FileEditorPanel: View {
 
     private func loadFile() {
         content = ""
+        savedContent = ""
         isLoaded = false
         errorMessage = nil
+        panel.isDirty = false
         do {
             let data = try Data(contentsOf: fileURL)
             guard let string = String(data: data, encoding: .utf8) else {
@@ -76,6 +110,7 @@ struct FileEditorPanel: View {
                 return
             }
             content = string
+            savedContent = string
             isLoaded = true
         } catch {
             errorMessage = error.localizedDescription
@@ -86,6 +121,7 @@ struct FileEditorPanel: View {
         isSaving = true
         do {
             try content.write(to: fileURL, atomically: true, encoding: .utf8)
+            savedContent = content
         } catch {
             errorMessage = error.localizedDescription
         }

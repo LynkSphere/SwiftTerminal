@@ -94,6 +94,51 @@ actor GitRepository {
         return .empty
     }
 
+    func diffFilePresentation(for reference: GitDiffReference) async throws -> DiffFilePresentation {
+        if reference.kind == .untracked {
+            // For untracked files, generate a synthetic diff
+            let pres = try self.presentationForUntrackedFile(reference)
+            let raw = """
+            diff --git a/\(reference.repositoryRelativePath) b/\(reference.repositoryRelativePath)
+            new file mode 100644
+            --- /dev/null
+            +++ b/\(reference.repositoryRelativePath)
+            """
+            let lines = pres.string.split(separator: "\n", omittingEmptySubsequences: false)
+            let hunkHeader = "@@ -0,0 +1,\(max(lines.count, 1)) @@"
+            let hunkLines = lines.map { "+" + $0 }
+            let fullRaw = raw + "\n" + hunkHeader + "\n" + hunkLines.joined(separator: "\n") + "\n"
+            let fileHeader = raw
+            return DiffFilePresentation(raw: fullRaw, fileHeader: fileHeader)
+        }
+
+        let raw = try await self.executor.execute(GitDiffCommand(reference: reference), at: reference.repositoryRootURL)
+        guard !raw.isEmpty else {
+            return DiffFilePresentation(message: "No diff available.")
+        }
+
+        // Extract file header (everything before first @@)
+        let lines = raw.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        var headerLines: [String] = []
+        for line in lines {
+            if line.hasPrefix("@@") { break }
+            headerLines.append(line)
+        }
+        let fileHeader = headerLines.joined(separator: "\n")
+
+        return DiffFilePresentation(raw: raw, fileHeader: fileHeader)
+    }
+
+    func applyPatch(_ patchText: String, reverse: Bool = false, cached: Bool = false, at repositoryRootURL: URL) async throws {
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".patch")
+        try patchText.write(to: tempURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+        try await self.executor.execute(
+            GitApplyPatchCommand(patchFilePath: tempURL.path, reverse: reverse, cached: cached),
+            at: repositoryRootURL
+        )
+    }
+
     func diffPresentation(for reference: GitDiffReference) async throws -> GitDiffPresentation {
         if reference.kind == .untracked {
             return try self.presentationForUntrackedFile(reference)
@@ -373,6 +418,23 @@ struct GitDiscardAllCommand: GitCommand {
 struct GitCleanUntrackedCommand: GitCommand {
     var arguments: [String] { ["clean", "-fd"] }
     func parse(output: String) throws { }
+}
+
+struct GitApplyPatchCommand: GitCommand {
+    let patchFilePath: String
+    let reverse: Bool
+    let cached: Bool
+
+    var arguments: [String] {
+        var args = ["apply"]
+        if reverse { args.append("--reverse") }
+        if cached { args.append("--cached") }
+        args.append("--unidiff-zero")
+        args.append(patchFilePath)
+        return args
+    }
+
+    func parse(output: String) throws {}
 }
 
 struct GitCommitCommand: GitCommand {
