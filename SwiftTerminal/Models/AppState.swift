@@ -13,6 +13,9 @@ final class AppState {
     var selectedInspectorTab: InspectorTab = .files
     var searchFocusToken: UUID?
 
+    /// Bumped by Cmd+J; observed by WorkspaceDetailView to toggle the editor panel.
+    var panelToggleToken = UUID()
+
     let modelContext: ModelContext
 
     init(modelContext: ModelContext) {

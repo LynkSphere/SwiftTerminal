@@ -23,8 +23,10 @@ struct WorkspaceDetailView: View {
 
             if editorPanel.isOpen {
                 PanelDragHandle(panelHeight: $panelHeight)
-                editorPanelView
-                    .frame(height: panelHeight)
+                EditorPanelView(
+                    directoryURL: workspace.directory.map { URL(fileURLWithPath: $0) } ?? URL(fileURLWithPath: "/")
+                )
+                .frame(height: panelHeight)
             }
         }
         .navigationTitle(workspace.name)
@@ -45,18 +47,8 @@ struct WorkspaceDetailView: View {
             }
         }
         .environment(editorPanel)
-    }
-
-    @ViewBuilder
-    private var editorPanelView: some View {
-        let dir = workspace.directory.map { URL(fileURLWithPath: $0) } ?? URL(fileURLWithPath: "/")
-        switch editorPanel.content {
-        case .file(let url):
-            FileEditorPanel(fileURL: url, directoryURL: dir)
-        case .diff(let reference):
-            DiffPanel(reference: reference)
-        case .none:
-            EmptyView()
+        .onChange(of: appState.panelToggleToken) {
+            editorPanel.toggle()
         }
     }
 
@@ -89,7 +81,7 @@ private struct PanelDragHandle: View {
                                 panelHeight = max(100, panelHeight + delta)
                             }
                     )
-            }
+            }   .transaction { $0.animation = nil }
     }
 }
 

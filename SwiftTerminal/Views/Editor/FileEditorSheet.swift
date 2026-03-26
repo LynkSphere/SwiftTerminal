@@ -17,14 +17,13 @@ struct FileEditorPanel: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            Divider()
+        Group {
             if isLoaded {
                 HighlightedTextEditor(
                     text: $content,
                     fileExtension: fileURL.pathExtension.lowercased(),
-                    gutterDiff: gutterDiff
+                    gutterDiff: gutterDiff,
+                    highlightRequest: panel.highlightRequest
                 )
             } else if let errorMessage {
                 ContentUnavailableView {
@@ -37,10 +36,15 @@ struct FileEditorPanel: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .background(.regularMaterial)
         .task(id: fileURL) { loadFile() }
         .onChange(of: hasUnsavedChanges) { _, dirty in
             panel.isDirty = dirty
+        }
+        .onChange(of: panel.saveRequested) { _, requested in
+            if requested {
+                saveFile()
+                panel.saveRequested = false
+            }
         }
         .alert("Unsaved Changes", isPresented: Binding(
             get: { panel.showUnsavedAlert },
@@ -59,48 +63,6 @@ struct FileEditorPanel: View {
         } message: {
             Text("Do you want to save changes to \"\(fileURL.lastPathComponent)\"?")
         }
-    }
-
-    private var header: some View {
-        HStack(spacing: 6) {
-            Image(nsImage: fileURL.fileIcon)
-                .resizable()
-                .frame(width: 16, height: 16)
-            Text(fileURL.relativePath(from: directoryURL))
-                .font(.subheadline.weight(.medium))
-                .lineLimit(1)
-                .truncationMode(.middle)
-
-            if hasUnsavedChanges {
-                Circle()
-                    .fill(.secondary)
-                    .frame(width: 6, height: 6)
-                    .help("Unsaved changes")
-            }
-
-            Spacer()
-
-            if isSaving {
-                ProgressView()
-                    .controlSize(.small)
-            }
-
-            Button { saveFile() } label: {
-                Image(systemName: "square.and.arrow.down")
-            }
-            .buttonStyle(.borderless)
-            .keyboardShortcut("s", modifiers: .command)
-            .disabled(!hasUnsavedChanges || isSaving)
-            .help("Save")
-
-            Button { panel.close() } label: {
-                Image(systemName: "xmark")
-            }
-            .buttonStyle(.borderless)
-            .help("Close")
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
     }
 
     private func loadFile() {
@@ -157,6 +119,7 @@ struct HighlightedTextEditor: NSViewRepresentable {
     @Binding var text: String
     let fileExtension: String
     var gutterDiff: GutterDiffResult
+    var highlightRequest: HighlightRequest?
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -196,21 +159,14 @@ struct HighlightedTextEditor: NSViewRepresentable {
         textView.textContainerInset = NSSize(width: gutterWidth, height: 4)
         textView.delegate = context.coordinator
 
-        // Horizontal scrolling (no line wrapping)
-        textView.isHorizontallyResizable = true
+        // Line wrapping enabled
+        textView.isHorizontallyResizable = false
         textView.isVerticallyResizable = true
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        textView.minSize = NSSize(width: contentSize.width, height: contentSize.height)
-        textView.autoresizingMask = []
-
-        // To enable line wrapping instead, comment out the 4 lines above and uncomment:
-        // textView.isHorizontallyResizable = false
-        // textView.isVerticallyResizable = true
-        // textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        // textView.minSize = NSSize(width: 0, height: contentSize.height)
-        // textView.textContainer?.widthTracksTextView = true
-        // textView.textContainer?.containerSize = NSSize(width: contentSize.width, height: CGFloat.greatestFiniteMagnitude)
-        // textView.autoresizingMask = [.width]
+        textView.minSize = NSSize(width: 0, height: contentSize.height)
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.containerSize = NSSize(width: contentSize.width, height: CGFloat.greatestFiniteMagnitude)
+        textView.autoresizingMask = [.width]
 
         scrollView.documentView = textView
 
@@ -221,6 +177,17 @@ struct HighlightedTextEditor: NSViewRepresentable {
         // Initial content
         let highlighted = SyntaxHighlighter.highlight(text, fileExtension: fileExtension)
         textView.textStorage?.setAttributedString(highlighted)
+
+        // Apply highlight request after initial content is set
+        if let request = highlightRequest {
+            context.coordinator.lastAppliedHighlight = request
+            DispatchQueue.main.async {
+                textView.scrollToLineAndHighlight(
+                    lineNumber: request.lineNumber,
+                    columnRange: request.columnRange
+                )
+            }
+        }
 
         return scrollView
     }
@@ -236,12 +203,25 @@ struct HighlightedTextEditor: NSViewRepresentable {
             let highlighted = SyntaxHighlighter.highlight(text, fileExtension: fileExtension)
             textView.textStorage?.setAttributedString(highlighted)
         }
+
+        // Apply pending highlight request
+        if let request = highlightRequest, request != context.coordinator.lastAppliedHighlight {
+            context.coordinator.lastAppliedHighlight = request
+            // Delay slightly to ensure layout is complete after content load
+            DispatchQueue.main.async {
+                textView.scrollToLineAndHighlight(
+                    lineNumber: request.lineNumber,
+                    columnRange: request.columnRange
+                )
+            }
+        }
     }
 
     final class Coordinator: NSObject, NSTextViewDelegate {
         let parent: HighlightedTextEditor
         weak var textView: EditorTextView?
         var isEditing = false
+        var lastAppliedHighlight: HighlightRequest?
         private var rehighlightTask: DispatchWorkItem?
 
         init(_ parent: HighlightedTextEditor) { self.parent = parent }
@@ -285,13 +265,13 @@ final class EditorTextView: NSTextView {
         let containerOrigin = textContainerOrigin
         let text = string as NSString
 
-        // Draw gutter background
+        // Draw gutter background TODO: not doing anything rn
         let gutterRect = NSRect(x: 0, y: rect.minY, width: gutterWidth, height: rect.height)
         NSColor.controlBackgroundColor.withAlphaComponent(0.5).setFill()
         gutterRect.fill()
 
         // Draw gutter separator
-        NSColor.separatorColor.withAlphaComponent(0.2).setStroke()
+        NSColor.separatorColor.withAlphaComponent(0.15).setStroke()
         NSBezierPath.strokeLine(
             from: NSPoint(x: gutterWidth - 0.5, y: rect.minY),
             to: NSPoint(x: gutterWidth - 0.5, y: rect.maxY)
@@ -361,6 +341,43 @@ final class EditorTextView: NSTextView {
             let nextIndex = NSMaxRange(lineRange)
             if nextIndex <= charIndex { break }
             charIndex = nextIndex
+        }
+    }
+
+    // MARK: - Scroll to line and highlight match
+
+    func scrollToLineAndHighlight(lineNumber: Int, columnRange: Range<Int>) {
+        let text = string as NSString
+        guard text.length > 0 else { return }
+
+        // Find the character range for the target line
+        var currentLine = 1
+        var lineStart = 0
+        while currentLine < lineNumber && lineStart < text.length {
+            let lineRange = text.lineRange(for: NSRange(location: lineStart, length: 0))
+            lineStart = NSMaxRange(lineRange)
+            currentLine += 1
+        }
+
+        guard currentLine == lineNumber else { return }
+
+        let lineRange = text.lineRange(for: NSRange(location: lineStart, length: 0))
+
+        // Calculate the match range within this line
+        let matchLocation = lineStart + columnRange.lowerBound
+        let matchLength = columnRange.upperBound - columnRange.lowerBound
+        let matchRange = NSRange(
+            location: min(matchLocation, text.length),
+            length: min(matchLength, text.length - min(matchLocation, text.length))
+        )
+
+        // Select the match range and scroll to it
+        setSelectedRange(matchRange)
+        scrollRangeToVisible(lineRange)
+
+        // Show native find indicator (yellow bounce, like CotEditor)
+        if matchRange.length > 0 {
+            showFindIndicator(for: matchRange)
         }
     }
 

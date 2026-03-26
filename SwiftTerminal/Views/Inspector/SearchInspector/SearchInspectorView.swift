@@ -4,21 +4,24 @@ struct SearchInspectorView: View {
     let directoryURL: URL
 
     @Environment(AppState.self) private var appState
+    @Environment(EditorPanel.self) private var editorPanel
     @State private var model = SearchInspectorModel()
     @State private var expandedIDs: Set<UUID> = []
-    @State private var selectedMatch: SearchMatch.ID?
+    @State private var selectedID: UUID?
     @FocusState private var isSearchFocused: Bool
 
     var body: some View {
-        List(selection: $selectedMatch) {
+        List(selection: $selectedID) {
             ForEach(model.results) { fileResult in
                 DisclosureGroup(isExpanded: binding(for: fileResult.id)) {
                     ForEach(fileResult.matches) { match in
                         matchRow(match)
+                            .tag(match.id)
                     }
                 } label: {
                     FileLabel(name: fileResult.relativePath, icon: fileResult.fileURL.fileIcon)
                 }
+                .tag(fileResult.id)
             }
         }
         .scrollContentBackground(.hidden)
@@ -32,6 +35,27 @@ struct SearchInspectorView: View {
             .focused($isSearchFocused)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
+        }
+        .onChange(of: selectedID) { _, newID in
+            guard let id = newID else { return }
+
+            // Check if a file result was selected
+            if let fileResult = model.results.first(where: { $0.id == id }) {
+                editorPanel.openFile(fileResult.fileURL)
+                return
+            }
+
+            // Check if a match was selected
+            for fileResult in model.results {
+                if let match = fileResult.matches.first(where: { $0.id == id }) {
+                    editorPanel.openFileAndHighlight(
+                        match.fileURL,
+                        lineNumber: match.lineNumber,
+                        columnRange: match.columnRange
+                    )
+                    return
+                }
+            }
         }
         .task(id: appState.searchFocusToken) {
             guard appState.searchFocusToken != nil else { return }

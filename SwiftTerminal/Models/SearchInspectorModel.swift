@@ -12,7 +12,9 @@ struct SearchFileResult: Identifiable {
 
 struct SearchMatch: Identifiable {
     let id = UUID()
+    let fileURL: URL
     let lineNumber: Int
+    let columnRange: Range<Int>
     let highlightedContent: AttributedString
 }
 
@@ -59,8 +61,12 @@ final class SearchInspectorModel {
 
                 let trimmedLine = String(line.prefix(500))
                 if let matchRange = trimmedLine.range(of: query, options: .caseInsensitive) {
+                    let colStart = trimmedLine.distance(from: trimmedLine.startIndex, to: matchRange.lowerBound)
+                    let colEnd = trimmedLine.distance(from: trimmedLine.startIndex, to: matchRange.upperBound)
                     matches.append(SearchMatch(
+                        fileURL: fileURL,
                         lineNumber: index + 1,
+                        columnRange: colStart..<colEnd,
                         highlightedContent: Self.highlight(line: trimmedLine, match: matchRange)
                     ))
                 }

@@ -31,6 +31,13 @@ struct AppCommands: Commands {
             .disabled(appState.selectedWorkspace?.selectedTab?.localProcessTerminalView == nil)
         }
 
+        CommandMenu("Editor") {
+            Button("Toggle Editor Panel") {
+                appState.panelToggleToken = UUID()
+            }
+            .keyboardShortcut("j", modifiers: .command)
+        }
+
         CommandMenu("Inspector") {
             Button("Files") {
                 appState.showingInspector = true

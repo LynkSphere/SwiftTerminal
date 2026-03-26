@@ -3,14 +3,11 @@ import SwiftUI
 
 struct DiffPanel: View {
     let reference: GitDiffReference
-    @Environment(EditorPanel.self) private var panel
     @State private var presentation: DiffFilePresentation?
     @State private var isLoading = true
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-
+        Group {
             if isLoading {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -28,38 +25,7 @@ struct DiffPanel: View {
                 )
             }
         }
-        .background(.regularMaterial)
         .task(id: reference) { await loadDiff() }
-    }
-
-    private var header: some View {
-        HStack(spacing: 6) {
-            Image(nsImage: reference.fileURL.fileIcon)
-                .resizable()
-                .frame(width: 16, height: 16)
-            Text(reference.repositoryRelativePath)
-                .font(.subheadline.weight(.medium))
-                .lineLimit(1)
-                .truncationMode(.middle)
-
-            GitStatusBadge(kind: reference.kind, staged: reference.stage == .staged)
-
-            Spacer()
-
-            Button { panel.openFile(reference.fileURL) } label: {
-                Image(systemName: "doc.text")
-            }
-            .buttonStyle(.borderless)
-            .help("Open File")
-
-            Button { panel.close() } label: {
-                Image(systemName: "xmark")
-            }
-            .buttonStyle(.borderless)
-            .help("Close")
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
     }
 
     private func loadDiff() async {
