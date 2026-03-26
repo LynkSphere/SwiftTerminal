@@ -3,12 +3,17 @@ import SwiftUI
 struct EditorPanelView: View {
     let directoryURL: URL
     @Environment(EditorPanel.self) private var panel
+    @Namespace private var panelNamespace
 
     var body: some View {
         VStack(spacing: 0) {
             header
-            Divider()
-            content
+                .matchedGeometryEffect(id: "panelHeader", in: panelNamespace)
+            if panel.isOpen {
+                Divider()
+                content
+                    .matchedGeometryEffect(id: "panelContent", in: panelNamespace)
+            }
         }
     }
 
@@ -41,16 +46,20 @@ struct EditorPanelView: View {
 
             contentActions
 
-            Button { panel.toggle() } label: {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    panel.toggle()
+                }
+            } label: {
                 Image(systemName: "inset.filled.bottomthird.square")
-                    .foregroundStyle(.accent)
+                    .foregroundStyle(panel.isOpen ? .accent : .secondary)
             }
             .buttonStyle(.borderless)
             .help("Toggle Panel")
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .background(.ultraThickMaterial)
+        .background(.background.secondary)
     }
 
     @ViewBuilder

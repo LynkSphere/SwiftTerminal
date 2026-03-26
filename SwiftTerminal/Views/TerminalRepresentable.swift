@@ -75,8 +75,8 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
         }
 
         func createTerminalView(for tab: TerminalTab) -> LocalProcessTerminalView {
-            let tv = BellNotifyingTerminalView(frame: .zero)
-            tv.onAttention = { [weak tab, weak tv] in
+            let tv = LocalProcessTerminalView(frame: .zero)
+            tv.onBell = { [weak tab, weak tv] in
                 Task { @MainActor in
                     guard let tab else { return }
                     // Only badge if the tab isn't currently visible to the user

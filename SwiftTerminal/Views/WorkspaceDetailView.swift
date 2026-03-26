@@ -21,12 +21,30 @@ struct WorkspaceDetailView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            if editorPanel.isOpen {
-                PanelDragHandle(panelHeight: $panelHeight)
+            if editorPanel.content != nil {
+                Rectangle()
+                    .fill(Color(nsColor: .gridColor))
+                    .frame(height: 1)
+                    .overlay {
+                        if editorPanel.isOpen {
+                            Rectangle()
+                                .fill(.clear)
+                                .frame(height: 8)
+                                .contentShape(Rectangle())
+                                .cursor(.resizeUpDown)
+                                .gesture(
+                                    DragGesture(minimumDistance: 1)
+                                        .onChanged { value in
+                                            let delta = -value.translation.height
+                                            panelHeight = max(100, panelHeight + delta)
+                                        }
+                                )
+                        }
+                    }
                 EditorPanelView(
                     directoryURL: workspace.directory.map { URL(fileURLWithPath: $0) } ?? URL(fileURLWithPath: "/")
                 )
-                .frame(height: panelHeight)
+                .frame(height: editorPanel.isOpen ? panelHeight : nil)
             }
         }
         .navigationTitle(workspace.name)
@@ -48,7 +66,9 @@ struct WorkspaceDetailView: View {
         }
         .environment(editorPanel)
         .onChange(of: appState.panelToggleToken) {
-            editorPanel.toggle()
+            withAnimation(.easeInOut(duration: 0.2)) {
+                editorPanel.toggle()
+            }
         }
     }
 
@@ -58,30 +78,6 @@ struct WorkspaceDetailView: View {
         DispatchQueue.main.async {
             isTerminalFocused = true
         }
-    }
-}
-
-// MARK: - Drag Handle
-
-private struct PanelDragHandle: View {
-    @Binding var panelHeight: Double
-
-    var body: some View {
-        Divider()
-            .overlay {
-                Rectangle()
-                    .fill(.clear)
-                    .frame(height: 8)
-                    .contentShape(Rectangle())
-                    .cursor(.resizeUpDown)
-                    .gesture(
-                        DragGesture(minimumDistance: 1)
-                            .onChanged { value in
-                                let delta = -value.translation.height
-                                panelHeight = max(100, panelHeight + delta)
-                            }
-                    )
-            }   .transaction { $0.animation = nil }
     }
 }
 
