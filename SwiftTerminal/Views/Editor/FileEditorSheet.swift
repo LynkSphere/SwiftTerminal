@@ -199,12 +199,14 @@ struct HighlightedTextEditor: NSViewRepresentable {
         textView.isHorizontallyResizable = true
         textView.isVerticallyResizable = true
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        textView.minSize = NSSize(width: contentSize.width, height: 0)
-        textView.autoresizingMask = [.width]
+        textView.minSize = NSSize(width: contentSize.width, height: contentSize.height)
+        textView.autoresizingMask = []
 
-        // To enable line wrapping instead, uncomment the following and comment out the horizontal scrolling block above:
+        // To enable line wrapping instead, comment out the 4 lines above and uncomment:
         // textView.isHorizontallyResizable = false
         // textView.isVerticallyResizable = true
+        // textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        // textView.minSize = NSSize(width: 0, height: contentSize.height)
         // textView.textContainer?.widthTracksTextView = true
         // textView.textContainer?.containerSize = NSSize(width: contentSize.width, height: CGFloat.greatestFiniteMagnitude)
         // textView.autoresizingMask = [.width]
