@@ -65,7 +65,7 @@ struct FileEditorPanel: View {
             Image(nsImage: fileURL.fileIcon)
                 .resizable()
                 .frame(width: 16, height: 16)
-            Text(fileURL.lastPathComponent)
+            Text(fileURL.relativePath(from: directoryURL))
                 .font(.subheadline.weight(.medium))
                 .lineLimit(1)
                 .truncationMode(.middle)

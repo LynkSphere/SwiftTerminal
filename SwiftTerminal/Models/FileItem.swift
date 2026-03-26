@@ -14,7 +14,7 @@ struct FileItem: Identifiable, Hashable {
     }
 
     static func == (lhs: FileItem, rhs: FileItem) -> Bool {
-        lhs.url == rhs.url
+        lhs.url == rhs.url && lhs.gitStatus == rhs.gitStatus
     }
 
     func hash(into hasher: inout Hasher) {
@@ -95,6 +95,17 @@ struct FileItem: Identifiable, Hashable {
 
 
 extension URL {
+    /// Returns the path of this URL relative to the given directory, or the last path component if not nested.
+    func relativePath(from directoryURL: URL) -> String {
+        let filePath = self.standardizedFileURL.path(percentEncoded: false)
+        var dirPath = directoryURL.standardizedFileURL.path(percentEncoded: false)
+        if !dirPath.hasSuffix("/") { dirPath += "/" }
+        if filePath.hasPrefix(dirPath) {
+            return String(filePath.dropFirst(dirPath.count))
+        }
+        return lastPathComponent
+    }
+
     var fileIcon: NSImage {
         let values = try? resourceValues(forKeys: [.isDirectoryKey])
         if values?.isDirectory == true {

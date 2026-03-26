@@ -105,7 +105,7 @@ struct GitInspectorView: View {
     private func fileRows(_ files: [GitChangedFile], staged: Bool, snapshot: GitRepositoryStatusSnapshot) -> some View {
         let prefix = staged ? "staged" : "unstaged"
         ForEach(files.map { (id: "\(prefix):\($0.repositoryRelativePath)", file: $0) }, id: \.id) { entry in
-            FileLabel(name: entry.file.repositoryRelativePath, icon: entry.file.fileURL.fileIcon) {
+            FileLabel(name: entry.file.fileURL.lastPathComponent, icon: entry.file.fileURL.fileIcon) {
                 GitStatusBadge(kind: entry.file.kind, staged: staged)
             }
             .tag(entry.id)

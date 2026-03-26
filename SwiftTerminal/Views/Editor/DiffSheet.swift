@@ -36,9 +36,10 @@ struct DiffPanel: View {
             Image(nsImage: reference.fileURL.fileIcon)
                 .resizable()
                 .frame(width: 16, height: 16)
-            Text(reference.fileURL.lastPathComponent)
+            Text(reference.repositoryRelativePath)
                 .font(.subheadline.weight(.medium))
                 .lineLimit(1)
+                .truncationMode(.middle)
 
             GitStatusBadge(kind: reference.kind, staged: reference.stage == .staged)
 

@@ -5,15 +5,15 @@ struct FileTreeView: View {
 
     @Environment(EditorPanel.self) private var editorPanel
     @State private var model = FileTreeModel()
-    @State private var selectedItem: FileItem?
+    @State private var selectedID: FileItem.ID?
     @State private var expandedIDs: Set<String> = []
     @State private var savedExpandedIDs: Set<String>?
 
     var body: some View {
-        List(selection: $selectedItem) {
+        List(selection: $selectedID) {
             ForEach(model.displayItems) { item in
                 FileNodeView(item: item, expandedIDs: $expandedIDs)
-                    .tag(item)
+                    .tag(item.id)
             }
         }
         .scrollContentBackground(.hidden)
@@ -31,8 +31,11 @@ struct FileTreeView: View {
         .task(id: directoryURL, priority: .low) {
             await pollGitStatus()
         }
-        .onChange(of: selectedItem) { _, newItem in
-            guard let item = newItem, !item.isDirectory else { return }
+        .onChange(of: selectedID) { _, newID in
+            guard let id = newID,
+                  let item = model.findItem(id: id),
+                  !item.isDirectory
+            else { return }
             editorPanel.openFile(item.url)
         }
     }

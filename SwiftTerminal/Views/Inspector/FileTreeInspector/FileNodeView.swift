@@ -18,7 +18,7 @@ struct FileNodeView: View {
             )) {
                 ForEach(children) { child in
                     FileNodeView(item: child, expandedIDs: $expandedIDs)
-                        .tag(child)
+                        .tag(child.id)
                 }
             } label: {
                 FileRowView(item: item)
@@ -26,7 +26,7 @@ struct FileNodeView: View {
             .listRowSeparator(.hidden)
         } else {
             FileRowView(item: item)
-                .tag(item)
+                .tag(item.id)
                 .listRowSeparator(.hidden)
         }
     }

@@ -39,6 +39,15 @@ final class FileTreeModel {
         items = tree
     }
 
+    func findItem(id: FileItem.ID, in items: [FileItem]? = nil) -> FileItem? {
+        for item in items ?? self.items {
+            if item.id == id { return item }
+            if let children = item.children,
+               let found = findItem(id: id, in: children) { return found }
+        }
+        return nil
+    }
+
     private func applyStatuses(to tree: inout [FileItem]) {
         guard !gitStatuses.isEmpty else { return }
         for i in tree.indices {
