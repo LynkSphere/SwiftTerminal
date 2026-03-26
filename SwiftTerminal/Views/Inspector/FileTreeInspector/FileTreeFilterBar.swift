@@ -6,12 +6,8 @@ struct FileTreeFilterBar: View {
     var onToggleChanged: () -> Void
 
     var body: some View {
-        HStack(spacing: 4) {
-            FilterField(text: $searchText)
-            
-            Button {
-                onToggleChanged()
-            } label: {
+        FilterField(text: $searchText) {
+            Button(action: onToggleChanged) {
                 Image(systemName: showChangedOnly ? "externaldrive.fill.badge.checkmark" : "externaldrive.badge.checkmark")
                     .font(.caption)
                     .foregroundStyle(showChangedOnly ? Color.accentColor : .secondary)
@@ -19,7 +15,7 @@ struct FileTreeFilterBar: View {
             .buttonStyle(.plain)
             .help("Show only git-changed files")
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
     }
 }

@@ -37,6 +37,7 @@ struct FileEditorPanel: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .background(.regularMaterial)
         .task(id: fileURL) { loadFile() }
         .onChange(of: hasUnsavedChanges) { _, dirty in
             panel.isDirty = dirty
@@ -286,11 +287,11 @@ final class EditorTextView: NSTextView {
 
         // Draw gutter background
         let gutterRect = NSRect(x: 0, y: rect.minY, width: gutterWidth, height: rect.height)
-        NSColor.controlBackgroundColor.withAlphaComponent(0.3).setFill()
+        NSColor.controlBackgroundColor.withAlphaComponent(0.5).setFill()
         gutterRect.fill()
 
         // Draw gutter separator
-        NSColor.separatorColor.withAlphaComponent(0.3).setStroke()
+        NSColor.separatorColor.withAlphaComponent(0.2).setStroke()
         NSBezierPath.strokeLine(
             from: NSPoint(x: gutterWidth - 0.5, y: rect.minY),
             to: NSPoint(x: gutterWidth - 0.5, y: rect.maxY)
@@ -303,7 +304,7 @@ final class EditorTextView: NSTextView {
 
         let lineNumAttrs: [NSAttributedString.Key: Any] = [
             .font: lineNumberFont,
-            .foregroundColor: NSColor.secondaryLabelColor,
+            .foregroundColor: NSColor.tertiaryLabelColor,
         ]
 
         // Count lines before visible range
@@ -496,7 +497,7 @@ private enum DiffPopoverConstants {
     static let lineHeight: CGFloat = 17
     static let gutterWidth: CGFloat = 48
     static let lineNumFont = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular)
-    static let verticalPadding: CGFloat = 4
+    static let verticalPadding: CGFloat = 8
 }
 
 /// Draws diff lines with line number gutter and colored backgrounds, like HunkNSTextView.

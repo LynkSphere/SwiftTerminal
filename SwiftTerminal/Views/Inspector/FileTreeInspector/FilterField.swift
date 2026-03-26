@@ -1,7 +1,8 @@
 import SwiftUI
 
-struct FilterField: View {
+struct FilterField<Trailing: View>: View {
     @Binding var text: String
+    @ViewBuilder var trailing: Trailing
 
     @FocusState private var isFocused: Bool
 
@@ -18,16 +19,7 @@ struct FilterField: View {
                 .font(.caption)
                 .focused($isFocused)
 
-            if !text.isEmpty {
-                Button {
-                    text = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                }
-                .buttonStyle(.plain)
-            }
+            trailing
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 4)

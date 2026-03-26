@@ -28,6 +28,7 @@ struct DiffPanel: View {
                 )
             }
         }
+        .background(.regularMaterial)
         .task(id: reference) { await loadDiff() }
     }
 
@@ -44,6 +45,12 @@ struct DiffPanel: View {
             GitStatusBadge(kind: reference.kind, staged: reference.stage == .staged)
 
             Spacer()
+
+            Button { panel.openFile(reference.fileURL) } label: {
+                Image(systemName: "doc.text")
+            }
+            .buttonStyle(.borderless)
+            .help("Open File")
 
             Button { panel.close() } label: {
                 Image(systemName: "xmark")
