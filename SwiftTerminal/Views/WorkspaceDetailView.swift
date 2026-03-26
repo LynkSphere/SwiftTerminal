@@ -54,7 +54,7 @@ struct WorkspaceDetailView: View {
         case .file(let url):
             FileEditorPanel(fileURL: url, directoryURL: dir)
         case .diff(let reference):
-            DiffPanel(reference: reference, directoryURL: dir)
+            DiffPanel(reference: reference)
         case .none:
             EmptyView()
         }

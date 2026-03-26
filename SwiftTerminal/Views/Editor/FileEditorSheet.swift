@@ -65,7 +65,7 @@ struct FileEditorPanel: View {
             Image(nsImage: fileURL.fileIcon)
                 .resizable()
                 .frame(width: 16, height: 16)
-            Text(fileURL.relativePath(from: directoryURL))
+            Text(fileURL.lastPathComponent)
                 .font(.subheadline.weight(.medium))
                 .lineLimit(1)
                 .truncationMode(.middle)
@@ -473,7 +473,8 @@ final class LineNumberRulerView: NSRulerView {
         ])
 
         viewController.view = container
-        let lineCount = max(hunk.oldContent.components(separatedBy: "\n").count, 1)
+        let oldLineCount = hunk.oldContent.isEmpty ? 0 : hunk.oldContent.components(separatedBy: "\n").count
+        let lineCount = max(oldLineCount + hunk.newCount, 1)
         let height = min(CGFloat(lineCount) * 16 + 44, 300)
         viewController.preferredContentSize = NSSize(width: 400, height: height)
 
@@ -517,17 +518,23 @@ final class LineNumberRulerView: NSRulerView {
             }
         }
 
-        // For added-only hunks, show a summary
-        if hunk.kind == .added {
-            let addedStr = NSMutableAttributedString(
-                string: "+ \(hunk.newCount) new line\(hunk.newCount == 1 ? "" : "s")\n",
-                attributes: [
-                    .font: baseFont,
-                    .foregroundColor: NSColor.systemGreen,
-                    .backgroundColor: addedBg,
-                ]
-            )
-            result.append(addedStr)
+        // Show new (added) content from current file
+        if hunk.kind == .added || hunk.kind == .modified, hunk.newCount > 0,
+           let currentLines = textView?.string.components(separatedBy: "\n")
+        {
+            let start = max(hunk.newStart - 1, 0)
+            let end = min(start + hunk.newCount, currentLines.count)
+            for i in start..<end {
+                let lineStr = NSMutableAttributedString(
+                    string: "+ " + currentLines[i] + "\n",
+                    attributes: [
+                        .font: baseFont,
+                        .foregroundColor: NSColor.systemGreen,
+                        .backgroundColor: addedBg,
+                    ]
+                )
+                result.append(lineStr)
+            }
         }
 
         return result
