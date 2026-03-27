@@ -37,6 +37,24 @@ struct FileTreeView: View {
         .task(id: directoryURL, priority: .low) {
             await pollGitStatus()
         }
+        .onChange(of: model.searchText) { oldValue, newValue in
+            if !newValue.isEmpty && oldValue.isEmpty {
+                // Starting a search — save expansion state and expand all
+                if savedExpandedIDs == nil {
+                    savedExpandedIDs = expandedIDs
+                }
+                expandAllFolders(in: model.displayItems)
+            } else if !newValue.isEmpty {
+                // Search text changed — expand all filtered results
+                expandAllFolders(in: model.displayItems)
+            } else if newValue.isEmpty && !oldValue.isEmpty && !model.showChangedOnly {
+                // Search cleared and no other filter active — restore
+                if let saved = savedExpandedIDs {
+                    expandedIDs = saved
+                    savedExpandedIDs = nil
+                }
+            }
+        }
         .onChange(of: showHiddenFiles) {
             model.showHiddenFiles = showHiddenFiles
             model.load(directoryURL: directoryURL)
@@ -60,9 +78,12 @@ struct FileTreeView: View {
 
     private func toggleChangedFilter() {
         if !model.showChangedOnly {
-            savedExpandedIDs = expandedIDs
+            if savedExpandedIDs == nil {
+                savedExpandedIDs = expandedIDs
+            }
             expandAllFolders(in: model.displayItems)
-        } else if let saved = savedExpandedIDs {
+        } else if model.searchText.isEmpty, let saved = savedExpandedIDs {
+            // Only restore if search is also inactive
             expandedIDs = saved
             savedExpandedIDs = nil
         }

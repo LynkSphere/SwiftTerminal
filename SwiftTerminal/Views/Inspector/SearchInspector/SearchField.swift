@@ -28,8 +28,8 @@ struct SearchField: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 4)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 5)
         .background(.quaternary, in: Capsule())
     }
 }

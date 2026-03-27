@@ -90,6 +90,22 @@ struct AppCommands: Commands {
             .keyboardShortcut("f", modifiers: [.command, .shift])
         }
 
+        CommandGroup(after: .textEditing) {
+            Button("Find…") {
+                let item = NSMenuItem()
+                item.tag = Int(NSFindPanelAction.showFindPanel.rawValue)
+                NSApp.sendAction(#selector(NSTextView.performFindPanelAction(_:)), to: nil, from: item)
+            }
+            .keyboardShortcut("f", modifiers: .command)
+
+            Button("Find and Replace…") {
+                let item = NSMenuItem()
+                item.tag = Int(NSFindPanelAction.setFindString.rawValue)
+                NSApp.sendAction(#selector(NSTextView.performFindPanelAction(_:)), to: nil, from: item)
+            }
+            .keyboardShortcut("f", modifiers: [.command, .option])
+        }
+
         CommandMenu("Terminal") {
             Button {
                 guard let terminalView = appState.selectedWorkspace?.selectedTab?.localProcessTerminalView else { return }
