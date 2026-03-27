@@ -130,14 +130,19 @@ struct GitInspectorView: View {
         .scrollContentBackground(.hidden)
         .safeAreaBar(edge: .top) {
             VStack(spacing: 8) {
-                if model.snapshots.count > 1 {
-                    repoPicker
-                }
                 branchRow
+                
                 commitArea
+                    .padding(.horizontal, 5)
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
+        }
+        .safeAreaBar(edge: .bottom) {
+            if model.snapshots.count > 1 {
+                repoPicker
+                    .padding()
+            }
         }
     }
 
@@ -326,7 +331,6 @@ struct GitInspectorView: View {
             .buttonStyle(.borderedProminent)
             .disabled(currentAction == .commit && commitMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
-        .padding(.horizontal, 5)
     }
 
     private func performSourceControlAction() {
