@@ -151,6 +151,7 @@ final class EditorPanel {
             forwardStack.append(current)
         }
         content = previous
+        isHidden = false
     }
 
     private func performForward() {
@@ -159,5 +160,6 @@ final class EditorPanel {
             backStack.append(current)
         }
         content = next
+        isHidden = false
     }
 }

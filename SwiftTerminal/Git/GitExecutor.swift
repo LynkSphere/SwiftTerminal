@@ -5,7 +5,7 @@ enum GitError: Error {
     case commandFailed(command: String, message: String)
 }
 
-actor GitExecutor {
+struct GitExecutor: Sendable {
     private let executableURL = URL(filePath: "/usr/bin/git")
 
     func execute<Command: GitCommand>(_ command: Command, at directoryURL: URL) async throws -> Command.Output {
@@ -41,6 +41,8 @@ actor GitExecutor {
             throw GitError.gitUnavailable
         }
 
+        // Read pipes and wait for exit concurrently in detached tasks to avoid
+        // blocking the cooperative thread pool and to prevent pipe buffer deadlocks.
         let standardOutputHandle = standardOutputPipe.fileHandleForReading
         let standardErrorHandle = standardErrorPipe.fileHandleForReading
         async let standardOutputData = Task.detached(priority: .userInitiated) {
@@ -49,18 +51,20 @@ actor GitExecutor {
         async let standardErrorData = Task.detached(priority: .userInitiated) {
             standardErrorHandle.readDataToEndOfFile()
         }.value
-
-        process.waitUntilExit()
+        async let terminationStatus = Task.detached(priority: .userInitiated) {
+            process.waitUntilExit()
+            return process.terminationStatus
+        }.value
 
         return ExecutionResult(
             standardOutput: String(bytes: await standardOutputData, encoding: .utf8) ?? "",
             standardError: String(bytes: await standardErrorData, encoding: .utf8) ?? "",
-            terminationStatus: process.terminationStatus
+            terminationStatus: await terminationStatus
         )
     }
 }
 
-private struct ExecutionResult {
+private struct ExecutionResult: Sendable {
     var standardOutput: String
     var standardError: String
     var terminationStatus: Int32

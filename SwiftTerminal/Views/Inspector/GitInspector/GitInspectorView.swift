@@ -188,16 +188,30 @@ struct GitInspectorView: View {
                     }
                 }
             } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.triangle.branch")
-                        .font(.caption)
+//                HStack(spacing: 4) {
+//                    Image(systemName: "arrow.triangle.branch")
+////                        .font(.caption)
+//                        .imageScale(.small)
+//                    Text(selectedSnapshot?.branchName ?? "No Branch")
+//                        .font(.subheadline)
+//                        .lineLimit(1)
+//                }
+//                .foregroundStyle(.primary)
+//                .frame(maxWidth: .infinity, alignment: .leading)
+//                .contentShape(Rectangle())
+                
+//                Label(selectedSnapshot?.branchName ?? "No Branch", systemImage: "arrow.triangle.branch")
+//                    .font(.caption)
+//                    .foregroundStyle(.secondary)
+                Label {
                     Text(selectedSnapshot?.branchName ?? "No Branch")
-                        .font(.subheadline)
-                        .lineLimit(1)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } icon: {
+                    Image(systemName: "arrow.triangle.branch")
+                        .imageScale(.small)
+                        .foregroundStyle(.secondary)
                 }
-                .foregroundStyle(.primary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)

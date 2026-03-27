@@ -12,48 +12,49 @@ actor GitRepository {
     func statusSnapshots(in directoryURL: URL) async throws -> [GitRepositoryStatusSnapshot] {
         let directoryURL = directoryURL.standardizedFileURL
         let repositoryRootURLs = await self.repositoryRoots(in: directoryURL)
-        var snapshots: [GitRepositoryStatusSnapshot] = []
 
-        for repositoryRootURL in repositoryRootURLs {
-            let entries = try await self.executor.execute(GitStatusCommand(), at: repositoryRootURL)
-            let branchName = try? await self.executor.execute(GitBranchNameCommand(), at: repositoryRootURL)
-            var stagedFiles: [GitChangedFile] = []
-            var unstagedFiles: [GitChangedFile] = []
+        return try await withThrowingTaskGroup(of: GitRepositoryStatusSnapshot.self) { group in
+            for repositoryRootURL in repositoryRootURLs {
+                group.addTask {
+                    let entries = try await self.executor.execute(GitStatusCommand(), at: repositoryRootURL)
 
-            for entry in entries {
-                guard
-                    let stagedKind = entry.stagedKind,
-                    let fileURL = Self.fileURL(for: entry.path, in: repositoryRootURL, scopedTo: directoryURL)
-                else { continue }
+                    async let branchName = try? self.executor.execute(GitBranchNameCommand(), at: repositoryRootURL)
+                    async let unpushedCommits = self.fetchUnpushedCommits(at: repositoryRootURL)
+                    async let remoteAheadCount = (try? self.executor.execute(GitRemoteAheadCountCommand(), at: repositoryRootURL)) ?? 0
+                    async let localBranches = (try? self.executor.execute(GitLocalBranchesCommand(), at: repositoryRootURL)) ?? []
 
-                stagedFiles.append(GitChangedFile(fileURL: fileURL, repositoryRelativePath: entry.path, kind: stagedKind))
+                    var stagedFiles: [GitChangedFile] = []
+                    var unstagedFiles: [GitChangedFile] = []
+
+                    for entry in entries {
+                        if let stagedKind = entry.stagedKind,
+                           let fileURL = Self.fileURL(for: entry.path, in: repositoryRootURL, scopedTo: directoryURL) {
+                            stagedFiles.append(GitChangedFile(fileURL: fileURL, repositoryRelativePath: entry.path, kind: stagedKind))
+                        }
+                        if let unstagedKind = entry.unstagedKind,
+                           let fileURL = Self.fileURL(for: entry.path, in: repositoryRootURL, scopedTo: directoryURL) {
+                            unstagedFiles.append(GitChangedFile(fileURL: fileURL, repositoryRelativePath: entry.path, kind: unstagedKind))
+                        }
+                    }
+
+                    return GitRepositoryStatusSnapshot(
+                        repositoryRootURL: repositoryRootURL,
+                        branchName: await branchName,
+                        localBranches: await localBranches,
+                        stagedFiles: stagedFiles,
+                        unstagedFiles: unstagedFiles,
+                        unpushedCommits: await unpushedCommits,
+                        remoteAheadCount: await remoteAheadCount
+                    )
+                }
             }
 
-            for entry in entries {
-                guard
-                    let unstagedKind = entry.unstagedKind,
-                    let fileURL = Self.fileURL(for: entry.path, in: repositoryRootURL, scopedTo: directoryURL)
-                else { continue }
-
-                unstagedFiles.append(GitChangedFile(fileURL: fileURL, repositoryRelativePath: entry.path, kind: unstagedKind))
+            var snapshots: [GitRepositoryStatusSnapshot] = []
+            for try await snapshot in group {
+                snapshots.append(snapshot)
             }
-
-            let unpushedCommits = await self.fetchUnpushedCommits(at: repositoryRootURL)
-            let remoteAheadCount = (try? await self.executor.execute(GitRemoteAheadCountCommand(), at: repositoryRootURL)) ?? 0
-            let localBranches = (try? await self.executor.execute(GitLocalBranchesCommand(), at: repositoryRootURL)) ?? []
-
-            snapshots.append(GitRepositoryStatusSnapshot(
-                repositoryRootURL: repositoryRootURL,
-                branchName: branchName,
-                localBranches: localBranches,
-                stagedFiles: stagedFiles,
-                unstagedFiles: unstagedFiles,
-                unpushedCommits: unpushedCommits,
-                remoteAheadCount: remoteAheadCount
-            ))
+            return snapshots.sorted { $0.repositoryRootURL.path < $1.repositoryRootURL.path }
         }
-
-        return snapshots
     }
 
     func changedFileURLs(in directoryURL: URL) async throws -> Set<URL> {
@@ -215,22 +216,29 @@ actor GitRepository {
             GitUnpushedCommitListCommand(), at: repositoryRootURL
         ) else { return [] }
 
-        var commits: [GitUnpushedCommit] = []
-        for entry in commitEntries {
-            let fileEntries = (try? await self.executor.execute(
-                GitCommitFilesCommand(hash: entry.hash), at: repositoryRootURL
-            )) ?? []
+        return await withTaskGroup(of: (Int, GitUnpushedCommit).self) { group in
+            for (index, entry) in commitEntries.enumerated() {
+                group.addTask {
+                    let fileEntries = (try? await self.executor.execute(
+                        GitCommitFilesCommand(hash: entry.hash), at: repositoryRootURL
+                    )) ?? []
 
-            let files: [GitChangedFile] = fileEntries.compactMap { fileEntry in
-                guard let kind = Self.changeKindFromDiffTreeStatus(fileEntry.status) else { return nil }
-                let fileURL = repositoryRootURL.appending(path: fileEntry.path).standardizedFileURL
-                return GitChangedFile(fileURL: fileURL, repositoryRelativePath: fileEntry.path, kind: kind)
+                    let files: [GitChangedFile] = fileEntries.compactMap { fileEntry in
+                        guard let kind = Self.changeKindFromDiffTreeStatus(fileEntry.status) else { return nil }
+                        let fileURL = repositoryRootURL.appending(path: fileEntry.path).standardizedFileURL
+                        return GitChangedFile(fileURL: fileURL, repositoryRelativePath: fileEntry.path, kind: kind)
+                    }
+
+                    return (index, GitUnpushedCommit(hash: entry.hash, message: entry.message, files: files))
+                }
             }
 
-            commits.append(GitUnpushedCommit(hash: entry.hash, message: entry.message, files: files))
+            var results: [(Int, GitUnpushedCommit)] = []
+            for await result in group {
+                results.append(result)
+            }
+            return results.sorted { $0.0 < $1.0 }.map(\.1)
         }
-
-        return commits
     }
 
     private nonisolated static func changeKindFromDiffTreeStatus(_ status: Character) -> GitChangeKind? {
@@ -247,27 +255,34 @@ actor GitRepository {
 
     private func repositoryRoots(in directoryURL: URL) async -> [URL] {
         let directoryURL = directoryURL.standardizedFileURL.resolvingSymlinksInPath()
-        var repositoryRootURLs: Set<URL> = []
+        let candidates = self.candidateDirectories(in: directoryURL)
 
-        for candidateDirectoryURL in self.candidateDirectories(in: directoryURL) {
-            do {
-                let repositoryRootURL = try await self.executor.execute(GitRepositoryRootCommand(), at: candidateDirectoryURL)
-                let resolvedRoot = repositoryRootURL.standardizedFileURL.resolvingSymlinksInPath()
+        return await withTaskGroup(of: URL?.self) { group in
+            for candidateDirectoryURL in candidates {
+                group.addTask {
+                    guard let repositoryRootURL = try? await self.executor.execute(
+                        GitRepositoryRootCommand(), at: candidateDirectoryURL
+                    ) else { return nil }
 
-                // Accept if: workspace is inside or equal to the repo root,
-                // OR the repo root is inside the workspace (nested repo)
-                guard resolvedRoot == directoryURL
-                        || resolvedRoot.isAncestor(of: directoryURL)
-                        || directoryURL.isAncestor(of: resolvedRoot)
-                else { continue }
+                    let resolvedRoot = repositoryRootURL.standardizedFileURL.resolvingSymlinksInPath()
 
-                repositoryRootURLs.insert(resolvedRoot)
-            } catch {
-                continue
+                    // Accept if: workspace is inside or equal to the repo root,
+                    // OR the repo root is inside the workspace (nested repo)
+                    guard resolvedRoot == directoryURL
+                            || resolvedRoot.isAncestor(of: directoryURL)
+                            || directoryURL.isAncestor(of: resolvedRoot)
+                    else { return nil }
+
+                    return resolvedRoot
+                }
             }
-        }
 
-        return repositoryRootURLs.sorted { $0.path < $1.path }
+            var repositoryRootURLs: Set<URL> = []
+            for await rootURL in group {
+                if let rootURL { repositoryRootURLs.insert(rootURL) }
+            }
+            return repositoryRootURLs.sorted { $0.path < $1.path }
+        }
     }
 
     private func candidateDirectories(in directoryURL: URL) -> [URL] {
