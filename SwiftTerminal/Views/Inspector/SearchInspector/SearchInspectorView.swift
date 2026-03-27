@@ -35,6 +35,7 @@ struct SearchInspectorView: View {
             .focused($isSearchFocused)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
+            .padding(.top, 6)
         }
         .onChange(of: selectedID) { _, newID in
             guard let id = newID else { return }

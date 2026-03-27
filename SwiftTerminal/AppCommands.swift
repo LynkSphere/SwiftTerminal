@@ -78,6 +78,14 @@ struct AppCommands: Commands {
             }
             .keyboardShortcut("3", modifiers: .command)
 
+            Button {
+                appState.showingInspector = true
+                appState.selectedInspectorTab = .extensions
+            } label: {
+                Label("Extensions", systemImage: "puzzlepiece.extension")
+            }
+            .keyboardShortcut("4", modifiers: .command)
+
             Divider()
 
             Button {

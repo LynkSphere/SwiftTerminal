@@ -25,7 +25,20 @@ final class Workspace {
 
     @discardableResult
     func addTab(currentDirectory: String? = nil) -> TerminalTab {
-        let tab = TerminalTab(currentDirectory: currentDirectory, sortOrder: tabs.count)
+        let ordered = sortedTabs
+        let insertIndex: Int
+        if let current = selectedTab, let currentIndex = ordered.firstIndex(of: current) {
+            insertIndex = currentIndex + 1
+        } else {
+            insertIndex = ordered.count
+        }
+
+        // Shift tabs at or after the insert position
+        for t in ordered where t.sortOrder >= insertIndex {
+            t.sortOrder += 1
+        }
+
+        let tab = TerminalTab(currentDirectory: currentDirectory, sortOrder: insertIndex)
         tabs.append(tab)
         selectedTab = tab
         return tab

@@ -137,6 +137,7 @@ struct GitInspectorView: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
+            .padding(.top, 8)
         }
         .safeAreaBar(edge: .bottom) {
             if model.snapshots.count > 1 {
@@ -325,7 +326,7 @@ struct GitInspectorView: View {
             Button {
                 performSourceControlAction()
             } label: {
-                Label(currentAction.label, systemImage: currentAction.systemImage)
+                Text(currentAction.label)
             }
             .buttonSizing(.flexible)
             .buttonStyle(.borderedProminent)

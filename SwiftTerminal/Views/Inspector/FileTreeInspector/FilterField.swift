@@ -8,21 +8,15 @@ struct FilterField<Trailing: View>: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            Image(systemName: text.isEmpty
-                  ? "line.3.horizontal.decrease.circle"
-                  : "line.3.horizontal.decrease.circle.fill")
-                .foregroundStyle(text.isEmpty ? .secondary : Color.accentColor)
-                .font(.caption)
-
             TextField("Filter", text: $text)
                 .textFieldStyle(.plain)
-                .font(.caption)
+                .font(.subheadline)
                 .focused($isFocused)
 
             trailing
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 4)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 5)
         .background(.quaternary, in: Capsule())
     }
 }

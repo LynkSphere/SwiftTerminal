@@ -29,7 +29,7 @@ struct WorkspaceDetailView: View {
                         if editorPanel.isOpen {
                             Rectangle()
                                 .fill(.clear)
-                                .frame(height: 8)
+                                .frame(height: 20)
                                 .contentShape(Rectangle())
                                 .cursor(.resizeUpDown)
                                 .gesture(

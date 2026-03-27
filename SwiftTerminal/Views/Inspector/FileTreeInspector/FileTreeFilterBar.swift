@@ -20,7 +20,6 @@ struct FileTreeFilterBar: View {
 
             Button(action: onToggleChanged) {
                 Image(systemName: showChangedOnly ? "plusminus.circle.fill" : "plusminus.circle")
-                    .font(.caption)
                     .foregroundStyle(showChangedOnly ? Color.accentColor : .secondary)
             }
             .buttonStyle(.plain)
