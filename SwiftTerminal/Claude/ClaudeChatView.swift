@@ -7,7 +7,9 @@ struct ClaudeChatView: View {
     var body: some View {
         List {
             if service.messages.isEmpty {
-                EmptyStateView()
+                EmptyStateView(onContinue: service.session.sessionID == nil ? {
+                    service.continueLastSession()
+                } : nil)
             } else {
                 MessageListView(service: service)
             }
@@ -41,8 +43,8 @@ struct ClaudeChatView: View {
                 promptSuggestionsBar
             }
         }
-        .safeAreaBar(edge: .top) {
-            SessionBarView(service: service)
+        .toolbar {
+            ToolbarContentView(service: service)
         }
         .safeAreaBar(edge: .bottom) {
             InputBarView(input: $input, service: service, onSend: sendMessage)

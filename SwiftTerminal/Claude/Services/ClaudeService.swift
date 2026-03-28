@@ -150,6 +150,7 @@ final class ClaudeService {
 
     func setModel(_ model: ModelOption) {
         selectedModel = model
+        selectedContextWindow = model == .opus ? .extended : .standard
         if queryActive {
             process?.sendCommand("set_model", params: ["model": model.rawValue])
         }
@@ -183,12 +184,6 @@ final class ClaudeService {
 
     func stopTask(_ taskID: String) {
         process?.sendCommand("stop_task", params: ["taskId": taskID])
-    }
-
-    // MARK: - Context
-
-    func setContextWindow(_ window: ContextWindow) {
-        selectedContextWindow = window
     }
 
     // MARK: - Rewind

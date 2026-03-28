@@ -7,8 +7,6 @@ final class SessionInfo {
     var sessionID: String?
     var model: String?
     var tools: [String] = []
-    var totalCost: Double = 0
-    var turnCount: Int = 0
     var isInitialized = false
     var permissionMode: PermissionModeOption = .bypassPermissions
     var state: SessionState = .idle
@@ -28,8 +26,6 @@ final class SessionInfo {
 
     func update(from result: ResultEvent) {
         sessionID = result.sessionID ?? sessionID
-        if let cost = result.totalCostUsd { totalCost = cost }
-        if let turns = result.numTurns { turnCount = turns }
     }
 }
 
@@ -104,6 +100,15 @@ enum EffortLevel: String, CaseIterable {
     case low, medium, high, max
 
     var label: String { rawValue.capitalized }
+
+    var systemImage: String {
+        switch self {
+        case .low: "gauge.low"
+        case .medium: "gauge.medium"
+        case .high: "gauge.high"
+        case .max: "gauge.high"
+        }
+    }
 }
 
 // MARK: - Session Summary

@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct EmptyStateView: View {
+    var onContinue: (() -> Void)?
+
     var body: some View {
         VStack(spacing: 12) {
             Spacer()
@@ -20,6 +22,13 @@ struct EmptyStateView: View {
                 hintItem(icon: "clock.arrow.circlepath", text: "Resume sessions")
             }
             .padding(.top, 8)
+
+            if let onContinue {
+                Button("Continue Last Session", action: onContinue)
+                    .buttonStyle(.link)
+                    .font(.subheadline)
+                    .padding(.top, 4)
+            }
 
             Spacer()
         }

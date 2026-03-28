@@ -19,43 +19,34 @@ struct WorkspaceDetailView: View {
                 }
             }
             .navigationTitle(workspace.name)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .navigationSubtitle(workspace.directory ?? "")
-        .inspector(isPresented: Bindable(appState).showingInspector) {
-            if let directory = workspace.directory {
-                InspectorView(directoryURL: URL(fileURLWithPath: directory))
-                    .inspectorColumnWidth(min: 180, ideal: 220, max: 360)
+            .navigationSubtitle(workspace.directory ?? "")
+            .inspector(isPresented: Bindable(appState).showingInspector) {
+                if let directory = workspace.directory {
+                    InspectorView(directoryURL: URL(fileURLWithPath: directory))
+                        .inspectorColumnWidth(min: 180, ideal: 220, max: 360)
+                }
             }
-        }
-        .environment(editorPanel)
-        .onChange(of: appState.panelToggleToken) {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                editorPanel.toggle()
+            .environment(editorPanel)
+            .onChange(of: appState.panelToggleToken) {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    editorPanel.toggle()
+                }
             }
-        }
-        .onChange(of: service.session.sessionID) { _, newID in
-            if let newID {
-                workspace.addClaudeSession(newID)
+            .onChange(of: service.session.sessionID) { _, newID in
+                if let newID {
+                    workspace.addClaudeSession(newID)
+                }
             }
-        }
-        .onChange(of: appState.selectedSessionID) { _, sessionID in
-            if let sessionID, sessionID != service.session.sessionID {
-                service.resumeSession(sessionID)
+            .onChange(of: appState.selectedSessionID) { _, sessionID in
+                if let sessionID, sessionID != service.session.sessionID {
+                    service.resumeSession(sessionID)
+                }
             }
-        }
-        .task {
-            // Auto-resume the most recent session if service is fresh
-            if service.messages.isEmpty, let lastSessionID = workspace.claudeSessionIDs.last {
-                service.resumeSession(lastSessionID)
+            .task {
+                // Auto-resume the most recent session if service is fresh
+                if service.messages.isEmpty, let lastSessionID = workspace.claudeSessionIDs.last {
+                    service.resumeSession(lastSessionID)
+                }
             }
-        }
     }
-
-//    private func focusTerminal() {
-//        guard workspace.selectedTab != nil else { return }
-//
-//        DispatchQueue.main.async {
-//            isTerminalFocused = true
-//        }
-//    }
 }
