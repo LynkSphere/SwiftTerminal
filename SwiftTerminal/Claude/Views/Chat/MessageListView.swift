@@ -14,9 +14,7 @@ struct MessageListView: View {
             case .assistant(let messages):
                 AssistantTurnView(
                     messages: messages,
-                    isStreaming: service.isStreaming && turn.isLast,
-                    activeTasks: service.activeTasks,
-                    onStopTask: { service.stopTask($0) }
+                    isStreaming: service.isStreaming && turn.isLast
                 )
                 .id(turn.id)
                 .listRowSeparator(.hidden)
@@ -101,8 +99,6 @@ struct UserMessageView: View {
 struct AssistantTurnView: View {
     let messages: [ChatMessage]
     let isStreaming: Bool
-    let activeTasks: [String: TaskEvent]
-    let onStopTask: (String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -119,11 +115,7 @@ struct AssistantTurnView: View {
                         )
 
                     case .toolGroup(let tools):
-                        ToolGroupView(
-                            tools: tools,
-                            activeTasks: tasksForTools(tools),
-                            onStopTask: onStopTask
-                        )
+                        ToolGroupView(tools: tools)
                     }
                 }
 
@@ -141,14 +133,6 @@ struct AssistantTurnView: View {
 
     private var allBlocks: [MessageBlock] {
         messages.flatMap(\.blocks)
-    }
-
-    private func tasksForTools(_ tools: [ToolUseInfo]) -> [String: TaskEvent] {
-        let toolIDs = Set(tools.map(\.id))
-        return activeTasks.filter { _, task in
-            if let tuID = task.toolUseID { return toolIDs.contains(tuID) }
-            return false
-        }
     }
 
     private var groupedContent: [ContentGroup] {

@@ -57,10 +57,13 @@ struct ToolbarContentView: ToolbarContent {
             set: { service.setModel($0) }
         )) {
             ForEach(ModelOption.allCases, id: \.self) { model in
-                Text(model.label).tag(model)
+                Label(model.label, image: "claude.symbols")
+                    .labelStyle(.titleAndIcon)
+                    .tag(model)
             }
         } label: {
-            Text(service.selectedModel.label)
+            Label(service.selectedModel.label, image: "claude.symbols")
+                .labelStyle(.titleAndIcon)
         }
         .menuOrder(.fixed)
     }
@@ -80,8 +83,7 @@ struct ToolbarContentView: ToolbarContent {
                 }
             }
         } label: {
-            Image(systemName: permissionIcon)
-                .foregroundStyle(permissionColor)
+            Label(service.session.permissionMode.label, systemImage: permissionIcon)
         }
     }
 
