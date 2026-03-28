@@ -49,7 +49,8 @@ struct WorkspaceRow: View {
         .badgeProminence(.increased)
         .contextMenu {
             Button {
-                appState.newSession(for: workspace)
+                let service = workspace.newSession()
+                appState.sidebarSelection = .session(workspaceID: workspace.id, serviceID: service.id)
             } label: {
                 Label("New Session", systemImage: "plus.bubble")
             }

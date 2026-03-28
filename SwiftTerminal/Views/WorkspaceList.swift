@@ -22,10 +22,15 @@ struct WorkspaceList: View {
 
     private var sidebarItems: [SidebarItem] {
         filteredWorkspaces.map { workspace in
-            let sessionChildren = workspace.claudeSessionIDs.map { sessionID in
-                SidebarItem(
-                    id: .session(workspaceID: workspace.id, sessionID: sessionID),
-                    label: String(sessionID.prefix(8)),
+            let sessionChildren = workspace.sessions.map { service in
+                let label = if let sid = service.session.sessionID {
+                    String(sid.prefix(8))
+                } else {
+                    "New Session"
+                }
+                return SidebarItem(
+                    id: .session(workspaceID: workspace.id, serviceID: service.id),
+                    label: label,
                     icon: "bubble.left"
                 )
             }
@@ -68,9 +73,25 @@ struct WorkspaceList: View {
                     renamingWorkspace: $renamingWorkspace
                 )
             }
-        case .session(_, let sessionID):
-            Label(String(sessionID.prefix(8)), systemImage: "bubble.left")
+        case .session(let workspaceID, let serviceID):
+            if let workspace = appState.workspaces.first(where: { $0.id == workspaceID }),
+               let service = workspace.sessions.first(where: { $0.id == serviceID }) {
+                Label(
+                    service.session.sessionID.map { String($0.prefix(8)) } ?? "New Session",
+                    systemImage: "bubble.left"
+                )
                 .font(.subheadline)
+                .contextMenu {
+                    Button(role: .destructive) {
+                        workspace.removeSession(service)
+                        if appState.sidebarSelection == .session(workspaceID: workspaceID, serviceID: serviceID) {
+                            appState.sidebarSelection = .workspace(workspaceID)
+                        }
+                    } label: {
+                        Label("Delete Session", systemImage: "trash")
+                    }
+                }
+            }
         }
     }
 

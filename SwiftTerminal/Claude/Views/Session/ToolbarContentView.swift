@@ -20,14 +20,6 @@ struct ToolbarContentView: ToolbarContent {
             ToolbarSpacer(.fixed)
 
             ToolbarItem(placement: .primaryAction) {
-                if service.isStreaming {
-                    ProgressView()
-                        .scaleEffect(0.5)
-                        .frame(width: 14, height: 14)
-                }
-            }
-
-            ToolbarItem(placement: .primaryAction) {
                 Picker(selection: Binding(
                     get: { service.selectedEffort },
                     set: { service.selectedEffort = $0 }
@@ -56,16 +48,6 @@ struct ToolbarContentView: ToolbarContent {
             }
 
             ToolbarSpacer(.fixed)
-
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    if let workspace = appState.workspaces.first(where: { $0.id == service.workspaceID }) {
-                        appState.newSession(for: workspace)
-                    }
-                } label: {
-                    Label("New Session", systemImage: "plus")
-                }
-            }
         }
     }
 

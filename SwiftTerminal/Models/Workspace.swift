@@ -11,6 +11,9 @@ final class Workspace {
     var selectedTab: TerminalTab?
     var claudeSessionIDs: [String] = []
 
+    @Transient var sessions: [ClaudeService] = []
+    @Transient var selectedSession: ClaudeService?
+
     @Relationship(deleteRule: .cascade, inverse: \TerminalTab.workspace)
     var tabs: [TerminalTab] = []
 
@@ -129,9 +132,44 @@ final class Workspace {
         return pidsWithChildren.count
     }
 
-    func addClaudeSession(_ sessionID: String) {
-        guard !claudeSessionIDs.contains(sessionID) else { return }
-        claudeSessionIDs.append(sessionID)
+    // MARK: - Session Management
+
+    var activeSession: ClaudeService? {
+        hydrateSessions()
+        return selectedSession ?? sessions.last
+    }
+
+    /// Create ClaudeService objects from persisted session IDs if not already hydrated.
+    func hydrateSessions() {
+        guard sessions.isEmpty, !claudeSessionIDs.isEmpty else { return }
+        for sdkID in claudeSessionIDs {
+            let service = ClaudeService(workspace: self)
+            service.session.sessionID = sdkID
+            sessions.append(service)
+        }
+    }
+
+    @discardableResult
+    func newSession() -> ClaudeService {
+        let service = ClaudeService(workspace: self)
+        sessions.append(service)
+        return service
+    }
+
+    func removeSession(_ service: ClaudeService) {
+        if let sdkID = service.session.sessionID {
+            claudeSessionIDs.removeAll { $0 == sdkID }
+        }
+        sessions.removeAll { $0 === service }
+        if selectedSession === service {
+            selectedSession = nil
+        }
+    }
+
+    /// Persist an SDK session ID so the session can be resumed across app launches.
+    func persistSession(_ sdkSessionID: String) {
+        guard !claudeSessionIDs.contains(sdkSessionID) else { return }
+        claudeSessionIDs.append(sdkSessionID)
     }
 
     func terminateAll() {

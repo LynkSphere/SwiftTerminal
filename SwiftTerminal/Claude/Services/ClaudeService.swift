@@ -5,6 +5,7 @@ import Foundation
 final class ClaudeService {
     // MARK: - Public State
 
+    let id = UUID()
     var messages: [ChatMessage] = []
     var isStreaming = false
     var session = SessionInfo()
@@ -20,9 +21,8 @@ final class ClaudeService {
 
     // MARK: - Private
 
-    let workspaceID: UUID
-    let workingDirectory: String
-    let serviceKey = UUID().uuidString
+    let workspace: Workspace
+    var workingDirectory: String { workspace.directory ?? NSHomeDirectory() }
     private var process: ClaudeProcess?
     private var readerTask: Task<Void, Never>?
     private var bridgeReady = false
@@ -35,9 +35,8 @@ final class ClaudeService {
     @ObservationIgnored private var responseContinuations: [String: CheckedContinuation<BridgeResponse?, Never>] = [:]
     @ObservationIgnored private var userMessageUUIDs: [String: String] = [:]
 
-    init(workspaceID: UUID, workingDirectory: String) {
-        self.workspaceID = workspaceID
-        self.workingDirectory = workingDirectory
+    init(workspace: Workspace) {
+        self.workspace = workspace
     }
 
     deinit {

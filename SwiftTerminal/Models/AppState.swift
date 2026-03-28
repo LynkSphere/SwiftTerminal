@@ -5,7 +5,7 @@ import SwiftData
 
 enum SidebarSelection: Hashable {
     case workspace(UUID)
-    case session(workspaceID: UUID, sessionID: String)
+    case session(workspaceID: UUID, serviceID: UUID)
 
     var workspaceID: UUID {
         switch self {
@@ -33,21 +33,15 @@ final class AppState {
     /// Bumped by Cmd+J; observed by WorkspaceDetailView to toggle the editor panel.
     var panelToggleToken = UUID()
 
-    /// The active service for each workspace. Observed so views update on switch.
-    var activeServices: [UUID: ClaudeService] = [:]
-
     let modelContext: ModelContext
-
-    /// All services keyed by their serviceKey. Keeps processes alive.
-    @ObservationIgnored private var services: [String: ClaudeService] = [:]
-
-    /// SDK session ID → service key, for sidebar session lookups.
-    @ObservationIgnored private var sdkSessionMap: [String: String] = [:]
 
     init(modelContext: ModelContext) {
         self.modelContext = modelContext
         let descriptor = FetchDescriptor<Workspace>(sortBy: [SortDescriptor(\.sortOrder)])
         workspaces = (try? modelContext.fetch(descriptor)) ?? []
+        for workspace in workspaces {
+            workspace.hydrateSessions()
+        }
         sidebarSelection = workspaces.first.map { .workspace($0.id) }
     }
 
@@ -63,55 +57,12 @@ final class AppState {
         }
     }
 
-    var selectedSessionID: String? {
-        if case .session(_, let sid) = sidebarSelection {
-            return sid
+    var selectedService: ClaudeService? {
+        guard case .session(let workspaceID, let serviceID) = sidebarSelection,
+              let workspace = workspaces.first(where: { $0.id == workspaceID }) else {
+            return nil
         }
-        return nil
-    }
-
-    // MARK: - Claude Service
-
-    func claudeService(for workspace: Workspace) -> ClaudeService {
-        if let service = activeServices[workspace.id] {
-            return service
-        }
-        return makeService(for: workspace)
-    }
-
-    func newSession(for workspace: Workspace) {
-        makeService(for: workspace)
-        sidebarSelection = .workspace(workspace.id)
-    }
-
-    func activateSession(_ sdkSessionID: String, for workspace: Workspace) {
-        // Already showing this session?
-        if activeServices[workspace.id]?.session.sessionID == sdkSessionID { return }
-
-        // Find existing service running this session
-        if let key = sdkSessionMap[sdkSessionID], let service = services[key] {
-            activeServices[workspace.id] = service
-            return
-        }
-
-        // Create new service and resume into it
-        let service = makeService(for: workspace)
-        service.resumeSession(sdkSessionID)
-    }
-
-    func registerSDKSession(_ sdkSessionID: String, serviceKey: String) {
-        sdkSessionMap[sdkSessionID] = serviceKey
-    }
-
-    @discardableResult
-    private func makeService(for workspace: Workspace) -> ClaudeService {
-        let service = ClaudeService(
-            workspaceID: workspace.id,
-            workingDirectory: workspace.directory ?? NSHomeDirectory()
-        )
-        services[service.serviceKey] = service
-        activeServices[workspace.id] = service
-        return service
+        return workspace.sessions.first { $0.id == serviceID }
     }
 
     // MARK: - Workspace Management
@@ -129,16 +80,6 @@ final class AppState {
 
     func removeWorkspace(_ workspace: Workspace) {
         workspace.terminateAll()
-        // Remove all services for this workspace
-        let keys = services.filter { $0.value.workspaceID == workspace.id }.map(\.key)
-        for key in keys {
-            services.removeValue(forKey: key)
-        }
-        for sessionID in workspace.claudeSessionIDs {
-            sdkSessionMap.removeValue(forKey: sessionID)
-        }
-        activeServices.removeValue(forKey: workspace.id)
-
         workspaces.removeAll { $0.id == workspace.id }
         modelContext.delete(workspace)
         if sidebarSelection?.workspaceID == workspace.id {
