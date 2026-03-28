@@ -9,6 +9,7 @@ final class Workspace {
     var directory: String?
     var sortOrder: Int = 0
     var selectedTab: TerminalTab?
+    var claudeSessionIDs: [String] = []
 
     @Relationship(deleteRule: .cascade, inverse: \TerminalTab.workspace)
     var tabs: [TerminalTab] = []
@@ -126,6 +127,11 @@ final class Workspace {
             }
         }
         return pidsWithChildren.count
+    }
+
+    func addClaudeSession(_ sessionID: String) {
+        guard !claudeSessionIDs.contains(sessionID) else { return }
+        claudeSessionIDs.append(sessionID)
     }
 
     func terminateAll() {

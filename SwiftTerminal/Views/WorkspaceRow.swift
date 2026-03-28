@@ -48,6 +48,12 @@ struct WorkspaceRow: View {
         .badge(workspace.notificationCount)
         .badgeProminence(.increased)
         .contextMenu {
+            Button {
+                appState.newSession(for: workspace)
+            } label: {
+                Label("New Session", systemImage: "plus.bubble")
+            }
+            Divider()
             RenameButton()
             Divider()
             Button(role: .destructive) {

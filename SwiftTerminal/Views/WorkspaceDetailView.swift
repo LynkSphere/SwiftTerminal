@@ -3,23 +3,17 @@ import SwiftUI
 struct WorkspaceDetailView: View {
     @Bindable var workspace: Workspace
     @Environment(AppState.self) private var appState
-    @FocusState private var isTerminalFocused: Bool
     @State private var editorPanel = EditorPanel()
     @AppStorage("editorPanelHeight") private var panelHeight: Double = 250
 
+    private var service: ClaudeService {
+        appState.claudeService(for: workspace)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            ScrollView {
-                TerminalContainerRepresentable(
-                    tabs: workspace.tabs,
-                    selectedTab: workspace.selectedTab
-                )
-                .focusable()
-                .focusEffectDisabled()
-                .focused($isTerminalFocused)
-                .containerRelativeFrame(.vertical)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            ClaudeChatView(service: service)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             if editorPanel.content != nil {
                 Rectangle()
@@ -48,16 +42,8 @@ struct WorkspaceDetailView: View {
             }
         }
         .navigationTitle(workspace.name)
-        .navigationSubtitle(workspace.selectedTab?.displayDirectory ?? "")
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .task(id: workspace.selectedTab?.id) {
-            focusTerminal()
-        }
-        .safeAreaBar(edge: .top, spacing: 0) {
-            if workspace.tabs.count > 1 {
-                DocumentTabBar(workspace: workspace)
-            }
-        }
+        .navigationSubtitle(workspace.directory ?? "")
         .inspector(isPresented: Bindable(appState).showingInspector) {
             if let directory = workspace.directory {
                 InspectorView(directoryURL: URL(fileURLWithPath: directory))
@@ -70,15 +56,31 @@ struct WorkspaceDetailView: View {
                 editorPanel.toggle()
             }
         }
-    }
-
-    private func focusTerminal() {
-        guard workspace.selectedTab != nil else { return }
-
-        DispatchQueue.main.async {
-            isTerminalFocused = true
+        .onChange(of: service.session.sessionID) { _, newID in
+            if let newID {
+                workspace.addClaudeSession(newID)
+            }
+        }
+        .onChange(of: appState.selectedSessionID) { _, sessionID in
+            if let sessionID, sessionID != service.session.sessionID {
+                service.resumeSession(sessionID)
+            }
+        }
+        .task {
+            // Auto-resume the most recent session if service is fresh
+            if service.messages.isEmpty, let lastSessionID = workspace.claudeSessionIDs.last {
+                service.resumeSession(lastSessionID)
+            }
         }
     }
+
+//    private func focusTerminal() {
+//        guard workspace.selectedTab != nil else { return }
+//
+//        DispatchQueue.main.async {
+//            isTerminalFocused = true
+//        }
+//    }
 }
 
 private extension View {

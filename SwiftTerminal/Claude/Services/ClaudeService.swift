@@ -1,0 +1,808 @@
+import Foundation
+
+/// High-level service that orchestrates Claude via the Agent SDK bridge.
+@Observable
+final class ClaudeService {
+    // MARK: - Public State
+
+    var messages: [ChatMessage] = []
+    var isStreaming = false
+    var session = SessionInfo()
+    var error: String?
+    var availableSessions: [SessionSummary] = []
+    var pendingApproval: ApprovalRequest?
+    var pendingElicitation: ElicitationRequest?
+    var promptSuggestions: [String] = []
+    var selectedModel: ModelOption = .sonnet
+    var selectedEffort: EffortLevel = .high
+    var selectedContextWindow: ContextWindow = .standard
+    var activeTasks: [String: TaskEvent] = [:]
+
+    // MARK: - Private
+
+    let workingDirectory: String
+    private var process: ClaudeProcess?
+    private var readerTask: Task<Void, Never>?
+    private var bridgeReady = false
+    private var queryActive = false
+
+    @ObservationIgnored private var toolUseIndex: [String: BlockLocation] = [:]
+    @ObservationIgnored private var state = StreamState()
+    @ObservationIgnored private var turnContinuation: CheckedContinuation<Void, Never>?
+    @ObservationIgnored private var bridgeReadyContinuations: [CheckedContinuation<Void, Never>] = []
+    @ObservationIgnored private var responseContinuations: [String: CheckedContinuation<BridgeResponse?, Never>] = [:]
+    @ObservationIgnored private var userMessageUUIDs: [String: String] = [:]
+
+    init(workingDirectory: String) {
+        self.workingDirectory = workingDirectory
+    }
+
+    deinit {
+        process?.terminate()
+        readerTask?.cancel()
+    }
+
+    // MARK: - Public API
+
+    func send(_ text: String) {
+        guard !isStreaming else { return }
+
+        let userMessage = ChatMessage(role: .user, blocks: [.text(TextInfo(content: text))])
+        messages.append(userMessage)
+        messages.append(ChatMessage(role: .assistant))
+        state.reset()
+
+        isStreaming = true
+        error = nil
+
+        Task { [weak self] in
+            guard let self else { return }
+            await self.ensureBridgeStarted()
+
+            if !self.queryActive {
+                var params: [String: Any] = [
+                    "cwd": self.workingDirectory,
+                    "permissionMode": self.session.permissionMode.rawValue,
+                    "initialMessage": text,
+                    "model": self.selectedModel.rawValue,
+                    "effort": self.selectedEffort.rawValue,
+                    "contextWindow": self.selectedContextWindow.rawValue,
+                ]
+                if self._continueLastOnNextSend {
+                    params["continueSession"] = true
+                    self._continueLastOnNextSend = false
+                } else if let resumeID = self.session.sessionID {
+                    params["resume"] = resumeID
+                }
+                self.process?.sendCommand("start_session", params: params)
+                self.queryActive = true
+                self.userMessageUUIDs[userMessage.id] = userMessage.id
+            } else {
+                self.process?.sendCommand("send_message", params: [
+                    "text": text
+                ])
+            }
+
+            await withCheckedContinuation { continuation in
+                self.turnContinuation = continuation
+            }
+        }
+    }
+
+    func stop() {
+        process?.sendCommand("interrupt")
+        isStreaming = false
+        pendingApproval = nil
+        pendingElicitation = nil
+        turnContinuation?.resume()
+        turnContinuation = nil
+    }
+
+    func clearSession() {
+        process?.sendCommand("stop")
+        process?.terminate()
+        process = nil
+        readerTask?.cancel()
+        readerTask = nil
+        bridgeReady = false
+        queryActive = false
+
+        messages.removeAll()
+        session = SessionInfo()
+        toolUseIndex.removeAll()
+        state = StreamState()
+        userMessageUUIDs.removeAll()
+        activeTasks.removeAll()
+        pendingApproval = nil
+        pendingElicitation = nil
+        promptSuggestions.removeAll()
+        _continueLastOnNextSend = false
+        error = nil
+
+        turnContinuation?.resume()
+        turnContinuation = nil
+        for c in bridgeReadyContinuations { c.resume() }
+        bridgeReadyContinuations.removeAll()
+    }
+
+    // MARK: - Approval Flow
+
+    func respondToApproval(allow: Bool, forSession: Bool = false) {
+        guard let approval = pendingApproval else { return }
+        pendingApproval = nil
+
+        var params: [String: Any] = ["requestId": approval.requestId]
+
+        if allow {
+            params["behavior"] = "allow"
+            if forSession {
+                // Could pass updatedPermissions to allow for session
+            }
+        } else {
+            params["behavior"] = "deny"
+            params["message"] = "Denied by user"
+        }
+
+        process?.sendCommand("respond_to_approval", params: params)
+    }
+
+    // MARK: - Model & Settings
+
+    func setModel(_ model: ModelOption) {
+        selectedModel = model
+        if queryActive {
+            process?.sendCommand("set_model", params: ["model": model.rawValue])
+        }
+    }
+
+    func setPermissionMode(_ mode: PermissionModeOption) {
+        session.permissionMode = mode
+        if queryActive {
+            process?.sendCommand("set_permission_mode", params: ["mode": mode.rawValue])
+        }
+    }
+
+    // MARK: - Elicitation Flow
+
+    func respondToElicitation(action: String, content: [String: Any]? = nil) {
+        guard let elicitation = pendingElicitation else { return }
+        pendingElicitation = nil
+
+        var params: [String: Any] = [
+            "requestId": elicitation.requestId,
+            "action": action,
+        ]
+        if let content {
+            params["content"] = content
+        }
+
+        process?.sendCommand("respond_to_elicitation", params: params)
+    }
+
+    // MARK: - Task Control
+
+    func stopTask(_ taskID: String) {
+        process?.sendCommand("stop_task", params: ["taskId": taskID])
+    }
+
+    // MARK: - Context
+
+    func setContextWindow(_ window: ContextWindow) {
+        selectedContextWindow = window
+    }
+
+    // MARK: - Rewind
+
+    func rewind(toMessageID messageID: String) async -> RewindResult? {
+        guard let uuid = findUserMessageUUID(messageID) else { return nil }
+
+        process?.sendCommand("rewind", params: [
+            "userMessageId": uuid
+        ])
+
+        let response = await waitForBridgeResponse("rewind")
+        guard let result = response?.result else { return nil }
+
+        return RewindResult(
+            canRewind: result["canRewind"] as? Bool ?? false,
+            error: result["error"] as? String,
+            filesChanged: result["filesChanged"] as? [String],
+            insertions: result["insertions"] as? Int,
+            deletions: result["deletions"] as? Int
+        )
+    }
+
+    // MARK: - Session Management
+
+    func listSessions() async {
+        await ensureBridgeStarted()
+        process?.sendCommand("list_sessions", params: [
+            "cwd": workingDirectory,
+            "limit": 50
+        ])
+
+        let response = await waitForBridgeResponse("list_sessions")
+        if let sessions = response?.sessions {
+            availableSessions = sessions.compactMap { dict in
+                guard let id = dict["sessionId"] as? String else { return nil }
+                return SessionSummary(
+                    id: id,
+                    title: dict["title"] as? String,
+                    lastActive: dict["lastActive"] as? String,
+                    messageCount: dict["messageCount"] as? Int ?? 0
+                )
+            }
+        }
+    }
+
+    /// Resume a specific session by ID.
+    func resumeSession(_ sessionID: String) {
+        clearSession()
+
+        Task { [weak self] in
+            guard let self else { return }
+            await self.ensureBridgeStarted()
+
+            self.process?.sendCommand("get_session_messages", params: [
+                "sessionId": sessionID,
+                "cwd": self.workingDirectory
+            ])
+
+            let response = await self.waitForBridgeResponse("get_session_messages")
+            if let rawMessages = response?.messages {
+                self.restoreMessages(from: rawMessages)
+            }
+
+            self.session.sessionID = sessionID
+        }
+    }
+
+    /// Continue the most recent session in this workspace.
+    func continueLastSession() {
+        guard !isStreaming else { return }
+        clearSession()
+
+        Task { [weak self] in
+            guard let self else { return }
+            await self.ensureBridgeStarted()
+
+            // List sessions to find the most recent one
+            self.process?.sendCommand("list_sessions", params: [
+                "cwd": self.workingDirectory,
+                "limit": 1
+            ])
+
+            let listResp = await self.waitForBridgeResponse("list_sessions")
+            if let sessions = listResp?.sessions,
+               let first = sessions.first,
+               let sessionID = first["sessionId"] as? String {
+
+                // Load the session history
+                self.process?.sendCommand("get_session_messages", params: [
+                    "sessionId": sessionID,
+                    "cwd": self.workingDirectory
+                ])
+
+                let msgResp = await self.waitForBridgeResponse("get_session_messages")
+                if let rawMessages = msgResp?.messages {
+                    self.restoreMessages(from: rawMessages)
+                }
+            }
+
+            // Set the flag so next send uses { continue: true }
+            self._continueLastOnNextSend = true
+        }
+    }
+
+    @ObservationIgnored private var _continueLastOnNextSend = false
+
+    private func restoreMessages(from rawMessages: [[String: Any]]) {
+        for raw in rawMessages {
+            guard let type = raw["type"] as? String,
+                  let message = raw["message"] as? [String: Any],
+                  let contentArray = message["content"] as? [[String: Any]] else { continue }
+
+            let role: MessageRole = type == "user" ? .user : .assistant
+
+            var blocks: [MessageBlock] = []
+            for block in contentArray {
+                guard let blockType = block["type"] as? String else { continue }
+                switch blockType {
+                case "text":
+                    if let text = block["text"] as? String, !text.isEmpty {
+                        blocks.append(.text(TextInfo(content: text)))
+                    }
+                case "tool_use":
+                    if let id = block["id"] as? String, let name = block["name"] as? String {
+                        var input: [String: Any] = [:]
+                        if let rawInput = block["input"] as? [String: Any] {
+                            input = rawInput
+                        }
+                        let info = ToolUseInfo(id: id, name: name, input: input, result: nil, isComplete: true)
+                        blocks.append(.toolUse(info))
+                    }
+                case "tool_result":
+                    break
+                case "thinking":
+                    if let text = block["thinking"] as? String, !text.isEmpty {
+                        blocks.append(.thinking(ThinkingInfo(text: text)))
+                    }
+                default:
+                    break
+                }
+            }
+
+            guard !blocks.isEmpty else { continue }
+
+            if let uuid = raw["uuid"] as? String, role == .user {
+                let msg = ChatMessage(role: role, blocks: blocks)
+                userMessageUUIDs[msg.id] = uuid
+                messages.append(msg)
+            } else {
+                messages.append(ChatMessage(role: role, blocks: blocks))
+            }
+        }
+    }
+
+    // MARK: - Bridge Lifecycle
+
+    private func ensureBridgeStarted() async {
+        if bridgeReady { return }
+
+        if process != nil, process!.isRunning {
+            // Process running but not ready yet - wait for bridge_ready
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                bridgeReadyContinuations.append(continuation)
+            }
+            return
+        }
+
+        let proc = ClaudeProcess()
+        process = proc
+
+        do {
+            let lineStream = try proc.start()
+            startReader(lineStream)
+
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                bridgeReadyContinuations.append(continuation)
+            }
+        } catch {
+            appendError("Failed to start bridge: \(error.localizedDescription)")
+        }
+    }
+
+    private func startReader(_ lineStream: AsyncStream<String>) {
+        readerTask?.cancel()
+        readerTask = Task { [weak self] in
+            for await line in lineStream {
+                guard let self, !Task.isCancelled else { break }
+                self.handleLine(line)
+            }
+            guard let self else { return }
+            if self.isStreaming {
+                self.error = "Bridge process disconnected"
+            }
+            self.isStreaming = false
+            self.queryActive = false
+            self.process = nil
+            self.bridgeReady = false
+            self.pendingApproval = nil
+            self.turnContinuation?.resume()
+            self.turnContinuation = nil
+            for c in self.bridgeReadyContinuations { c.resume() }
+            self.bridgeReadyContinuations.removeAll()
+        }
+    }
+
+    // MARK: - Line Handling
+
+    private func handleLine(_ line: String) {
+        guard let event = StreamParser.parse(line) else { return }
+
+        switch event {
+        case .bridgeReady:
+            bridgeReady = true
+            for continuation in bridgeReadyContinuations {
+                continuation.resume()
+            }
+            bridgeReadyContinuations.removeAll()
+
+        case .bridgeResponse(let resp):
+            responseContinuations[resp.command]?.resume(returning: resp)
+            responseContinuations.removeValue(forKey: resp.command)
+
+        case .bridgeError(let err):
+            self.error = err.error
+            if let cmd = err.command {
+                responseContinuations[cmd]?.resume(returning: nil)
+                responseContinuations.removeValue(forKey: cmd)
+            }
+
+        case .sdkDone:
+            // Query finished - clean up streaming state
+            queryActive = false
+            if isStreaming {
+                isStreaming = false
+                turnContinuation?.resume()
+                turnContinuation = nil
+            }
+
+        case .system(let e):
+            session.update(from: e)
+            // Sync model selection with what the SDK reports
+            if let detected = ModelOption.from(modelString: e.model) {
+                selectedModel = detected
+            }
+
+        case .streamEvent(let delta):
+            handleStreamDelta(delta)
+
+        case .assistant(let e):
+            handleAssistantEvent(e)
+
+        case .user(let e):
+            handleUserEvent(e)
+
+        case .result(let e):
+            handleResult(e)
+
+        case .approvalRequest(let request):
+            pendingApproval = request
+
+        case .toolProgress(let progress):
+            handleToolProgress(progress)
+
+        case .sessionStateChanged(let stateEvent):
+            session.state = stateEvent.state
+            session.sessionID = stateEvent.sessionID
+
+        case .statusUpdate(let statusEvent):
+            session.isCompacting = statusEvent.status == "compacting"
+
+        case .taskStarted(let task):
+            activeTasks[task.taskID] = task
+
+        case .taskProgress(let task):
+            activeTasks[task.taskID] = task
+
+        case .taskCompleted(let task):
+            activeTasks[task.taskID] = task
+            let taskID = task.taskID
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(3))
+                self?.activeTasks.removeValue(forKey: taskID)
+            }
+
+        case .elicitationRequest(let request):
+            pendingElicitation = request
+
+        case .promptSuggestion(let event):
+            promptSuggestions = event.suggestions
+
+        case .rateLimit(let e):
+            if let status = e.rateLimitInfo?.status {
+                session.rateLimitStatus = status
+            }
+
+        case .unknown:
+            break
+        }
+    }
+
+    // MARK: - Stream Delta Handling
+
+    private func handleStreamDelta(_ delta: StreamDelta) {
+        let msgIdx = currentAssistantIndex
+
+        switch delta.eventType {
+        case "content_block_start":
+            guard let cb = delta.contentBlock, let index = delta.index else { return }
+            switch cb.type {
+            case "text":
+                state.blockTexts[index] = ""
+            case "tool_use":
+                if let id = cb.id, let name = cb.name {
+                    state.blockToolIDs[index] = id
+                    let info = ToolUseInfo(id: id, name: name, input: [:])
+                    let blockIdx = appendToolUseBlock(at: msgIdx, info: info)
+                    toolUseIndex[id] = BlockLocation(messageIndex: msgIdx, blockIndex: blockIdx)
+                }
+            case "thinking":
+                state.blockTexts[index] = ""
+                state.thinkingBlockIndices.insert(index)
+            default:
+                break
+            }
+
+        case "content_block_delta":
+            guard let d = delta.delta, let index = delta.index else { return }
+            if d.type == "text_delta", let text = d.text {
+                state.blockTexts[index, default: ""] += text
+                updateTextBlock(at: msgIdx, text: state.blockTexts[index]!)
+            } else if d.type == "input_json_delta", let json = d.partialJSON {
+                state.toolInputJSON[index, default: ""] += json
+            } else if d.type == "thinking_delta", let text = d.text {
+                state.blockTexts[index, default: ""] += text
+                updateThinkingBlock(at: msgIdx, text: state.blockTexts[index]!)
+            }
+
+        case "content_block_stop":
+            guard let index = delta.index else { return }
+            if let toolID = state.blockToolIDs[index],
+               let jsonStr = state.toolInputJSON[index],
+               let location = toolUseIndex[toolID] {
+                updateToolUseInput(at: location, input: parseToolInput(jsonStr))
+            }
+            if state.thinkingBlockIndices.contains(index),
+               let text = state.blockTexts[index], !text.isEmpty,
+               !state.hasAddedThinking {
+                appendThinkingBlock(at: msgIdx, text: text)
+                state.hasAddedThinking = true
+            }
+
+        default:
+            break
+        }
+    }
+
+    // MARK: - Assistant Event Handling
+
+    private func handleAssistantEvent(_ event: AssistantEvent) {
+        let msg = event.message
+        let msgID = msg.id
+
+        if let msgID, msgID != state.lastMessageID {
+            if state.lastMessageID != nil {
+                messages.append(ChatMessage(role: .assistant))
+                state.resetBlocks()
+            }
+            state.lastMessageID = msgID
+        }
+
+        for block in msg.content {
+            switch block {
+            case .toolUse(let toolBlock):
+                let id = toolBlock.id
+                if toolUseIndex[id] == nil {
+                    let info = ToolUseInfo(
+                        id: id,
+                        name: toolBlock.name,
+                        input: toolBlock.input.mapValues(\.value)
+                    )
+                    let blockIdx = appendToolUseBlock(at: currentAssistantIndex, info: info)
+                    toolUseIndex[id] = BlockLocation(messageIndex: currentAssistantIndex, blockIndex: blockIdx)
+                } else if let location = toolUseIndex[id] {
+                    let input = toolBlock.input.mapValues(\.value)
+                    if !input.isEmpty {
+                        updateToolUseInput(at: location, input: input)
+                    }
+                }
+
+            case .thinking(let thinkBlock):
+                if !state.hasAddedThinking {
+                    appendThinkingBlock(at: currentAssistantIndex, text: thinkBlock.thinking)
+                    state.hasAddedThinking = true
+                }
+
+            case .text(let textBlock):
+                if !state.hasStreamedText {
+                    updateTextBlock(at: currentAssistantIndex, text: textBlock.text)
+                }
+
+            case .unknown:
+                break
+            }
+        }
+
+        if let sid = event.sessionID {
+            session.sessionID = sid
+        }
+    }
+
+    // MARK: - User Event Handling
+
+    private func handleUserEvent(_ event: UserEvent) {
+        for content in event.message.content {
+            guard content.type == "tool_result",
+                  let toolID = content.toolUseID else { continue }
+
+            let resultText: String
+            if let str = content.content?.stringValue {
+                resultText = str
+            } else if let dict = content.content?.dictValue {
+                resultText = formatDict(dict)
+            } else {
+                resultText = ""
+            }
+
+            let resultInfo = ToolResultInfo(
+                toolUseID: toolID,
+                content: resultText,
+                filePath: event.toolUseResult?.file?.filePath,
+                numLines: event.toolUseResult?.file?.numLines
+            )
+
+            attachToolResult(toolID: toolID, result: resultInfo)
+        }
+    }
+
+    // MARK: - Result Handling
+
+    private func handleResult(_ event: ResultEvent) {
+        session.update(from: event)
+
+        let msgIdx = currentAssistantIndex
+        if let resultText = event.result,
+           !resultText.isEmpty,
+           !state.hasStreamedText,
+           messages[safe: msgIdx]?.text.isEmpty == true {
+            updateTextBlock(at: msgIdx, text: resultText)
+        }
+
+        if event.isError == true {
+            self.error = event.result
+        }
+
+        isStreaming = false
+        pendingApproval = nil
+        session.isCompacting = false
+        turnContinuation?.resume()
+        turnContinuation = nil
+    }
+
+    // MARK: - Tool Progress
+
+    private func handleToolProgress(_ progress: ToolProgressEvent) {
+        guard let location = toolUseIndex[progress.toolUseID],
+              location.messageIndex < messages.count,
+              location.blockIndex < messages[location.messageIndex].blocks.count else { return }
+        if case .toolUse(var info) = messages[location.messageIndex].blocks[location.blockIndex] {
+            info.elapsedSeconds = progress.elapsedSeconds
+            messages[location.messageIndex].blocks[location.blockIndex] = .toolUse(info)
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func waitForBridgeResponse(_ command: String) async -> BridgeResponse? {
+        await withCheckedContinuation { continuation in
+            responseContinuations[command] = continuation
+        }
+    }
+
+    private func findUserMessageUUID(_ messageID: String) -> String? {
+        userMessageUUIDs[messageID] ?? messageID
+    }
+
+    // MARK: - Message Mutation Helpers
+
+    private var currentAssistantIndex: Int {
+        if let idx = messages.indices.reversed().first(where: { messages[$0].role == .assistant }) {
+            return idx
+        }
+        messages.append(ChatMessage(role: .assistant))
+        return messages.count - 1
+    }
+
+    private func updateTextBlock(at messageIndex: Int, text: String) {
+        guard messageIndex < messages.count else { return }
+        if let textIdx = messages[messageIndex].blocks.lastIndex(where: {
+            if case .text = $0 { return true }; return false
+        }) {
+            if case .text(var info) = messages[messageIndex].blocks[textIdx] {
+                info.content = text
+                messages[messageIndex].blocks[textIdx] = .text(info)
+            }
+        } else {
+            messages[messageIndex].blocks.append(.text(TextInfo(content: text)))
+        }
+    }
+
+    private func appendToolUseBlock(at messageIndex: Int, info: ToolUseInfo) -> Int {
+        guard messageIndex < messages.count else { return 0 }
+        let idx = messages[messageIndex].blocks.count
+        messages[messageIndex].blocks.append(.toolUse(info))
+        return idx
+    }
+
+    private func appendThinkingBlock(at messageIndex: Int, text: String) {
+        guard messageIndex < messages.count, !text.isEmpty else { return }
+        messages[messageIndex].blocks.append(.thinking(ThinkingInfo(text: text)))
+    }
+
+    private func updateThinkingBlock(at messageIndex: Int, text: String) {
+        guard messageIndex < messages.count else { return }
+        if let idx = messages[messageIndex].blocks.lastIndex(where: {
+            if case .thinking = $0 { return true }; return false
+        }) {
+            if case .thinking(var info) = messages[messageIndex].blocks[idx] {
+                info.text = text
+                messages[messageIndex].blocks[idx] = .thinking(info)
+            }
+        } else if !state.hasAddedThinking {
+            messages[messageIndex].blocks.append(.thinking(ThinkingInfo(text: text)))
+            state.hasAddedThinking = true
+        }
+    }
+
+    private func updateToolUseInput(at location: BlockLocation, input: [String: Any]) {
+        guard location.messageIndex < messages.count,
+              location.blockIndex < messages[location.messageIndex].blocks.count else { return }
+        if case .toolUse(var info) = messages[location.messageIndex].blocks[location.blockIndex] {
+            info.input = input
+            messages[location.messageIndex].blocks[location.blockIndex] = .toolUse(info)
+        }
+    }
+
+    private func attachToolResult(toolID: String, result: ToolResultInfo) {
+        guard let location = toolUseIndex[toolID],
+              location.messageIndex < messages.count,
+              location.blockIndex < messages[location.messageIndex].blocks.count else { return }
+        if case .toolUse(var info) = messages[location.messageIndex].blocks[location.blockIndex] {
+            info.result = result
+            info.isComplete = true
+            messages[location.messageIndex].blocks[location.blockIndex] = .toolUse(info)
+        }
+    }
+
+    private func appendError(_ text: String) {
+        error = text
+        if let lastIdx = messages.indices.last, messages[lastIdx].role == .assistant {
+            messages[lastIdx].blocks = [.text(TextInfo(content: text))]
+        }
+    }
+
+    private func parseToolInput(_ jsonString: String) -> [String: Any] {
+        guard let data = jsonString.data(using: .utf8),
+              let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return [:]
+        }
+        return dict
+    }
+
+    private func formatDict(_ dict: [String: Any]) -> String {
+        if let data = try? JSONSerialization.data(withJSONObject: dict, options: [.fragmentsAllowed]),
+           let str = String(data: data, encoding: .utf8) {
+            return str
+        }
+        return String(describing: dict)
+    }
+}
+
+// MARK: - Supporting Types
+
+private struct BlockLocation {
+    let messageIndex: Int
+    let blockIndex: Int
+}
+
+private struct StreamState {
+    var lastMessageID: String?
+    var hasAddedThinking = false
+    var thinkingBlockIndices: Set<Int> = []
+    var hasStreamedText: Bool { !blockTexts.values.filter({ !$0.isEmpty }).isEmpty }
+
+    var blockTexts: [Int: String] = [:]
+    var blockToolIDs: [Int: String] = [:]
+    var toolInputJSON: [Int: String] = [:]
+
+    mutating func reset() {
+        lastMessageID = nil
+        resetBlocks()
+    }
+
+    mutating func resetBlocks() {
+        hasAddedThinking = false
+        thinkingBlockIndices.removeAll()
+        blockTexts.removeAll()
+        blockToolIDs.removeAll()
+        toolInputJSON.removeAll()
+    }
+}
+
+private extension Array {
+    subscript(safe index: Index) -> Element? {
+        indices.contains(index) ? self[index] : nil
+    }
+}

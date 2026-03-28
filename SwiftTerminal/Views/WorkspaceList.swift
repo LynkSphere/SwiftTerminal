@@ -1,6 +1,13 @@
 import SwiftUI
 import AppKit
 
+struct SidebarItem: Identifiable, Hashable {
+    let id: SidebarSelection
+    let label: String
+    let icon: String
+    var children: [SidebarItem]?
+}
+
 struct WorkspaceList: View {
     @Environment(AppState.self) private var appState
     @State private var renamingWorkspace: Workspace?
@@ -13,20 +20,29 @@ struct WorkspaceList: View {
         }
     }
 
+    private var sidebarItems: [SidebarItem] {
+        filteredWorkspaces.map { workspace in
+            let sessionChildren = workspace.claudeSessionIDs.map { sessionID in
+                SidebarItem(
+                    id: .session(workspaceID: workspace.id, sessionID: sessionID),
+                    label: String(sessionID.prefix(8)),
+                    icon: "bubble.left"
+                )
+            }
+            return SidebarItem(
+                id: .workspace(workspace.id),
+                label: workspace.name,
+                icon: "folder",
+                children: sessionChildren.isEmpty ? nil : sessionChildren
+            )
+        }
+    }
+
     var body: some View {
         @Bindable var appState = appState
 
-        List(selection: $appState.selectedWorkspace) {
-            ForEach(filteredWorkspaces) { workspace in
-                WorkspaceRow(
-                    workspace: workspace,
-                    renamingWorkspace: $renamingWorkspace
-                )
-                .tag(workspace)
-            }
-            .onMove { source, destination in
-                appState.moveWorkspaces(from: source, to: destination)
-            }
+        List(sidebarItems, children: \.children, selection: $appState.sidebarSelection) { item in
+            sidebarRow(for: item)
         }
         .searchable(text: $searchText, placement: .sidebar, prompt: "Filter workspaces")
         .safeAreaInset(edge: .bottom) {
@@ -42,6 +58,22 @@ struct WorkspaceList: View {
         }
     }
 
+    @ViewBuilder
+    private func sidebarRow(for item: SidebarItem) -> some View {
+        switch item.id {
+        case .workspace(let id):
+            if let workspace = appState.workspaces.first(where: { $0.id == id }) {
+                WorkspaceRow(
+                    workspace: workspace,
+                    renamingWorkspace: $renamingWorkspace
+                )
+            }
+        case .session(_, let sessionID):
+            Label(String(sessionID.prefix(8)), systemImage: "bubble.left")
+                .font(.subheadline)
+        }
+    }
+
     private func chooseDirectoryForNewWorkspace() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
@@ -54,4 +86,3 @@ struct WorkspaceList: View {
         appState.addWorkspace(directory: url.path)
     }
 }
-
