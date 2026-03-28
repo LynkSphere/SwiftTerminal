@@ -37,26 +37,17 @@ struct ToolGroupView: View {
             HStack(spacing: 6) {
                 ForEach(uniqueCategories, id: \.iconName) { cat in
                     Image(systemName: cat.iconName)
-                        .font(.caption2)
                 }
 
                 Text(summary)
-                    .font(.caption)
                     .lineLimit(1)
 
                 if hasRunningTool {
                     ProgressView()
-                        .scaleEffect(0.4)
-                        .frame(width: 10, height: 10)
+                        .controlSize(.small)
                 }
             }
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(.quaternary.opacity(0.5))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
         }
-        .buttonStyle(.plain)
         .popover(isPresented: $showingPopover) {
             toolList
         }
@@ -95,9 +86,9 @@ struct ToolGroupView: View {
                     }
                 }
             }
-            .padding(10)
+            .contentMargins(10)
         }
-        .frame(width: 350, height: 300)
+        .frame(maxHeight: 300)
     }
 
     private var summary: String {
@@ -119,65 +110,5 @@ struct ToolGroupView: View {
 
     private var hasRunningTool: Bool {
         tools.contains { !$0.isComplete }
-    }
-}
-
-// MARK: - Expandable Text
-
-struct ExpandableText: View {
-    let text: String
-    let maxCharacters: Int
-
-    @State private var isExpanded = false
-    private let needsExpansion: Bool
-
-    init(text: String, maxCharacters: Int = 400) {
-        self.text = text
-        self.maxCharacters = maxCharacters
-        self.needsExpansion = text.count > maxCharacters
-    }
-
-    var body: some View {
-        VStack(alignment: .trailing, spacing: 3) {
-            Text(displayedText)
-                .textSelection(.enabled)
-                .lineSpacing(2)
-
-            if needsExpansion {
-                Button {
-                    isExpanded.toggle()
-                } label: {
-                    Text(isExpanded ? "Show Less" : "Show More")
-                }
-                .buttonBorderShape(.capsule)
-            }
-        }
-    }
-
-    private var displayedText: String {
-        guard needsExpansion && !isExpanded else { return text }
-        return String(text.prefix(maxCharacters))
-    }
-}
-
-// MARK: - Color Hex Extension
-
-extension Color {
-    init(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-        let a, r, g, b: UInt64
-        switch hex.count {
-        case 3:
-            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6:
-            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8:
-            (r, g, b, a) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
-        default:
-            (a, r, g, b) = (255, 0, 0, 0)
-        }
-        self.init(.sRGB, red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255, opacity: Double(a) / 255)
     }
 }

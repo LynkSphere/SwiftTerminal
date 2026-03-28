@@ -116,6 +116,10 @@ struct AssistantTurnView: View {
 
                     case .toolGroup(let tools):
                         ToolGroupView(tools: tools)
+
+                    case .editDiff(let tool):
+                        InlineEditDiffView(tool: tool)
+                        
                     }
                 }
 
@@ -139,29 +143,34 @@ struct AssistantTurnView: View {
         var groups: [ContentGroup] = []
         var pendingTools: [ToolUseInfo] = []
 
+        func flushPendingTools() {
+            guard !pendingTools.isEmpty else { return }
+            groups.append(.toolGroup(pendingTools))
+            pendingTools = []
+        }
+
         for block in allBlocks {
             switch block {
             case .text(let info):
-                if !pendingTools.isEmpty {
-                    groups.append(.toolGroup(pendingTools))
-                    pendingTools = []
-                }
+                flushPendingTools()
                 if !info.content.isEmpty {
                     groups.append(.text(info))
                 }
 
             case .toolUse(let info):
-                pendingTools.append(info)
+                if info.name == "Edit" || info.name == "Write" {
+                    flushPendingTools()
+                    groups.append(.editDiff(info))
+                } else {
+                    pendingTools.append(info)
+                }
 
             case .thinking, .toolResult:
                 break
             }
         }
 
-        if !pendingTools.isEmpty {
-            groups.append(.toolGroup(pendingTools))
-        }
-
+        flushPendingTools()
         return groups
     }
 }
@@ -171,11 +180,13 @@ struct AssistantTurnView: View {
 private enum ContentGroup: Identifiable {
     case text(TextInfo)
     case toolGroup([ToolUseInfo])
+    case editDiff(ToolUseInfo)
 
     var id: String {
         switch self {
         case .text(let info): "text-\(info.id)"
         case .toolGroup(let tools): "tools-\(tools.map(\.id).joined(separator: "-"))"
+        case .editDiff(let tool): "edit-\(tool.id)"
         }
     }
 }
