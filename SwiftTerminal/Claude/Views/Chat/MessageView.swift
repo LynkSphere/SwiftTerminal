@@ -86,7 +86,7 @@ struct ToolGroupView: View {
                     }
                 }
             }
-            .contentMargins(10)
+            .padding(10)
         }
         .frame(maxHeight: 300)
     }

@@ -137,7 +137,7 @@ struct GitInspectorView: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
-            .padding(.top, 8)
+            .padding(.top, 7)
         }
         .safeAreaBar(edge: .bottom) {
             if model.snapshots.count > 1 {

@@ -22,7 +22,7 @@ struct SessionDetailView: View {
             }
             .inspector(isPresented: Bindable(appState).showingInspector) {
                 InspectorView(directoryURL: workspace.url)
-                    .inspectorColumnWidth(min: 180, ideal: 220, max: 360)
+                    .inspectorColumnWidth(min: 240, ideal: 240, max: 360)
             }
             .environment(editorPanel)
             .onChange(of: appState.panelToggleToken) {

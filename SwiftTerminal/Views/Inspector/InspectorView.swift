@@ -58,8 +58,8 @@ struct InspectorView: View {
             SearchInspectorView(directoryURL: directoryURL)
         case .git:
             GitInspectorView(directoryURL: directoryURL)
-        case .extensions:
-            ContentUnavailableView("Extensions", systemImage: "puzzlepiece.extension", description: Text("No extensions installed."))
+        case .terminal:
+            TerminalInspectorView()
         }
     }
 

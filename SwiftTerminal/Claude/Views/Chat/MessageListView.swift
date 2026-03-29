@@ -84,7 +84,7 @@ struct UserMessageView: View {
 
     var body: some View {
         VStack(alignment: .trailing) {
-            ExpandableText(text: message.text)
+            Text(message.text)
                 .padding(12)
                 .background(.background.secondary)
                 .clipShape(RoundedRectangle(cornerRadius: 20))
@@ -118,8 +118,9 @@ struct AssistantTurnView: View {
                         ToolGroupView(tools: tools)
 
                     case .editDiff(let tool):
-                        InlineEditDiffView(tool: tool)
-                        
+//                    TODO: define
+                        Text(tool.result?.content ?? "")
+//                        InlineEditDiffView(tool: tool)
                     }
                 }
 

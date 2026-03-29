@@ -11,6 +11,7 @@ final class TerminalTab {
     var workspace: Workspace?
 
     @Attribute(.ephemeral) var hasBellNotification = false
+    @Attribute(.ephemeral) var shellTitle: String?
     @Transient var localProcessTerminalView: LocalProcessTerminalView?
 
     init(title: String = "Terminal", currentDirectory: String? = nil, sortOrder: Int = 0) {
@@ -80,6 +81,12 @@ final class TerminalTab {
     func resetFontSize() {
         guard let tv = localProcessTerminalView else { return }
         tv.font = .monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+    }
+
+    func clearTerminal() {
+        guard let tv = localProcessTerminalView else { return }
+        tv.getTerminal().resetToInitialState()
+        tv.send(txt: "\u{0C}")
     }
 
     func clearNotification() {

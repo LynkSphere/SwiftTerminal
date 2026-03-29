@@ -53,9 +53,9 @@ struct AppCommands: Commands {
 
             Button {
                 appState.showingInspector = true
-                appState.selectedInspectorTab = .extensions
+                appState.selectedInspectorTab = .terminal
             } label: {
-                Label("Extensions", systemImage: "puzzlepiece.extension")
+                Label("Terminal", systemImage: "terminal")
             }
             .keyboardShortcut("4", modifiers: .command)
 

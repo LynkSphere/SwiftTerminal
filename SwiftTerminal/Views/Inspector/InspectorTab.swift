@@ -4,7 +4,7 @@ enum InspectorTab: Int, CaseIterable, Identifiable {
     case files
     case git
     case search
-    case extensions
+    case terminal
 
     var id: Int { rawValue }
 
@@ -13,7 +13,7 @@ enum InspectorTab: Int, CaseIterable, Identifiable {
         case .files: "Files"
         case .search: "Search"
         case .git: "Git"
-        case .extensions: "Extensions"
+        case .terminal: "Terminal"
         }
     }
 
@@ -22,7 +22,7 @@ enum InspectorTab: Int, CaseIterable, Identifiable {
         case .files: "folder"
         case .search: "magnifyingglass"
         case .git: "point.topleft.down.curvedto.point.bottomright.up"
-        case .extensions: "puzzlepiece.extension"
+        case .terminal: "terminal"
         }
     }
 
@@ -31,7 +31,7 @@ enum InspectorTab: Int, CaseIterable, Identifiable {
         case .files: "folder.fill"
         case .search: "magnifyingglass.circle.fill"
         case .git: "point.topleft.down.curvedto.point.bottomright.up.fill"
-        case .extensions: "puzzlepiece.extension.fill"
+        case .terminal: "terminal.fill"
         }
     }
 }
