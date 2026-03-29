@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import SwiftUI
 import UserNotifications
 
 /// A pending image attachment to send with the next message.
@@ -33,6 +34,27 @@ final class ClaudeService {
     var selectedModel: ModelOption = .opus
     var selectedEffort: EffortLevel = .medium
     var selectedContextWindow: ContextWindow = .extended
+    var userDidScroll = false
+
+    // MARK: - Scroll
+
+    @ObservationIgnored var scrollProxy: ScrollViewProxy?
+
+    func scrollToBottom(animated: Bool = false, delay: TimeInterval = 0) {
+        let scroll = { [weak self] in
+            guard let self else { return }
+            if animated {
+                withAnimation { self.scrollProxy?.scrollTo(String.bottomID, anchor: .bottom) }
+            } else {
+                self.scrollProxy?.scrollTo(String.bottomID, anchor: .bottom)
+            }
+        }
+        if delay > 0 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { scroll() }
+        } else {
+            DispatchQueue.main.async { scroll() }
+        }
+    }
 
     // MARK: - Private
 
@@ -96,6 +118,8 @@ final class ClaudeService {
         messages.append(userMessage)
         messages.append(ChatMessage(role: .assistant))
         state.reset()
+        userDidScroll = false
+        scrollToBottom()
 
         // Record preceding assistant UUID for this user message
         if let aUUID = lastAssistantSDKUUID {
@@ -696,6 +720,10 @@ final class ClaudeService {
             case .unknown:
                 break
             }
+        }
+
+        if !userDidScroll {
+            scrollToBottom()
         }
 
         if let sid = event.sessionID {

@@ -1,14 +1,35 @@
 import SwiftUI
 
+extension String {
+    nonisolated static let bottomID = "bottomID"
+}
+
 struct ClaudeChatView: View {
     let service: ClaudeService
 
     var body: some View {
-        List {
-            MessageListView(service: service)
+        ScrollViewReader { proxy in
+            List {
+                MessageListView(service: service)
 
-            ErrorBarView(service: service)
-                .listRowSeparator(.hidden)
+                ErrorBarView(service: service)
+                    .listRowSeparator(.hidden)
+
+                Color.clear
+                    .frame(height: 1)
+                    .listRowSeparator(.hidden)
+                    .id(String.bottomID)
+            }
+            .task {
+                service.scrollProxy = proxy
+                // Scroll to bottom once messages are rendered
+                service.scrollToBottom(delay: 0.25)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSScrollView.willStartLiveScrollNotification)) { _ in
+                if service.isStreaming {
+                    service.userDidScroll = true
+                }
+            }
         }
         .overlay {
             if service.messages.isEmpty {
