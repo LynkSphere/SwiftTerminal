@@ -4,7 +4,7 @@ import SwiftUI
 enum HunkTextViewConstants {
     static let font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
     static let lineHeight: CGFloat = 17
-    static let gutterWidth: CGFloat = 56
+    static let gutterWidth: CGFloat = 36
     static let lineNumFont = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular)
 }
 
@@ -121,8 +121,6 @@ final class HunkNSTextView: NSTextView {
             .foregroundColor: NSColor.secondaryLabelColor,
         ]
 
-        let colWidth: CGFloat = (gutterWidth - 8) / 2
-
         text.enumerateSubstrings(in: charRange, options: [.byLines, .substringNotRequired]) { _, substringRange, enclosingRange, _ in
             let lineIdx = self.lineIndex(forCharacterIndex: substringRange.location)
             guard lineIdx < self.lineData.count else { return }
@@ -146,18 +144,12 @@ final class HunkNSTextView: NSTextView {
             let y = lineRect.minY
             let data = self.lineData[lineIdx]
 
-            // Old line number
-            if let old = data.oldNum {
-                let str = "\(old)" as NSString
+            // Single line number: prefer new, fall back to old (removed lines)
+            let lineNum = data.newNum ?? data.oldNum
+            if let num = lineNum {
+                let str = "\(num)" as NSString
                 let size = str.size(withAttributes: lineNumAttrs)
-                str.draw(at: NSPoint(x: colWidth - size.width + 2, y: y), withAttributes: lineNumAttrs)
-            }
-
-            // New line number
-            if let new = data.newNum {
-                let str = "\(new)" as NSString
-                let size = str.size(withAttributes: lineNumAttrs)
-                str.draw(at: NSPoint(x: colWidth + 4 + (colWidth - size.width), y: y), withAttributes: lineNumAttrs)
+                str.draw(at: NSPoint(x: gutterWidth - size.width - 6, y: y), withAttributes: lineNumAttrs)
             }
         }
     }
