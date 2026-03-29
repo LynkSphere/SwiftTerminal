@@ -30,7 +30,7 @@ struct InputBarView: View {
                     }
                     .font(.body)
                     .focused($isFocused)
-                    .padding(.horizontal, 7)
+                    .padding(.horizontal, 6)
                     .padding(.vertical, 3)
                     .padding(6)
                     .glassEffect(in: .rect(cornerRadius: 16))

@@ -2,12 +2,15 @@ import SwiftUI
 
 struct AppCommands: Commands {
     @Bindable var appState: AppState
+    @FocusedValue(\.editorPanel) private var editorPanel
     @AppStorage("showHiddenFiles") var showHiddenFiles = false
 
     var body: some Commands {
         CommandGroup(replacing: .toolbar) {
             Button {
-                appState.panelToggleToken = UUID()
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    editorPanel?.toggle()
+                }
             } label: {
                 Label("Toggle Editor Panel", systemImage: "rectangle.bottomhalf.inset.filled")
             }

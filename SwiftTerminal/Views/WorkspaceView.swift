@@ -20,11 +20,7 @@ struct WorkspaceView: View {
                         .inspectorColumnWidth(min: 240, ideal: 240, max: 360)
                 }
                 .environment(editorPanel)
-                .onChange(of: appState.panelToggleToken) {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        editorPanel.toggle()
-                    }
-                }
+                .focusedSceneValue(\.editorPanel, editorPanel)
         }
     }
 }

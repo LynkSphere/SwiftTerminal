@@ -1,4 +1,4 @@
-import Foundation
+import SwiftUI
 
 /// What the bottom editor panel should display.
 enum EditorPanelContent: Equatable {
@@ -162,4 +162,10 @@ final class EditorPanel {
         content = next
         isHidden = false
     }
+}
+
+// MARK: - FocusedValue
+
+extension FocusedValues {
+    @Entry var editorPanel: EditorPanel?
 }

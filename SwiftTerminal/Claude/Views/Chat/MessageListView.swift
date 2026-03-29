@@ -112,6 +112,7 @@ struct UserMessageView: View {
                     .padding(12)
                     .background(.background.secondary)
                     .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .textSelection(.enabled)
             }
         }
         .contextMenu {

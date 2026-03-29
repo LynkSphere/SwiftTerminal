@@ -3,6 +3,7 @@ import SwiftUI
 struct InspectorView: View {
     let directoryURL: URL
     @Environment(AppState.self) private var appState
+    @Environment(EditorPanel.self) private var editorPanel
     @State private var inspectorWidth: CGFloat = 0
     
     var body: some View {
@@ -19,7 +20,9 @@ struct InspectorView: View {
                 if appState.showingInspector {
                     ToolbarItem(placement: .automatic) {
                         Button {
-                            appState.panelToggleToken = UUID()
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                editorPanel.toggle()
+                            }
                         } label: {
                             Image(systemName: "inset.filled.bottomthird.square")
                         }
