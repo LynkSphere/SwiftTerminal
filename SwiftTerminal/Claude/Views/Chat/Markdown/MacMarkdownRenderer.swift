@@ -26,8 +26,6 @@ struct MarkdownTableBlock: Sendable {
     let range: NSRange
     let content: String
     let headerCharacterCount: Int
-    let columnSeparatorPositions: [CGFloat]
-    let contentWidth: CGFloat
 
     static func parseCells(from line: String) -> [String] {
         var content = line.trimmingCharacters(in: .whitespaces)
@@ -244,9 +242,7 @@ struct MacMarkdownRenderer: Sendable {
                         id: nextTableBlockID - 1,
                         range: range,
                         content: rawContent,
-                        headerCharacterCount: tableResult.headerCharacterCount,
-                        columnSeparatorPositions: tableResult.columnSeparatorPositions,
-                        contentWidth: tableResult.contentWidth
+                        headerCharacterCount: tableResult.headerCharacterCount
                     )
                 )
             }
@@ -434,8 +430,6 @@ struct MacMarkdownRenderer: Sendable {
     private struct RenderedTableResult {
         let attributedString: NSAttributedString
         let headerCharacterCount: Int
-        let columnSeparatorPositions: [CGFloat]
-        let contentWidth: CGFloat
     }
 
     private nonisolated func renderedTableResult(
@@ -447,9 +441,7 @@ struct MacMarkdownRenderer: Sendable {
         guard columnCount > 0 else {
             return RenderedTableResult(
                 attributedString: NSAttributedString(),
-                headerCharacterCount: 0,
-                columnSeparatorPositions: [],
-                contentWidth: 0
+                headerCharacterCount: 0
             )
         }
 
@@ -458,79 +450,147 @@ struct MacMarkdownRenderer: Sendable {
             row + Array(repeating: "", count: max(0, columnCount - row.count))
         }
 
+        let table = NSTextTable()
+        table.numberOfColumns = columnCount
+        table.setContentWidth(100, type: .percentageValueType)
+        table.hidesEmptyCells = false
+        table.collapsesBorders = true
+
         let headerFont = NSFont.systemFont(ofSize: bodyFontSize, weight: .semibold)
         let cellFont = bodyFont()
 
+        // Measure max text width per column for proportional sizing
+        let cellPadding: CGFloat = 16 // 8 + 8
         var columnWidths = [CGFloat](repeating: 0, count: columnCount)
-        for (i, header) in paddedHeaders.enumerated() {
-            columnWidths[i] = max(columnWidths[i], (header as NSString).size(withAttributes: [.font: headerFont]).width)
+        for (col, header) in paddedHeaders.enumerated() {
+            let width = header.size(withAttributes: [.font: headerFont]).width + cellPadding
+            columnWidths[col] = max(columnWidths[col], width)
         }
         for row in paddedRows {
-            for (i, cell) in row.enumerated() {
-                columnWidths[i] = max(columnWidths[i], (cell as NSString).size(withAttributes: [.font: cellFont]).width)
+            for (col, cell) in row.enumerated() {
+                let width = cell.size(withAttributes: [.font: cellFont]).width + cellPadding
+                columnWidths[col] = max(columnWidths[col], width)
             }
         }
+        let totalWidth = columnWidths.reduce(0, +)
+        let columnPercentages: [CGFloat] = totalWidth > 0
+            ? columnWidths.map { ($0 / totalWidth) * 100 }
+            : [CGFloat](repeating: 100 / CGFloat(columnCount), count: columnCount)
 
-        let horizontalPadding: CGFloat = 12
-        let columnGap: CGFloat = 24
-
-        var tabLocations: [CGFloat] = []
-        var columnSeparatorPositions: [CGFloat] = []
-        var x = horizontalPadding
-        for i in 0..<columnCount {
-            x += columnWidths[i]
-            if i < columnCount - 1 {
-                columnSeparatorPositions.append(x + columnGap / 2)
-                x += columnGap
-                tabLocations.append(x)
-            }
-        }
-
-        let contentWidth = x + horizontalPadding
-
-        let style = NSMutableParagraphStyle()
-        style.tabStops = tabLocations.map { NSTextTab(textAlignment: .left, location: $0) }
-        style.defaultTabInterval = 100
-        style.firstLineHeadIndent = horizontalPadding
-        style.headIndent = horizontalPadding
-        style.tailIndent = -horizontalPadding
-        style.lineSpacing = 4
-        style.paragraphSpacing = 6
-        style.paragraphSpacingBefore = 6
-        style.lineBreakMode = .byClipping
-
+        let alternateRowColor = NSColor.quaternarySystemFill
         let output = NSMutableAttributedString()
 
-        let headerText = paddedHeaders.joined(separator: "\t")
-        output.append(NSAttributedString(
-            string: headerText,
-            attributes: [
-                .font: headerFont,
-                .foregroundColor: NSColor.labelColor,
-            ]
-        ))
+        func makeCellString(row: Int, col: Int, text: String, font: NSFont, isHeader: Bool) -> NSAttributedString {
+            let block = NSTextTableBlock(
+                table: table,
+                startingRow: row,
+                rowSpan: 1,
+                startingColumn: col,
+                columnSpan: 1
+            )
 
-        for row in paddedRows {
-            output.append(NSAttributedString(string: "\n"))
-            output.append(NSAttributedString(
-                string: row.joined(separator: "\t"),
+            block.setContentWidth(columnPercentages[col], type: .percentageValueType)
+
+            block.setWidth(5, type: .absoluteValueType, for: .padding, edge: .minY)
+            block.setWidth(5, type: .absoluteValueType, for: .padding, edge: .maxY)
+            block.setWidth(8, type: .absoluteValueType, for: .padding, edge: .minX)
+            block.setWidth(8, type: .absoluteValueType, for: .padding, edge: .maxX)
+
+            block.setWidth(0.5, type: .absoluteValueType, for: .border)
+            block.setBorderColor(.separatorColor)
+
+            if isHeader {
+                block.backgroundColor = .quaternarySystemFill
+            } else {
+                // row is 1-based for data rows; even data rows (row 2, 4, ...) get alternate bg
+                block.backgroundColor = row % 2 == 0 ? alternateRowColor : .clear
+            }
+
+            let style = NSMutableParagraphStyle()
+            style.textBlocks = [block]
+            style.lineSpacing = 2
+            style.lineBreakMode = .byWordWrapping
+
+            // Parse inline markdown (bold, italic, inline code)
+            let cellContent: NSMutableAttributedString
+            if let parsed = try? NSAttributedString(
+                markdown: text,
+                options: .init(
+                    allowsExtendedAttributes: true,
+                    interpretedSyntax: .inlineOnlyPreservingWhitespace,
+                    failurePolicy: .returnPartiallyParsedIfPossible
+                ),
+                baseURL: nil
+            ) {
+                cellContent = NSMutableAttributedString(attributedString: parsed)
+                normalizeFonts(in: cellContent)
+                applyInlineCodeStyling(to: cellContent)
+            } else {
+                cellContent = NSMutableAttributedString(string: text)
+            }
+
+            // Apply cell-level attributes
+            let fullRange = NSRange(location: 0, length: cellContent.length)
+            cellContent.addAttributes([
+                .paragraphStyle: style,
+                .markdownTableBlockID: blockID
+            ], range: fullRange)
+
+            // Set base font for non-styled runs, preserve bold from normalization
+            cellContent.enumerateAttribute(.font, in: fullRange) { value, range, _ in
+                guard let existingFont = value as? NSFont else {
+                    cellContent.addAttribute(.font, value: font, range: range)
+                    return
+                }
+                let traits = existingFont.fontDescriptor.symbolicTraits
+                if isHeader || traits.contains(.bold) {
+                    // Keep semibold for headers and bold inline markdown
+                    let weight: NSFont.Weight = .semibold
+                    if traits.contains(.monoSpace) {
+                        cellContent.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: font.pointSize, weight: weight), range: range)
+                    } else {
+                        cellContent.addAttribute(.font, value: NSFont.systemFont(ofSize: font.pointSize, weight: weight), range: range)
+                    }
+                } else if !traits.contains(.monoSpace) {
+                    cellContent.addAttribute(.font, value: font, range: range)
+                }
+            }
+
+            // Set foreground color only where not already set by inline code styling
+            cellContent.enumerateAttribute(.foregroundColor, in: fullRange) { value, range, _ in
+                if value == nil {
+                    cellContent.addAttribute(.foregroundColor, value: NSColor.labelColor, range: range)
+                }
+            }
+
+            cellContent.append(NSAttributedString(
+                string: "\n",
                 attributes: [
-                    .font: cellFont,
+                    .font: font,
                     .foregroundColor: NSColor.labelColor,
+                    .paragraphStyle: style,
+                    .markdownTableBlockID: blockID
                 ]
             ))
+
+            return cellContent
         }
 
-        output.addAttributes([
-            .paragraphStyle: style,
-            .markdownTableBlockID: blockID,
-        ], range: output.fullRange)
+        var headerCharCount = 0
+        for (col, header) in paddedHeaders.enumerated() {
+            output.append(makeCellString(row: 0, col: col, text: header, font: headerFont, isHeader: true))
+            headerCharCount += header.count + 1
+        }
+
+        for (rowIdx, row) in paddedRows.enumerated() {
+            for (col, cell) in row.enumerated() {
+                output.append(makeCellString(row: rowIdx + 1, col: col, text: cell, font: cellFont, isHeader: false))
+            }
+        }
 
         return RenderedTableResult(
             attributedString: output,
-            headerCharacterCount: headerText.count,
-            columnSeparatorPositions: columnSeparatorPositions,
-            contentWidth: contentWidth
+            headerCharacterCount: headerCharCount
         )
     }
 

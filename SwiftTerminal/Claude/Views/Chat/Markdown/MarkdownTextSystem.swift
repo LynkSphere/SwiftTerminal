@@ -183,7 +183,6 @@ final class MarkdownLayoutManager: NSLayoutManager, NSLayoutManagerDelegate {
         static let cornerRadius: CGFloat = 12
         static let verticalPadding: CGFloat = 16
         static let codeBlockHorizontalPadding: CGFloat = 10
-        static let tableVerticalPadding: CGFloat = 2
         static let quoteIndentStep: CGFloat = 16
         static let quoteLineWidth: CGFloat = 3
         static let quoteLineInset: CGFloat = 6
@@ -200,7 +199,6 @@ final class MarkdownLayoutManager: NSLayoutManager, NSLayoutManagerDelegate {
     override func drawBackground(forGlyphRange glyphsToShow: NSRange, at origin: CGPoint) {
         super.drawBackground(forGlyphRange: glyphsToShow, at: origin)
         drawCodeBlockBackgrounds(forGlyphRange: glyphsToShow, at: origin)
-        drawTableBackgrounds(forGlyphRange: glyphsToShow, at: origin)
         drawQuoteLines(forGlyphRange: glyphsToShow, at: origin)
         drawThematicBreaks(forGlyphRange: glyphsToShow, at: origin)
     }
@@ -222,69 +220,6 @@ final class MarkdownLayoutManager: NSLayoutManager, NSLayoutManagerDelegate {
         guard !lineEndsDocument(at: glyphIndex) else { return 0 }
         guard let paragraphStyle = paragraphStyle(at: glyphIndex) else { return 0 }
         return paragraphStyle.paragraphSpacing
-    }
-
-    private func drawTableBackgrounds(forGlyphRange glyphsToShow: NSRange, at origin: CGPoint) {
-        guard !tableBlocks.isEmpty else { return }
-
-        let visibleCharacterRange = characterRange(forGlyphRange: glyphsToShow, actualGlyphRange: nil)
-        let visibleTables = tableBlocks.filter {
-            NSIntersectionRange($0.range, visibleCharacterRange).length > 0
-        }
-
-        guard !visibleTables.isEmpty else { return }
-
-        for table in visibleTables {
-            let glyphRange = glyphRange(forCharacterRange: table.range, actualCharacterRange: nil)
-            guard glyphRange.length > 0 else { continue }
-
-            var lineRects: [NSRect] = []
-            enumerateLineFragments(forGlyphRange: glyphRange) { lineRect, _, _, effectiveRange, _ in
-                guard NSIntersectionRange(effectiveRange, glyphRange).length > 0 else { return }
-                lineRects.append(lineRect.offsetBy(dx: origin.x, dy: origin.y))
-            }
-            guard !lineRects.isEmpty else { continue }
-
-            let unionRect = lineRects.reduce(lineRects[0]) { $0.union($1) }
-            let blockRect = NSRect(
-                x: unionRect.minX,
-                y: unionRect.minY - Layout.tableVerticalPadding / 2,
-                width: table.contentWidth,
-                height: unionRect.height + Layout.tableVerticalPadding
-            ).integral
-
-            codeBlockBackgroundColor.setFill()
-            let bgPath = NSBezierPath(
-                roundedRect: blockRect,
-                xRadius: Layout.cornerRadius,
-                yRadius: Layout.cornerRadius
-            )
-            bgPath.fill()
-
-            NSColor.separatorColor.setStroke()
-            bgPath.lineWidth = 1
-            bgPath.stroke()
-
-            NSColor.quaternaryLabelColor.setStroke()
-
-            for i in 0..<(lineRects.count - 1) {
-                let y = ceil((lineRects[i].maxY + lineRects[i + 1].minY) / 2)
-                let linePath = NSBezierPath()
-                linePath.move(to: NSPoint(x: blockRect.minX + 1, y: y))
-                linePath.line(to: NSPoint(x: blockRect.maxX - 1, y: y))
-                linePath.lineWidth = 1
-                linePath.stroke()
-            }
-
-            for separatorX in table.columnSeparatorPositions {
-                let x = ceil(origin.x + separatorX)
-                let linePath = NSBezierPath()
-                linePath.move(to: NSPoint(x: x, y: blockRect.minY + 1))
-                linePath.line(to: NSPoint(x: x, y: blockRect.maxY - 1))
-                linePath.lineWidth = 1
-                linePath.stroke()
-            }
-        }
     }
 
     private func drawCodeBlockBackgrounds(forGlyphRange glyphsToShow: NSRange, at origin: CGPoint) {
