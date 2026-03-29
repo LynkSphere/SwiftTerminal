@@ -45,6 +45,7 @@ enum MessageBlock: Identifiable {
     case toolUse(ToolUseInfo)
     case toolResult(ToolResultInfo)
     case thinking(ThinkingInfo)
+    case image(ImageInfo)
 
     var id: String {
         switch self {
@@ -52,6 +53,7 @@ enum MessageBlock: Identifiable {
         case .toolUse(let info): "tool-\(info.id)"
         case .toolResult(let info): "result-\(info.toolUseID)"
         case .thinking(let info): "think-\(info.id)"
+        case .image(let info): "img-\(info.id)"
         }
     }
 }
@@ -156,6 +158,20 @@ struct ThinkingInfo: Identifiable {
     init(text: String) {
         self.id = UUID().uuidString
         self.text = text
+    }
+}
+
+// MARK: - Image Info
+
+struct ImageInfo: Identifiable {
+    let id: String
+    let data: Data
+    let mediaType: String
+
+    init(data: Data, mediaType: String) {
+        self.id = UUID().uuidString
+        self.data = data
+        self.mediaType = mediaType
     }
 }
 

@@ -1,5 +1,18 @@
 import Foundation
 
+/// A pending image attachment to send with the next message.
+struct ImageAttachment: Identifiable {
+    let id = UUID()
+    let data: Data
+    let mediaType: String
+
+    var base64String: String { data.base64EncodedString() }
+
+    var bridgePayload: [String: String] {
+        ["mediaType": mediaType, "data": base64String]
+    }
+}
+
 /// High-level service that orchestrates Claude via the Agent SDK bridge.
 @Observable
 final class ClaudeService {
@@ -7,6 +20,7 @@ final class ClaudeService {
 
     let id = UUID()
     var prompt = ""
+    var imageAttachments: [ImageAttachment] = []
     var messages: [ChatMessage] = []
     var isStreaming = false
     var session = SessionInfo()
@@ -61,15 +75,21 @@ final class ClaudeService {
 
     func sendMessage() {
         let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !isStreaming else { return }
+        guard !trimmed.isEmpty || !imageAttachments.isEmpty, !isStreaming else { return }
+        let images = imageAttachments
         prompt = ""
-        send(trimmed)
+        imageAttachments = []
+        send(trimmed.isEmpty ? " " : trimmed, images: images)
     }
 
-    func send(_ text: String) {
+    func send(_ text: String, images: [ImageAttachment] = []) {
         guard !isStreaming else { return }
 
-        let userMessage = ChatMessage(role: .user, blocks: [.text(TextInfo(content: text))])
+        var blocks: [MessageBlock] = [.text(TextInfo(content: text))]
+        for image in images {
+            blocks.append(.image(ImageInfo(data: image.data, mediaType: image.mediaType)))
+        }
+        let userMessage = ChatMessage(role: .user, blocks: blocks)
         messages.append(userMessage)
         messages.append(ChatMessage(role: .assistant))
         state.reset()
@@ -82,6 +102,8 @@ final class ClaudeService {
 
         isStreaming = true
         error = nil
+
+        let imagePayloads = images.map(\.bridgePayload)
 
         Task { [weak self] in
             guard let self else { return }
@@ -96,6 +118,9 @@ final class ClaudeService {
                     "effort": self.selectedEffort.rawValue,
                     "contextWindow": self.selectedContextWindow.rawValue,
                 ]
+                if !imagePayloads.isEmpty {
+                    params["images"] = imagePayloads
+                }
                 if self._continueLastOnNextSend {
                     params["continueSession"] = true
                     self._continueLastOnNextSend = false
@@ -109,9 +134,11 @@ final class ClaudeService {
                 self.process?.sendCommand("start_session", params: params)
                 self.queryActive = true
             } else {
-                self.process?.sendCommand("send_message", params: [
-                    "text": text
-                ])
+                var msgParams: [String: Any] = ["text": text]
+                if !imagePayloads.isEmpty {
+                    msgParams["images"] = imagePayloads
+                }
+                self.process?.sendCommand("send_message", params: msgParams)
             }
 
             await withCheckedContinuation { continuation in
@@ -158,6 +185,7 @@ final class ClaudeService {
         isStreaming = false
 
         prompt = ""
+        imageAttachments = []
         messages.removeAll()
         session = SessionInfo()
         toolUseIndex.removeAll()

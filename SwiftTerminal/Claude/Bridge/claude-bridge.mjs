@@ -194,10 +194,22 @@ async function handleStartSession(params) {
     const promptIterable = createPromptIterable();
 
     const initialText = params.initialMessage || "Hello";
+    const content = [{ type: "text", text: initialText }];
+
+    // Support image attachments on initial message
+    if (params.images?.length) {
+      for (const img of params.images) {
+        content.push({
+          type: "image",
+          source: { type: "base64", media_type: img.mediaType, data: img.data },
+        });
+      }
+    }
+
     const userUUID = randomUUID();
     pushMessage({
       type: "user",
-      message: { role: "user", content: [{ type: "text", text: initialText }] },
+      message: { role: "user", content },
       parent_tool_use_id: null,
       uuid: userUUID,
     });

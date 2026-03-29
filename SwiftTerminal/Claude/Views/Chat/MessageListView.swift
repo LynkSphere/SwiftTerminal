@@ -83,25 +83,48 @@ struct UserMessageView: View {
     let message: ChatMessage
     let service: ClaudeService
 
+    private var images: [ImageInfo] {
+        message.blocks.compactMap {
+            if case .image(let info) = $0 { return info }
+            return nil
+        }
+    }
+
     var body: some View {
-        VStack(alignment: .trailing) {
-            Text(message.text)
-                .padding(12)
-                .background(.background.secondary)
-                .clipShape(RoundedRectangle(cornerRadius: 20))
-                .contextMenu {
-                    Button("Copy", systemImage: "doc.on.doc") {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(message.text, forType: .string)
-                    }
-                    Divider()
-                    Button("Rewind", systemImage: "arrow.counterclockwise") {
-                        Task {
-                            await service.rewind(toMessageID: message.id)
+        VStack(alignment: .trailing, spacing: 6) {
+            if !images.isEmpty {
+                HStack(spacing: 6) {
+                    ForEach(images) { img in
+                        if let nsImage = NSImage(data: img.data) {
+                            Image(nsImage: nsImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(maxWidth: 120, maxHeight: 120)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
                     }
-                    .disabled(service.isStreaming)
                 }
+            }
+
+            if !message.text.isEmpty {
+                Text(message.text)
+                    .padding(12)
+                    .background(.background.secondary)
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+            }
+        }
+        .contextMenu {
+            Button("Copy", systemImage: "doc.on.doc") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(message.text, forType: .string)
+            }
+            Divider()
+            Button("Rewind", systemImage: "arrow.counterclockwise") {
+                Task {
+                    await service.rewind(toMessageID: message.id)
+                }
+            }
+            .disabled(service.isStreaming)
         }
         .frame(maxWidth: .infinity, alignment: .trailing)
         .padding(.leading, 160)
@@ -180,7 +203,7 @@ struct AssistantTurnView: View {
                     pendingTools.append(info)
                 }
 
-            case .thinking, .toolResult:
+            case .thinking, .toolResult, .image:
                 break
             }
         }

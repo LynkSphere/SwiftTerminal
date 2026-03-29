@@ -6,76 +6,92 @@ struct InputBarView: View {
 
     var body: some View {
         GlassEffectContainer {
-            HStack(alignment: .bottom) {
-                Menu {
-                    if service.queryActive {
-                        Button(role: .destructive) {
-                            service.disconnectProcess()
-                        } label: {
-                            Label("Stop Session", systemImage: "xmark")
+            VStack(spacing: 0) {
+                if !service.imageAttachments.isEmpty {
+                    attachmentPreview
+                }
+
+                HStack(alignment: .bottom) {
+                    AttachmentMenuView(service: service)
+
+                    ZStack(alignment: .leading) {
+                        if service.prompt.isEmpty {
+                            Text("Make Claude do anything...")
+                                .padding(.leading, 1)
+                                .foregroundStyle(.placeholder)
                         }
-                        Divider()
-                    }
-                    Button {} label: {
-                        Label("Photos Library", systemImage: "photo.on.rectangle.angled")
-                    }
-                    Button {} label: {
-                        Label("Attach Files", systemImage: "paperclip")
-                    }
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .foregroundStyle(.secondary, .clear)
-                        .font(.largeTitle).fontWeight(.semibold)
-                        .glassEffect()
-                }
-                .menuStyle(.button)
-                .buttonStyle(.plain)
-                .menuIndicator(.hidden)
-                .fixedSize()
-                .offset(y: -1)
 
-                ZStack(alignment: .leading) {
-                    if service.prompt.isEmpty {
-                        Text("Make Claude do anything...")
-                            .padding(.leading, 1)
-                            .foregroundStyle(.placeholder)
+                        TextEditor(text: Bindable(service).prompt)
+                            .padding(.leading, -4)
+                            .frame(maxHeight: 350)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .scrollContentBackground(.hidden)
+                            .disabled(service.pendingApproval != nil)
                     }
+                    .font(.body)
+                    .focused($isFocused)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .padding(6)
+                    .glassEffect(in: .rect(cornerRadius: 16))
 
-                    TextEditor(text: Bindable(service).prompt)
-                        .padding(.leading, -4)
-                        .frame(maxHeight: 350)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .scrollContentBackground(.hidden)
-                        .disabled(service.pendingApproval != nil)
+                    Button {
+                        service.isStreaming ? service.stop() : service.sendMessage()
+                    } label: {
+                        Image(systemName: service.isStreaming ? "stop.fill" : "arrow.up")
+                            .font(.system(size: 15)).fontWeight(.bold)
+                    }
+                    .opacity(0.85)
+                    .controlSize(.large)
+                    .tint(service.isStreaming ? .red : .accent)
+                    .buttonStyle(.borderedProminent)
+                    .buttonBorderShape(.circle)
+                    .disabled(!service.isStreaming && !canSend)
+                    .offset(y: -2)
+                    .keyboardShortcut(service.isStreaming ? "d" : .return)
                 }
-                .font(.body)
-                .focused($isFocused)
-                .padding(.horizontal, 7)
-                .padding(.vertical, 3)
-                .padding(6)
-                .glassEffect(in: .rect(cornerRadius: 16))
-
-                Button {
-                    service.isStreaming ? service.stop() : service.sendMessage()
-                } label: {
-                    Image(systemName: service.isStreaming ? "stop.fill" : "arrow.up")
-                        .font(.system(size: 15)).fontWeight(.bold)
-                }
-                .opacity(0.85)
-                .controlSize(.large)
-                .tint(service.isStreaming ? .red : .accent)
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.circle)
-                .disabled(!service.isStreaming && trimmedPrompt.isEmpty)
-                .offset(y: -2)
-                .keyboardShortcut(service.isStreaming ? "d" : .return)
+                .padding(10)
             }
-            .padding(10)
         }
         .task { isFocused = true }
     }
 
+    private var canSend: Bool {
+        !trimmedPrompt.isEmpty || !service.imageAttachments.isEmpty
+    }
+
     private var trimmedPrompt: String {
         service.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var attachmentPreview: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(service.imageAttachments) { attachment in
+                    ZStack(alignment: .topTrailing) {
+                        if let nsImage = NSImage(data: attachment.data) {
+                            Image(nsImage: nsImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 60, height: 60)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+
+                        Button {
+                            service.imageAttachments.removeAll { $0.id == attachment.id }
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.caption)
+                                .foregroundStyle(.white, .black.opacity(0.6))
+                        }
+                        .buttonStyle(.plain)
+                        .offset(x: 4, y: -4)
+                    }
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 10)
+            .padding(.bottom, 4)
+        }
     }
 }
