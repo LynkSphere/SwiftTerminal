@@ -16,6 +16,7 @@ struct BottomSheetView: View {
                 content
             }
             .frame(height: panelHeight, alignment: .top)
+            .background(.background)
         }
     }
 

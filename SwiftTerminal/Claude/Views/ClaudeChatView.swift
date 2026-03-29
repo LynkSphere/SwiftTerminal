@@ -41,7 +41,7 @@ struct ClaudeChatView: View {
             .task {
                 service.scrollProxy = proxy
                 // Scroll to bottom once messages are rendered
-                service.scrollToBottom(delay: 0.25)
+                service.scrollToBottom(delay: 0.5)
             }
             .onReceive(NotificationCenter.default.publisher(for: NSScrollView.willStartLiveScrollNotification)) { _ in
                 if service.isStreaming {

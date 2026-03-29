@@ -45,6 +45,11 @@ struct SessionRow: View {
 
             Divider()
 
+            Button("Stop Session", systemImage: "xmark", role: .destructive) {
+                session.resolveService().disconnectProcess()
+            }
+            .disabled(session.service?.queryActive != true)
+            
             Button("Delete Session", systemImage: "trash", role: .destructive) {
                 deleteSession()
             }

@@ -725,7 +725,7 @@ final class ClaudeService {
         }
 
         if !userDidScroll {
-            scrollToBottom(animated: true)
+            scrollToBottom(animated: true, delay: 0.1)
         }
 
         if let sid = event.sessionID {

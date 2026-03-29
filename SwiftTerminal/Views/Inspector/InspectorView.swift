@@ -14,6 +14,8 @@ struct InspectorView: View {
                 inspectorWidth = width
             }
             .toolbar {
+                ToolbarSpacer(.fixed)
+                
                 if appState.showingInspector {
                     ToolbarItem(placement: .automatic) {
                         Button {
