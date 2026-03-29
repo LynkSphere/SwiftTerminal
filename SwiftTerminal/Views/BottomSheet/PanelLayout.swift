@@ -1,0 +1,81 @@
+import SwiftUI
+
+/// Layout contract for bottom-sheet panel content.
+///
+/// Each panel type (file editor, diff viewer, etc.) wraps its content in
+/// `PanelLayout`, supplying a title and trailing actions specific to that
+/// content type. The layout is responsible for the shared chrome: navigation
+/// buttons, the separator, and the trailing toggle button.
+struct PanelLayout<Title: View, Actions: View, Content: View>: View {
+    @Environment(EditorPanel.self) private var panel
+    @AppStorage("editorPanelHeight") private var panelHeight: Double = 250
+
+    @ViewBuilder let title: Title
+    @ViewBuilder let actions: Actions
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(spacing: 0) {
+            header
+            Rectangle()
+                .fill(Color(nsColor: .gridColor))
+                .frame(height: 1)
+            content
+        }
+    }
+
+    // MARK: - Header
+
+    private var header: some View {
+        HStack(spacing: 6) {
+            if panel.content != nil {
+                Button { panel.goBack() } label: {
+                    Image(systemName: "chevron.left")
+                }
+                .buttonStyle(.borderless)
+                .disabled(!panel.canGoBack)
+                .help("Back")
+
+                Button { panel.goForward() } label: {
+                    Image(systemName: "chevron.right")
+                }
+                .buttonStyle(.borderless)
+                .disabled(!panel.canGoForward)
+                .help("Forward")
+
+                Divider()
+                    .frame(height: 15)
+            }
+
+            title
+
+            Spacer()
+
+            actions
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    panel.toggle()
+                }
+            } label: {
+                Image(systemName: "inset.filled.bottomthird.square")
+                    .foregroundStyle(panel.isOpen ? .accent : .secondary)
+            }
+            .buttonStyle(.borderless)
+            .help("Toggle Panel")
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(.background.secondary)
+        .cursor(.resizeUpDown)
+        .gesture(resizeGesture)
+    }
+
+    private var resizeGesture: some Gesture {
+        DragGesture(minimumDistance: 1)
+            .onChanged { value in
+                let delta = -value.translation.height
+                panelHeight = max(100, panelHeight + delta)
+            }
+    }
+}

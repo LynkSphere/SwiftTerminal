@@ -16,7 +16,29 @@ struct FileEditorPanel: View {
     }
 
     var body: some View {
-        Group {
+        PanelLayout {
+            Image(nsImage: fileURL.fileIcon)
+                .resizable()
+                .frame(width: 16, height: 16)
+            Text(fileURL.relativePath(from: directoryURL))
+                .font(.subheadline.weight(.medium))
+                .lineLimit(1)
+                .truncationMode(.middle)
+            if panel.isDirty {
+                Circle()
+                    .fill(.secondary)
+                    .frame(width: 6, height: 6)
+                    .help("Unsaved changes")
+            }
+        } actions: {
+            Button { panel.saveRequested = true } label: {
+                Image(systemName: "opticaldiscdrive")
+            }
+            .buttonStyle(.borderless)
+            .keyboardShortcut("s", modifiers: .command)
+            .disabled(!panel.isDirty)
+            .help("Save")
+        } content: {
             if isLoaded {
                 HighlightedTextEditor(
                     text: $content,

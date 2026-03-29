@@ -5,8 +5,25 @@ struct DiffPanel: View {
     @State private var presentation: DiffFilePresentation?
     @State private var isLoading = true
 
+    @Environment(EditorPanel.self) private var panel
+
     var body: some View {
-        Group {
+        PanelLayout {
+            Image(nsImage: reference.fileURL.fileIcon)
+                .resizable()
+                .frame(width: 16, height: 16)
+            Text(reference.repositoryRelativePath)
+                .font(.subheadline.weight(.medium))
+                .lineLimit(1)
+                .truncationMode(.middle)
+            GitStatusBadge(kind: reference.kind, staged: reference.stage != .unstaged)
+        } actions: {
+            Button { panel.openFile(reference.fileURL) } label: {
+                Image(systemName: "doc.text")
+            }
+            .buttonStyle(.borderless)
+            .help("Open File")
+        } content: {
             if isLoading {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
