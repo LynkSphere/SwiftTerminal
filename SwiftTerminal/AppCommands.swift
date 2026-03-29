@@ -64,7 +64,6 @@ struct AppCommands: Commands {
             Button {
                 appState.showingInspector = true
                 appState.selectedInspectorTab = .search
-                appState.searchFocusToken = UUID()
             } label: {
                 Label("Find in Files", systemImage: "doc.text.magnifyingglass")
             }

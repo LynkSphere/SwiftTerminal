@@ -58,11 +58,8 @@ struct SearchInspectorView: View {
                 }
             }
         }
-        .task(id: appState.searchFocusToken) {
-            guard appState.searchFocusToken != nil else { return }
-            try? await Task.sleep(for: .milliseconds(50))
+        .task {
             isSearchFocused = true
-            appState.searchFocusToken = nil
         }
     }
     private func matchRow(_ match: SearchMatch) -> some View {
