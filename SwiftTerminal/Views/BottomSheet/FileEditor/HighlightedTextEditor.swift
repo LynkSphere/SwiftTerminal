@@ -62,9 +62,10 @@ struct HighlightedTextEditor: NSViewRepresentable {
         textView.fileExtension = fileExtension
         context.coordinator.textView = textView
 
-        // Initial content
+        // Initial content + fold computation
         let highlighted = SyntaxHighlighter.highlight(text, fileExtension: fileExtension)
         textView.textStorage?.setAttributedString(highlighted)
+        textView.recomputeFolding()
 
         // Apply highlight request after initial content is set
         if let request = highlightRequest {
@@ -90,6 +91,8 @@ struct HighlightedTextEditor: NSViewRepresentable {
         if !context.coordinator.isEditing, textView.string != text {
             let highlighted = SyntaxHighlighter.highlight(text, fileExtension: fileExtension)
             textView.textStorage?.setAttributedString(highlighted)
+            textView.recomputeFolding()
+            textView.applyFoldAttributes()
         }
 
         // Apply pending highlight request
@@ -120,7 +123,7 @@ struct HighlightedTextEditor: NSViewRepresentable {
             parent.text = textView.string
             isEditing = false
 
-            // Debounced re-highlight
+            // Debounced re-highlight and fold recomputation
             rehighlightTask?.cancel()
             let task = DispatchWorkItem { [weak self] in
                 guard let self, let tv = self.textView else { return }
@@ -130,6 +133,8 @@ struct HighlightedTextEditor: NSViewRepresentable {
                 let highlighted = SyntaxHighlighter.highlight(source, fileExtension: ext)
                 tv.textStorage?.setAttributedString(highlighted)
                 tv.setSelectedRanges(selectedRanges, affinity: .downstream, stillSelecting: false)
+                tv.recomputeFolding()
+                tv.applyFoldAttributes()
             }
             rehighlightTask = task
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: task)

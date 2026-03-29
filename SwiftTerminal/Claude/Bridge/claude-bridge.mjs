@@ -248,6 +248,7 @@ async function handleStartSession(params) {
     const options = {
       cwd: params.cwd || process.cwd(),
       permissionMode: permMode,
+      settingSources: ["user", "project", "local"],
       enableFileCheckpointing: true,
       includePartialMessages: false,
       canUseTool: createCanUseTool(permMode),
