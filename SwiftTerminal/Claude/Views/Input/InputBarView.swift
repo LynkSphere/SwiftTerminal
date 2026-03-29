@@ -41,7 +41,7 @@ struct InputBarView: View {
                 .buttonBorderShape(.circle)
                 .disabled(!service.isStreaming && trimmedPrompt.isEmpty)
                 .offset(y: -2)
-                .keyboardShortcut(.return)
+                .keyboardShortcut(service.isStreaming ? "d" : .return)
             }
             .padding(10)
         }

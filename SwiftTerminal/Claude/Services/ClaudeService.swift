@@ -13,8 +13,6 @@ final class ClaudeService {
     var error: String?
     var availableSessions: [SessionSummary] = []
     var pendingApproval: ApprovalRequest?
-    var pendingElicitation: ElicitationRequest?
-    var promptSuggestions: [String] = []
     var selectedModel: ModelOption = .opus
     var selectedEffort: EffortLevel = .medium
     var selectedContextWindow: ContextWindow = .extended
@@ -108,7 +106,6 @@ final class ClaudeService {
         process?.sendCommand("interrupt")
         isStreaming = false
         pendingApproval = nil
-        pendingElicitation = nil
         turnContinuation?.resume()
         turnContinuation = nil
     }
@@ -129,8 +126,6 @@ final class ClaudeService {
         userMessageUUIDs.removeAll()
         activeTasks.removeAll()
         pendingApproval = nil
-        pendingElicitation = nil
-        promptSuggestions.removeAll()
         _continueLastOnNextSend = false
         error = nil
 
@@ -174,23 +169,6 @@ final class ClaudeService {
         if queryActive {
             process?.sendCommand("set_permission_mode", params: ["mode": mode.rawValue])
         }
-    }
-
-    // MARK: - Elicitation Flow
-
-    func respondToElicitation(action: String, content: [String: Any]? = nil) {
-        guard let elicitation = pendingElicitation else { return }
-        pendingElicitation = nil
-
-        var params: [String: Any] = [
-            "requestId": elicitation.requestId,
-            "action": action,
-        ]
-        if let content {
-            params["content"] = content
-        }
-
-        process?.sendCommand("respond_to_elicitation", params: params)
     }
 
     // MARK: - Task Control
@@ -442,11 +420,8 @@ final class ClaudeService {
         case .taskCompleted(let task):
             activeTasks[task.taskID] = task
 
-        case .elicitationRequest(let request):
-            pendingElicitation = request
-
-        case .promptSuggestion(let event):
-            promptSuggestions = event.suggestions
+        case .elicitationRequest, .promptSuggestion:
+            break
 
         case .rateLimit(let e):
             if let status = e.rateLimitInfo?.status {
