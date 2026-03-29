@@ -155,9 +155,7 @@ struct AssistantTurnView: View {
                         ToolGroupView(tools: tools)
 
                     case .editDiff(let tool):
-//                    TODO: define
-                        Text(tool.result?.content ?? "")
-//                        InlineEditDiffView(tool: tool)
+                        InlineEditDiffView(tool: tool)
                     }
                 }
 
