@@ -1,8 +1,10 @@
 import SwiftUI
 
-struct SearchField: View {
+struct SearchBar<Trailing: View>: View {
     @Binding var text: String
-    var onSubmit: () -> Void
+    var placeholder: String = "Search"
+    var onSubmit: (() -> Void)?
+    @ViewBuilder var trailing: Trailing
 
     @FocusState private var isFocused: Bool
 
@@ -11,11 +13,11 @@ struct SearchField: View {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
 
-            TextField("Search Contents", text: $text)
-                .font(.subheadline)
+            TextField(placeholder, text: $text)
                 .textFieldStyle(.plain)
+                .font(.subheadline)
                 .focused($isFocused)
-                .onSubmit(onSubmit)
+                .onSubmit { onSubmit?() }
 
             if !text.isEmpty {
                 Button {
@@ -27,9 +29,27 @@ struct SearchField: View {
                 }
                 .buttonStyle(.plain)
             }
+
+            trailing
         }
         .padding(.horizontal, 7)
         .padding(.vertical, 5)
         .background(.quaternary, in: Capsule())
+        .task {
+            isFocused = true
+        }
+    }
+}
+
+extension SearchBar where Trailing == EmptyView {
+    init(
+        text: Binding<String>,
+        placeholder: String = "Search",
+        onSubmit: (() -> Void)? = nil
+    ) {
+        self._text = text
+        self.placeholder = placeholder
+        self.onSubmit = onSubmit
+        self.trailing = EmptyView()
     }
 }

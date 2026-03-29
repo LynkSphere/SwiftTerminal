@@ -29,12 +29,15 @@ struct FileTreeView: View {
             Toggle("Show Hidden Files", isOn: $showHiddenFiles)
         }
         .safeAreaBar(edge: .bottom) {
-            FileTreeFilterBar(
-                searchText: $model.searchText,
-                showChangedOnly: $model.showChangedOnly,
-                showHiddenFiles: $showHiddenFiles,
-                onToggleChanged: toggleChangedFilter
-            )
+            SearchBar(text: $model.searchText, placeholder: "Search for Files") {
+                Button(action: toggleChangedFilter) {
+                    Image(systemName: model.showChangedOnly ? "plusminus.circle.fill" : "plusminus.circle")
+                        .foregroundStyle(model.showChangedOnly ? Color.accentColor : .secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Show only git-changed files")
+            }
+            .padding(11)
         }
         .task(id: directoryURL) {
             model.showHiddenFiles = showHiddenFiles

@@ -8,7 +8,6 @@ struct SearchInspectorView: View {
     @State private var model = SearchInspectorModel()
     @State private var expandedIDs: Set<UUID> = []
     @State private var selectedID: UUID?
-    @FocusState private var isSearchFocused: Bool
 
     var body: some View {
         List(selection: $selectedID) {
@@ -26,13 +25,16 @@ struct SearchInspectorView: View {
         }
         .scrollContentBackground(.hidden)
         .safeAreaBar(edge: .top) {
-            SearchField(text: $model.query) {
-                Task {
-                    await model.search(in: directoryURL)
-                    expandedIDs = Set(model.results.map(\.id))
+            SearchBar(
+                text: $model.query,
+                placeholder: "Search Within Files",
+                onSubmit: {
+                    Task {
+                        await model.search(in: directoryURL)
+                        expandedIDs = Set(model.results.map(\.id))
+                    }
                 }
-            }
-            .focused($isSearchFocused)
+            )
             .padding(.horizontal, 10)
             .padding(.vertical, 3)
             .padding(.top, 6)
@@ -57,9 +59,6 @@ struct SearchInspectorView: View {
                     return
                 }
             }
-        }
-        .task {
-            isSearchFocused = true
         }
     }
     private func matchRow(_ match: SearchMatch) -> some View {
