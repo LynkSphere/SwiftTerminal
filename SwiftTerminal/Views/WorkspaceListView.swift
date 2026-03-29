@@ -46,13 +46,7 @@ struct WorkspaceListView: View {
         .onChange(of: appState.selectedItem) { _, newValue in
             guard case .workspace(let workspace) = newValue else { return }
             expandedWorkspaces.insert(workspace.id)
-            // Find an existing empty session (not tied to a Claude session)
-            if let empty = workspace.sessions.first(where: { $0.sdkSessionID == nil }) {
-                appState.selectedItem = .session(empty)
-            } else {
-                let session = workspace.newSession()
-                appState.selectedItem = .session(session)
-            }
+            appState.selectedItem = .session(workspace.emptyOrNewSession())
         }
         .safeAreaInset(edge: .bottom) {
             Button {

@@ -35,6 +35,12 @@ struct WorkspaceRow: View {
         }
         .tag(SidebarSelection.workspace(workspace))
         .contextMenu {
+            Button {
+                appState.selectedItem = .session(workspace.emptyOrNewSession())
+            } label: {
+                Label("New Chat", systemImage: "plus.bubble")
+            }
+            Divider()
             RenameButton()
             Divider()
             Button(role: .destructive) {

@@ -50,6 +50,14 @@ final class Workspace {
         return cs
     }
 
+    /// Returns an existing empty session or creates a new one.
+    func emptyOrNewSession() -> ClaudeSession {
+        if let empty = sessions.first(where: { $0.sdkSessionID == nil }) {
+            return empty
+        }
+        return newSession()
+    }
+
     func removeSession(_ cs: ClaudeSession) {
         cs.service?.stop()
         unsortedSessions.removeAll { $0.id == cs.id }

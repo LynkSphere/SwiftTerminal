@@ -19,6 +19,13 @@ struct FileTreeView: View {
         }
         .scrollContentBackground(.hidden)
         .contextMenu {
+            Button { handleAction(.newFile(directoryURL)) } label: {
+                Label("New File", systemImage: "doc.badge.plus")
+            }
+            Button { handleAction(.newFolder(directoryURL)) } label: {
+                Label("New Folder", systemImage: "folder.badge.plus")
+            }
+            Divider()
             Toggle("Show Hidden Files", isOn: $showHiddenFiles)
         }
         .safeAreaBar(edge: .bottom) {
