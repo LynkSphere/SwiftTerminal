@@ -502,6 +502,19 @@ async function handleSetModel(params) {
   }
 }
 
+async function handleSupportedCommands() {
+  if (!currentQuery) {
+    send({ type: "bridge_error", command: "supported_commands", error: "No active session" });
+    return;
+  }
+  try {
+    const commands = await currentQuery.supportedCommands();
+    send({ type: "bridge_response", command: "supported_commands", success: true, commands });
+  } catch (err) {
+    send({ type: "bridge_error", command: "supported_commands", error: err.message });
+  }
+}
+
 async function handleSetPermissionMode(params) {
   if (!currentQuery) {
     send({ type: "bridge_error", command: "set_permission_mode", error: "No active session" });
@@ -563,6 +576,7 @@ async function processCommand(line) {
     case "stop":                    await handleStop(); break;
     case "set_model":               await handleSetModel(params); break;
     case "set_permission_mode":     await handleSetPermissionMode(params); break;
+    case "supported_commands":      await handleSupportedCommands(); break;
     default: send({ type: "bridge_error", error: "Unknown command: " + cmd.command });
   }
 }

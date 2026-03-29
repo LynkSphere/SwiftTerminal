@@ -570,9 +570,11 @@ final class ClaudeService {
             case "tool_use":
                 if let id = cb.id, let name = cb.name {
                     state.blockToolIDs[index] = id
-                    let info = ToolUseInfo(id: id, name: name, input: [:])
-                    let blockIdx = appendToolUseBlock(at: msgIdx, info: info)
-                    toolUseIndex[id] = BlockLocation(messageIndex: msgIdx, blockIndex: blockIdx)
+                    if toolUseIndex[id] == nil {
+                        let info = ToolUseInfo(id: id, name: name, input: [:])
+                        let blockIdx = appendToolUseBlock(at: msgIdx, info: info)
+                        toolUseIndex[id] = BlockLocation(messageIndex: msgIdx, blockIndex: blockIdx)
+                    }
                 }
             case "thinking":
                 state.blockTexts[index] = ""
