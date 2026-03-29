@@ -26,7 +26,7 @@ struct InputBarView: View {
                             .frame(maxHeight: 350)
                             .fixedSize(horizontal: false, vertical: true)
                             .scrollContentBackground(.hidden)
-                            .disabled(service.pendingApproval != nil)
+                            .disabled(service.pendingApproval != nil || service.pendingPlanReview != nil)
                     }
                     .font(.body)
                     .focused($isFocused)

@@ -209,7 +209,10 @@ struct AssistantTurnView: View {
                 }
 
             case .toolUse(let info):
-                if info.name == "Edit" || info.name == "Write" {
+                // SDK-internal plan tools — not user-visible
+                if info.name == "ExitPlanMode" || info.name == "EnterPlanMode" {
+                    break
+                } else if info.name == "Edit" || info.name == "Write" {
                     flushPendingTools()
                     groups.append(.editDiff(info))
                 } else {

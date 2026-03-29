@@ -10,6 +10,7 @@ enum StreamEvent {
     case result(ResultEvent)
     case streamEvent(StreamDelta)
     case approvalRequest(ApprovalRequest)
+    case planReviewRequest(ApprovalRequest)
     case questionRequest(QuestionRequest)
     case toolProgress(ToolProgressEvent)
     case sessionStateChanged(SessionStateEvent)

@@ -31,6 +31,7 @@ final class ClaudeService {
     var availableSessions: [SessionSummary] = []
     var pendingApproval: ApprovalRequest?
     var pendingQuestion: UserQuestion?
+    var pendingPlanReview: ApprovalRequest?
     var selectedModel: ModelOption = .opus
     var selectedEffort: EffortLevel = .medium
     var selectedContextWindow: ContextWindow = .extended
@@ -177,6 +178,7 @@ final class ClaudeService {
         isStreaming = false
         pendingApproval = nil
         pendingQuestion = nil
+        pendingPlanReview = nil
         turnContinuation?.resume()
         turnContinuation = nil
     }
@@ -196,6 +198,7 @@ final class ClaudeService {
         isStreaming = false
         pendingApproval = nil
         pendingQuestion = nil
+        pendingPlanReview = nil
         turnContinuation?.resume()
         turnContinuation = nil
         for c in bridgeReadyContinuations { c.resume() }
@@ -223,6 +226,7 @@ final class ClaudeService {
         pendingResumeAt = nil
         pendingApproval = nil
         pendingQuestion = nil
+        pendingPlanReview = nil
         _continueLastOnNextSend = false
         error = nil
 
@@ -260,6 +264,33 @@ final class ClaudeService {
         process?.sendCommand("respond_to_question", params: [
             "requestId": question.requestId,
             "answer": answer,
+        ])
+    }
+
+    // MARK: - Plan Review Flow
+
+    func acceptPlan(mode: PermissionModeOption) {
+        guard let review = pendingPlanReview else { return }
+        pendingPlanReview = nil
+
+        // Switch permission mode first, then approve ExitPlanMode.
+        // Claude will continue implementing in the same turn.
+        setPermissionMode(mode)
+        process?.sendCommand("respond_to_approval", params: [
+            "requestId": review.requestId,
+            "behavior": "allow",
+        ])
+    }
+
+    func discussPlan(_ feedback: String) {
+        guard let review = pendingPlanReview else { return }
+        pendingPlanReview = nil
+
+        // Deny ExitPlanMode with feedback — Claude will revise the plan.
+        process?.sendCommand("respond_to_approval", params: [
+            "requestId": review.requestId,
+            "behavior": "deny",
+            "message": feedback,
         ])
     }
 
@@ -355,6 +386,7 @@ final class ClaudeService {
         isStreaming = false
         pendingApproval = nil
         pendingQuestion = nil
+        pendingPlanReview = nil
         state.reset()
         turnContinuation?.resume()
         turnContinuation = nil
@@ -578,6 +610,7 @@ final class ClaudeService {
             self.bridgeReady = false
             self.pendingApproval = nil
             self.pendingQuestion = nil
+            self.pendingPlanReview = nil
             self.turnContinuation?.resume()
             self.turnContinuation = nil
             for c in self.bridgeReadyContinuations { c.resume() }
@@ -655,6 +688,14 @@ final class ClaudeService {
                 title: chatSession.name ?? "Claude",
                 subtitle: "Permission required: \(request.displayName ?? request.toolName)",
                 category: "approvalRequest"
+            )
+
+        case .planReviewRequest(let request):
+            pendingPlanReview = request
+            postSessionNotification(
+                title: chatSession.name ?? "Claude",
+                subtitle: "Plan ready for review",
+                category: "planReview"
             )
 
         case .questionRequest(let request):

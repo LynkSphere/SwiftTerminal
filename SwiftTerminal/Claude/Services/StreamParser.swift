@@ -44,6 +44,10 @@ enum StreamParser {
         case "approval_request":
             return parseApprovalRequest(raw)
 
+        // Plan review request (ExitPlanMode tool intercepted in bridge)
+        case "plan_review_request":
+            return parsePlanReviewRequest(raw)
+
         // Question request (AskUserQuestion tool intercepted in bridge)
         case "question_request":
             return parseQuestionRequest(raw)
@@ -81,6 +85,24 @@ enum StreamParser {
             decisionReason: raw["decisionReason"] as? String
         )
         return .approvalRequest(request)
+    }
+
+    // MARK: - Plan Review Request
+
+    private static func parsePlanReviewRequest(_ raw: [String: Any]) -> StreamEvent? {
+        guard let requestId = raw["requestId"] as? String else { return nil }
+
+        let request = ApprovalRequest(
+            requestId: requestId,
+            toolName: "ExitPlanMode",
+            input: raw["input"] as? [String: Any] ?? [:],
+            toolUseID: raw["toolUseID"] as? String ?? requestId,
+            title: nil,
+            displayName: nil,
+            description: nil,
+            decisionReason: nil
+        )
+        return .planReviewRequest(request)
     }
 
     // MARK: - Question Request

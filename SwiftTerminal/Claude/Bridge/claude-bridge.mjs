@@ -10,6 +10,7 @@ import { randomUUID } from "crypto";
 // --- State ---
 
 let currentQuery = null;
+let currentPermissionMode = "default";
 
 // Prompt queue for multi-turn: the async iterable stays open,
 // allowing us to push new messages for each turn.
@@ -107,7 +108,7 @@ const FILE_TOOLS = new Set([
 // Pending question requests: requestId -> resolve callback
 const pendingQuestions = new Map();
 
-function createCanUseTool(permissionMode) {
+function createCanUseTool() {
   // Always provide a handler so we can intercept AskUserQuestion in all modes.
   return async (toolName, input, opts) => {
     // AskUserQuestion: hold until user answers, then deny with the answer as message
@@ -127,13 +128,31 @@ function createCanUseTool(permissionMode) {
       });
     }
 
+    // ExitPlanMode: send as plan_review_request so Swift shows the plan review UI.
+    // The approval is held until the user accepts or provides feedback.
+    if (toolName === "ExitPlanMode") {
+      const requestId = opts.toolUseID || `plan_${Date.now()}`;
+
+      send({
+        type: "plan_review_request",
+        requestId,
+        toolName,
+        input,
+        toolUseID: opts.toolUseID,
+      });
+
+      return new Promise((resolve) => {
+        pendingApprovals.set(requestId, resolve);
+      });
+    }
+
     // In bypassPermissions mode, auto-allow everything except AskUserQuestion
-    if (permissionMode === "bypassPermissions") {
+    if (currentPermissionMode === "bypassPermissions") {
       return { behavior: "allow" };
     }
 
     // In acceptEdits mode, auto-allow file operations
-    if (permissionMode === "acceptEdits" && FILE_TOOLS.has(toolName)) {
+    if (currentPermissionMode === "acceptEdits" && FILE_TOOLS.has(toolName)) {
       return { behavior: "allow" };
     }
 
@@ -244,6 +263,7 @@ async function handleStartSession(params) {
     });
 
     const permMode = params.permissionMode || "default";
+    currentPermissionMode = permMode;
 
     const options = {
       cwd: params.cwd || process.cwd(),
@@ -251,10 +271,10 @@ async function handleStartSession(params) {
       settingSources: ["user", "project", "local"],
       enableFileCheckpointing: true,
       includePartialMessages: false,
-      canUseTool: createCanUseTool(permMode),
+      canUseTool: createCanUseTool(),
       onElicitation: createOnElicitation(),
       promptSuggestions: params.promptSuggestions ?? false,
-      ...(permMode === "bypassPermissions" ? { allowDangerouslySkipPermissions: true } : {}),
+      ...(permMode === "bypassPermissions" || permMode === "plan" ? { allowDangerouslySkipPermissions: true } : {}),
       ...(params.model ? { model: params.model } : {}),
       ...(params.effort ? { effort: params.effort } : {}),
       ...(params.thinking ? { thinking: params.thinking } : {}),
@@ -592,6 +612,7 @@ async function handleSetPermissionMode(params) {
     return;
   }
   try {
+    currentPermissionMode = params.mode;
     await currentQuery.setPermissionMode(params.mode);
     send({ type: "bridge_response", command: "set_permission_mode", success: true });
   } catch (err) {

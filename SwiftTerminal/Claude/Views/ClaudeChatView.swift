@@ -64,6 +64,7 @@ struct ClaudeChatView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: service.pendingApproval != nil)
         .animation(.easeInOut(duration: 0.2), value: service.pendingQuestion != nil)
+        .animation(.easeInOut(duration: 0.2), value: service.pendingPlanReview != nil)
         .toolbar {
             ToolbarContentView(service: service)
         }
@@ -74,6 +75,9 @@ struct ClaudeChatView: View {
                 }
                 if let question = service.pendingQuestion {
                     QuestionPanelView(service: service, question: question)
+                }
+                if service.pendingPlanReview != nil {
+                    PlanReviewPanelView(service: service)
                 }
                 InputBarView(service: service)
             }
