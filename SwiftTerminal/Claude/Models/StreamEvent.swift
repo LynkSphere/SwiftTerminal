@@ -41,6 +41,7 @@ struct BridgeResponse {
     let sessions: [[String: Any]]?
     let messages: [[String: Any]]?
     let result: [String: Any]?
+    let userMessageUUID: String?
 }
 
 struct BridgeError {
@@ -161,9 +162,10 @@ struct SystemEvent: Decodable {
 struct AssistantEvent: Decodable {
     let message: AssistantMessage
     let sessionID: String?
+    let uuid: String?
 
     enum CodingKeys: String, CodingKey {
-        case message
+        case message, uuid
         case sessionID = "session_id"
     }
 }

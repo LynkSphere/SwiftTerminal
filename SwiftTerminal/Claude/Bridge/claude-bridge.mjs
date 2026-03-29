@@ -5,6 +5,7 @@
 // Persistent SDK query runtime for multi-turn sessions.
 
 import { query, listSessions, getSessionMessages, renameSession } from "@anthropic-ai/claude-agent-sdk";
+import { randomUUID } from "crypto";
 
 // --- State ---
 
@@ -193,10 +194,12 @@ async function handleStartSession(params) {
     const promptIterable = createPromptIterable();
 
     const initialText = params.initialMessage || "Hello";
+    const userUUID = randomUUID();
     pushMessage({
       type: "user",
       message: { role: "user", content: [{ type: "text", text: initialText }] },
       parent_tool_use_id: null,
+      uuid: userUUID,
     });
 
     const permMode = params.permissionMode || "default";
@@ -230,7 +233,7 @@ async function handleStartSession(params) {
     // Start consuming messages in background
     consumeMessages(currentQuery);
 
-    send({ type: "bridge_response", command: "start_session", success: true });
+    send({ type: "bridge_response", command: "start_session", success: true, userMessageUUID: userUUID });
   } catch (err) {
     send({ type: "bridge_error", command: "start_session", error: err.message });
   }
@@ -254,13 +257,15 @@ async function handleSendMessage(params) {
     }
   }
 
+  const userUUID = randomUUID();
   pushMessage({
     type: "user",
     message: { role: "user", content },
     parent_tool_use_id: null,
+    uuid: userUUID,
   });
 
-  send({ type: "bridge_response", command: "send_message", success: true });
+  send({ type: "bridge_response", command: "send_message", success: true, userMessageUUID: userUUID });
 }
 
 async function handleRespondToApproval(params) {
@@ -325,9 +330,19 @@ async function handleRewind(params) {
     return;
   }
   try {
+    // Rewind files to state at the target user message
     const result = await currentQuery.rewindFiles(params.userMessageId, {
       dryRun: params.dryRun || false,
     });
+
+    // If not a dry run, also stop the session so it can be resumed at a specific point
+    if (!params.dryRun) {
+      denyAllPending("Rewound");
+      endPromptIterable();
+      currentQuery.close();
+      currentQuery = null;
+    }
+
     send({ type: "bridge_response", command: "rewind", success: true, result });
   } catch (err) {
     send({ type: "bridge_error", command: "rewind", error: err.message });
@@ -397,6 +412,58 @@ async function handleRenameSession(params) {
     send({ type: "bridge_response", command: "rename_session", success: true });
   } catch (err) {
     send({ type: "bridge_error", command: "rename_session", error: err.message });
+  }
+}
+
+async function handleActivateSession(params) {
+  // If already active, respond immediately
+  if (currentQuery) {
+    send({ type: "bridge_response", command: "activate_session", success: true });
+    return;
+  }
+
+  if (!params.sessionId) {
+    send({ type: "bridge_error", command: "activate_session", error: "No sessionId provided" });
+    return;
+  }
+
+  try {
+    const promptIterable = createPromptIterable();
+
+    const options = {
+      cwd: params.cwd || process.cwd(),
+      resume: params.sessionId,
+      enableFileCheckpointing: true,
+      includePartialMessages: true,
+      permissionMode: params.permissionMode || "default",
+    };
+
+    currentQuery = query({ prompt: promptIterable, options });
+
+    // Consume replayed messages silently — don't forward to Swift
+    // We just need the query handle for rewindFiles/other operations.
+    // The session_state_changed → idle event signals replay is done.
+    (async () => {
+      try {
+        for await (const message of currentQuery) {
+          // Forward state changes so Swift knows when the session is ready
+          if (message.type === "system" && message.subtype === "session_state_changed") {
+            send({ type: "sdk_message", message });
+          }
+          // Discard other replayed messages (already hydrated in UI)
+        }
+        send({ type: "sdk_done" });
+      } catch (err) {
+        if (err.name !== "AbortError" && !err.message?.includes("closed") && !err.message?.includes("destroyed")) {
+          send({ type: "sdk_error", error: err.message });
+        }
+        send({ type: "sdk_done" });
+      }
+    })();
+
+    send({ type: "bridge_response", command: "activate_session", success: true });
+  } catch (err) {
+    send({ type: "bridge_error", command: "activate_session", error: err.message });
   }
 }
 
@@ -480,6 +547,7 @@ async function processCommand(line) {
     case "list_sessions":           await handleListSessions(params); break;
     case "get_session_messages":    await handleGetSessionMessages(params); break;
     case "rename_session":          await handleRenameSession(params); break;
+    case "activate_session":        await handleActivateSession(params); break;
     case "stop":                    await handleStop(); break;
     case "set_model":               await handleSetModel(params); break;
     case "set_permission_mode":     await handleSetPermissionMode(params); break;

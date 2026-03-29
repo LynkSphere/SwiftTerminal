@@ -33,7 +33,16 @@ final class ClaudeService {
     @ObservationIgnored private var turnContinuation: CheckedContinuation<Void, Never>?
     @ObservationIgnored private var bridgeReadyContinuations: [CheckedContinuation<Void, Never>] = []
     @ObservationIgnored private var responseContinuations: [String: CheckedContinuation<BridgeResponse?, Never>] = [:]
+    /// Maps local ChatMessage ID → SDK user message UUID
     @ObservationIgnored private var userMessageUUIDs: [String: String] = [:]
+    /// The local ID of the user message currently being sent (awaiting SDK UUID)
+    @ObservationIgnored private var pendingUserMessageLocalID: String?
+    /// SDK UUID of the most recent assistant message
+    @ObservationIgnored private var lastAssistantSDKUUID: String?
+    /// Maps local user message ID → SDK UUID of the assistant message preceding it
+    @ObservationIgnored private var precedingAssistantUUID: [String: String] = [:]
+    /// When set, next send() will pass resumeSessionAt to truncate conversation
+    @ObservationIgnored private var pendingResumeAt: String?
 
     init(workspace: Workspace, claudeSession: ClaudeSession? = nil) {
         self.workspace = workspace
@@ -65,6 +74,12 @@ final class ClaudeService {
         messages.append(ChatMessage(role: .assistant))
         state.reset()
 
+        // Record preceding assistant UUID for this user message
+        if let aUUID = lastAssistantSDKUUID {
+            precedingAssistantUUID[userMessage.id] = aUUID
+        }
+        pendingUserMessageLocalID = userMessage.id
+
         isStreaming = true
         error = nil
 
@@ -87,9 +102,12 @@ final class ClaudeService {
                 } else if let resumeID = self.session.sessionID {
                     params["resume"] = resumeID
                 }
+                if let resumeAt = self.pendingResumeAt {
+                    params["resumeSessionAt"] = resumeAt
+                    self.pendingResumeAt = nil
+                }
                 self.process?.sendCommand("start_session", params: params)
                 self.queryActive = true
-                self.userMessageUUIDs[userMessage.id] = userMessage.id
             } else {
                 self.process?.sendCommand("send_message", params: [
                     "text": text
@@ -124,6 +142,10 @@ final class ClaudeService {
         toolUseIndex.removeAll()
         state = StreamState()
         userMessageUUIDs.removeAll()
+        precedingAssistantUUID.removeAll()
+        lastAssistantSDKUUID = nil
+        pendingUserMessageLocalID = nil
+        pendingResumeAt = nil
         activeTasks.removeAll()
         pendingApproval = nil
         _continueLastOnNextSend = false
@@ -179,23 +201,81 @@ final class ClaudeService {
 
     // MARK: - Rewind
 
-    func rewind(toMessageID messageID: String) async -> RewindResult? {
-        guard let uuid = findUserMessageUUID(messageID) else { return nil }
+    /// Full rewind: reverts files, stops session, trims local messages,
+    /// and puts the rewound user message text back into the prompt.
+    func rewind(toMessageID messageID: String) async {
+        guard let sdkUUID = userMessageUUIDs[messageID] else {
+            error = "Cannot rewind: no SDK UUID for this message"
+            return
+        }
 
+        // Find the message index and its text
+        guard let msgIndex = messages.firstIndex(where: { $0.id == messageID }),
+              messages[msgIndex].role == .user else {
+            error = "Cannot rewind: message not found"
+            return
+        }
+        let messageText = messages[msgIndex].text
+
+        // 0. Ensure there's an active SDK session (needed after app reload)
+        await ensureBridgeStarted()
+        if !queryActive, let sessionID = session.sessionID {
+            process?.sendCommand("activate_session", params: [
+                "sessionId": sessionID,
+                "cwd": workingDirectory,
+                "permissionMode": session.permissionMode.rawValue
+            ])
+            let activateResp = await waitForBridgeResponse("activate_session")
+            if activateResp?.success == true {
+                queryActive = true
+            } else {
+                error = "Cannot rewind: failed to activate session"
+                return
+            }
+        }
+
+        // 1. Rewind files to state at this user message
         process?.sendCommand("rewind", params: [
-            "userMessageId": uuid
+            "userMessageId": sdkUUID
         ])
 
         let response = await waitForBridgeResponse("rewind")
-        guard let result = response?.result else { return nil }
+        if let result = response?.result, result["canRewind"] as? Bool != true {
+            error = result["error"] as? String ?? "Cannot rewind files"
+            return
+        }
 
-        return RewindResult(
-            canRewind: result["canRewind"] as? Bool ?? false,
-            error: result["error"] as? String,
-            filesChanged: result["filesChanged"] as? [String],
-            insertions: result["insertions"] as? Int,
-            deletions: result["deletions"] as? Int
-        )
+        // 2. The bridge already stopped the session after rewind.
+        //    Set up to resume at the preceding assistant message on next send.
+        queryActive = false
+
+        if let precedingUUID = precedingAssistantUUID[messageID] {
+            pendingResumeAt = precedingUUID
+        } else {
+            // First user message — clear session entirely, start fresh
+            session.sessionID = nil
+        }
+
+        // 3. Trim local messages: remove this user message and everything after
+        let removedIDs = messages[msgIndex...].map(\.id)
+        messages.removeSubrange(msgIndex...)
+
+        // Clean up tool indices for removed messages
+        for id in removedIDs {
+            userMessageUUIDs.removeValue(forKey: id)
+            precedingAssistantUUID.removeValue(forKey: id)
+        }
+        toolUseIndex = toolUseIndex.filter { $0.value.messageIndex < messages.count }
+
+        // 4. Put the message text back into the prompt
+        prompt = messageText
+
+        // 5. Reset streaming state
+        isStreaming = false
+        pendingApproval = nil
+        state.reset()
+        turnContinuation?.resume()
+        turnContinuation = nil
     }
 
     // MARK: - Session Management
@@ -283,13 +363,25 @@ final class ClaudeService {
 
             guard !blocks.isEmpty else { continue }
 
-            if let uuid = raw["uuid"] as? String, role == .user {
-                let msg = ChatMessage(role: role, blocks: blocks)
-                userMessageUUIDs[msg.id] = uuid
-                messages.append(msg)
-            } else {
-                messages.append(ChatMessage(role: role, blocks: blocks))
+            let sdkUUID = raw["uuid"] as? String
+            let msg = ChatMessage(role: role, blocks: blocks)
+
+            if role == .user {
+                if let uuid = sdkUUID {
+                    userMessageUUIDs[msg.id] = uuid
+                }
+                // Record which assistant message precedes this user message
+                if let aUUID = lastAssistantSDKUUID {
+                    precedingAssistantUUID[msg.id] = aUUID
+                }
+            } else if role == .assistant {
+                // Track the latest assistant UUID for precedingAssistantUUID mapping
+                if let uuid = sdkUUID {
+                    lastAssistantSDKUUID = uuid
+                }
             }
+
+            messages.append(msg)
         }
     }
 
@@ -358,6 +450,11 @@ final class ClaudeService {
             bridgeReadyContinuations.removeAll()
 
         case .bridgeResponse(let resp):
+            // Capture SDK UUID for user messages from start_session/send_message responses
+            if let uuid = resp.userMessageUUID, let localID = pendingUserMessageLocalID {
+                userMessageUUIDs[localID] = uuid
+                pendingUserMessageLocalID = nil
+            }
             responseContinuations[resp.command]?.resume(returning: resp)
             responseContinuations.removeValue(forKey: resp.command)
 
@@ -542,6 +639,11 @@ final class ClaudeService {
             session.sessionID = sid
             syncSessionID(sid)
         }
+
+        // Track assistant SDK UUID for resumeSessionAt
+        if let uuid = event.uuid {
+            lastAssistantSDKUUID = uuid
+        }
     }
 
     // MARK: - User Event Handling
@@ -614,10 +716,6 @@ final class ClaudeService {
         await withCheckedContinuation { continuation in
             responseContinuations[command] = continuation
         }
-    }
-
-    private func findUserMessageUUID(_ messageID: String) -> String? {
-        userMessageUUIDs[messageID] ?? messageID
     }
 
     // MARK: - Message Mutation Helpers

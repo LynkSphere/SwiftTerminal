@@ -25,7 +25,7 @@ struct WorkspaceListView: View {
                             systemImage: "bubble.left"
                         )
                         .tag(session)
-                        .contextMenu {
+                        .swipeActions(edge: .trailing) {
                             Button(role: .destructive) {
                                 if appState.selectedSession == session {
                                     appState.selectedSession = nil
@@ -33,6 +33,7 @@ struct WorkspaceListView: View {
                                 workspace.removeSession(session)
                             } label: {
                                 Label("Delete Session", systemImage: "trash")
+                                    .labelStyle(.iconOnly)
                             }
                         }
                     }

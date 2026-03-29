@@ -7,7 +7,7 @@ struct MessageListView: View {
         ForEach(turns) { turn in
             switch turn.kind {
             case .user(let message):
-                UserMessageView(message: message)
+                UserMessageView(message: message, service: service)
                     .id(turn.id)
                     .listRowSeparator(.hidden)
 
@@ -81,6 +81,7 @@ struct Turn: Identifiable {
 
 struct UserMessageView: View {
     let message: ChatMessage
+    let service: ClaudeService
 
     var body: some View {
         VStack(alignment: .trailing) {
@@ -88,6 +89,19 @@ struct UserMessageView: View {
                 .padding(12)
                 .background(.background.secondary)
                 .clipShape(RoundedRectangle(cornerRadius: 20))
+                .contextMenu {
+                    Button("Copy", systemImage: "doc.on.doc") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(message.text, forType: .string)
+                    }
+                    Divider()
+                    Button("Rewind to here", systemImage: "arrow.counterclockwise") {
+                        Task {
+                            await service.rewind(toMessageID: message.id)
+                        }
+                    }
+                    .disabled(service.isStreaming)
+                }
         }
         .frame(maxWidth: .infinity, alignment: .trailing)
         .padding(.leading, 160)

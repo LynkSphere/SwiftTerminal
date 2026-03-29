@@ -21,7 +21,8 @@ enum StreamParser {
                 success: raw["success"] as? Bool ?? false,
                 sessions: raw["sessions"] as? [[String: Any]],
                 messages: raw["messages"] as? [[String: Any]],
-                result: raw["result"] as? [String: Any]
+                result: raw["result"] as? [String: Any],
+                userMessageUUID: raw["userMessageUUID"] as? String
             )
             return .bridgeResponse(resp)
 
