@@ -11,7 +11,7 @@ struct WorkspaceView: View {
         if let workspace {
             SessionDetailView(session: session)
                 .navigationTitle(workspace.name)
-                .navigationSubtitle(workspace.directory)
+                .navigationSubtitle(workspace.directory.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     BottomSheetView(directoryURL: workspace.url)
                 }

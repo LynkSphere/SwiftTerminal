@@ -2,7 +2,7 @@ import SwiftUI
 
 struct InputBarView: View {
     let service: ClaudeService
-    @FocusState private var isFocused: Bool
+    @FocusState var isFocused: Bool
 
     var body: some View {
         GlassEffectContainer {
@@ -54,6 +54,16 @@ struct InputBarView: View {
             }
         }
         .task { isFocused = true }
+        .toolbar {
+            ToolbarItem(placement: .keyboard) {
+                Button {
+                    isFocused = true
+                } label: {
+                    EmptyView()
+                }
+                .keyboardShortcut("l", modifiers: .command)
+            }
+        }
     }
 
     private var canSend: Bool {

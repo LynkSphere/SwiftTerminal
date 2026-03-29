@@ -16,8 +16,16 @@ struct InspectorView: View {
             .toolbar {
                 if appState.showingInspector {
                     ToolbarItem(placement: .automatic) {
+                        Button {
+                            appState.panelToggleToken = UUID()
+                        } label: {
+                            Image(systemName: "inset.filled.bottomthird.square")
+                        }
+                    }
+
+                    ToolbarItem(placement: .automatic) {
                         Color.clear
-                            .frame(width: max(inspectorWidth - 50, 0), height: 0)
+                            .frame(width: max(inspectorWidth - 110, 0), height: 0)
                     }
                     .sharedBackgroundVisibility(.hidden)
                 }

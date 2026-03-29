@@ -119,7 +119,7 @@ final class ClaudeService {
         messages.append(ChatMessage(role: .assistant))
         state.reset()
         userDidScroll = false
-        scrollToBottom()
+        scrollToBottom(animated: true)
 
         // Record preceding assistant UUID for this user message
         if let aUUID = lastAssistantSDKUUID {
@@ -725,7 +725,7 @@ final class ClaudeService {
         }
 
         if !userDidScroll {
-            scrollToBottom()
+            scrollToBottom(animated: true)
         }
 
         if let sid = event.sessionID {

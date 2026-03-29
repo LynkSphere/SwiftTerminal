@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 extension String {
     nonisolated static let bottomID = "bottomID"
@@ -6,6 +7,23 @@ extension String {
 
 struct ClaudeChatView: View {
     let service: ClaudeService
+
+    private func handleImageDrop(_ providers: [NSItemProvider]) -> Bool {
+        var handled = false
+        for provider in providers {
+            if provider.hasRepresentationConforming(toTypeIdentifier: UTType.image.identifier) {
+                handled = true
+                provider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, _ in
+                    guard let data else { return }
+                    let attachment = ImageAttachment(data: data, mediaType: "image/png")
+                    Task { @MainActor in
+                        service.imageAttachments.append(attachment)
+                    }
+                }
+            }
+        }
+        return handled
+    }
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -39,6 +57,10 @@ struct ClaudeChatView: View {
                     Text("Do anything about this workspace")
                 }
             }
+        }
+        .imagePasteHandler(service: service)
+        .onDrop(of: [.image], isTargeted: nil) { providers in
+            handleImageDrop(providers)
         }
         .animation(.easeInOut(duration: 0.2), value: service.pendingApproval != nil)
         .animation(.easeInOut(duration: 0.2), value: service.pendingQuestion != nil)
