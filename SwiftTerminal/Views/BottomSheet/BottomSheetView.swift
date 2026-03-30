@@ -4,19 +4,19 @@ struct BottomSheetView: View {
     let directoryURL: URL
     @Environment(EditorPanel.self) private var panel
     @Environment(\.colorScheme) var colorScheme
-    @AppStorage("editorPanelHeight_v2") private var panelHeight: Double = 250
+    @AppStorage("editorPanelHeight_v3") private var panelHeight: Double = 250
+
+    private var headerHeight: CGFloat { 30 }
 
     var body: some View {
         VStack(spacing: 0) {
             dragBorder
             content
         }
-        .frame(height: panel.isOpen ? panelHeight : 1, alignment: .top)
+        .frame(height: panel.isOpen ? panelHeight : headerHeight, alignment: .top)
         .clipped()
         .background(colorScheme == .dark ? AnyShapeStyle(.regularMaterial) : AnyShapeStyle(.bar))
     }
-
-    // MARK: - Drag Border
 
     private var dragBorder: some View {
         Rectangle()
@@ -32,16 +32,6 @@ struct BottomSheetView: View {
             }
     }
 
-    private var resizeGesture: some Gesture {
-        DragGesture(minimumDistance: 1)
-            .onChanged { value in
-                let delta = -value.translation.height
-                panelHeight = max(100, panelHeight + delta)
-            }
-    }
-
-    // MARK: - Content
-
     @ViewBuilder
     private var content: some View {
         switch panel.content {
@@ -55,14 +45,17 @@ struct BottomSheetView: View {
             } actions: {
                 // no actions
             } content: {
-                ContentUnavailableView {
-                    Label("No File Open", systemImage: "doc")
-                } description: {
-                    Text("Open a file from the sidebar or search results.")
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // no content
             }
         }
+    }
+
+    private var resizeGesture: some Gesture {
+        DragGesture(minimumDistance: 1)
+            .onChanged { value in
+                let delta = -value.translation.height
+                panelHeight = max(100, panelHeight + delta)
+            }
     }
 }
 

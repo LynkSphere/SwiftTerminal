@@ -8,16 +8,6 @@ struct InspectorView: View {
     var body: some View {
         tabContent
             .toolbar {
-                ToolbarItem(placement: .automatic) {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            editorPanel.toggle()
-                        }
-                    } label: {
-                        Image(systemName: "inset.filled.bottomthird.square")
-                    }
-                }
-                
                 ToolbarSpacer(.flexible)
 
                 ToolbarItem(placement: .primaryAction) {

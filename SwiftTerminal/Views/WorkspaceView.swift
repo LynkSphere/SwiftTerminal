@@ -11,13 +11,6 @@ struct WorkspaceDetailView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .toolbar {
-            Button {
-                appState.selectedTerminal?.clearTerminal()
-            } label: {
-                Image(systemName: "clear")
-            }
-        }
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .navigationTitle(workspace.name)
         .navigationSubtitle(workspace.directory.replacingOccurrences(of: NSHomeDirectory(), with: "~"))

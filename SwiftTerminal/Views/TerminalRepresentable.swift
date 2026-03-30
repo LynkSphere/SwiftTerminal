@@ -43,6 +43,10 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
             subview.isHidden = (subview !== terminalView)
         }
         terminalView.isHidden = false
+
+        DispatchQueue.main.async {
+            terminalView.window?.makeFirstResponder(terminalView)
+        }
     }
 
     func makeCoordinator() -> Coordinator {

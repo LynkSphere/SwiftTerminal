@@ -10,7 +10,7 @@ struct PanelLayout<Title: View, Actions: View, Content: View>: View {
     @Environment(EditorPanel.self) private var panel
     @Environment(\.openWindow) private var openWindow
     @Environment(\.isDetachedEditor) private var isDetached
-    @AppStorage("editorPanelHeight_v2") private var panelHeight: Double = 250
+    @AppStorage("editorPanelHeight_v3") private var panelHeight: Double = 250
 
     @ViewBuilder let title: Title
     @ViewBuilder let actions: Actions
