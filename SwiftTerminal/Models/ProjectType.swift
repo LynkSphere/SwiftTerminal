@@ -19,6 +19,28 @@ enum ProjectType: String, Codable, CaseIterable {
     case git
     case unknown
 
+    var displayName: String {
+        switch self {
+        case .xcode:        "Xcode"
+        case .swiftPackage: "Swift Package"
+        case .nextjs:       "Next.js"
+        case .expo:         "Expo"
+        case .reactNative:  "React Native"
+        case .react:        "React"
+        case .typescript:   "TypeScript"
+        case .nodejs:       "Node.js"
+        case .python:       "Python"
+        case .rust:         "Rust"
+        case .go:           "Go"
+        case .flutter:      "Flutter"
+        case .docker:       "Docker"
+        case .ruby:         "Ruby"
+        case .android:      "Android"
+        case .git:          "Git"
+        case .unknown:      "Unknown"
+        }
+    }
+
     var iconName: String {
         switch self {
         case .xcode:        "swift"

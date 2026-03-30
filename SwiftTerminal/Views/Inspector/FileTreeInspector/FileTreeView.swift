@@ -44,8 +44,8 @@ struct FileTreeView: View {
             model.load(directoryURL: directoryURL)
             await model.refreshGit(directoryURL: directoryURL)
         }
-        .task(id: directoryURL, priority: .low) {
-            await pollGitStatus()
+        .gitPolling(id: directoryURL) {
+            await model.refreshGit(directoryURL: directoryURL)
         }
         .onChange(of: model.searchText) { oldValue, newValue in
             if !newValue.isEmpty && oldValue.isEmpty {
@@ -75,14 +75,6 @@ struct FileTreeView: View {
                   !item.isDirectory
             else { return }
             editorPanel.openFile(item.url)
-        }
-    }
-
-    private func pollGitStatus() async {
-        while !Task.isCancelled {
-            try? await Task.sleep(for: .seconds(5))
-            guard !Task.isCancelled else { break }
-            await model.refreshGit(directoryURL: directoryURL)
         }
     }
 
@@ -119,47 +111,18 @@ struct FileTreeView: View {
             NSWorkspace.shared.activateFileViewerSelecting([url])
 
         case .moveToTrash(let url):
-            try? FileManager.default.trashItem(at: url, resultingItemURL: nil)
-            model.load(directoryURL: directoryURL)
+            model.moveToTrash(url: url, directoryURL: directoryURL)
 
         case .duplicate(let url):
-            let fm = FileManager.default
-            let directory = url.deletingLastPathComponent()
-            let name = url.deletingPathExtension().lastPathComponent
-            let ext = url.pathExtension
-            var suffix = 2
-            var destination: URL
-            repeat {
-                let newName = ext.isEmpty ? "\(name) \(suffix)" : "\(name) \(suffix).\(ext)"
-                destination = directory.appendingPathComponent(newName)
-                suffix += 1
-            } while fm.fileExists(atPath: destination.path)
-            try? fm.copyItem(at: url, to: destination)
-            model.load(directoryURL: directoryURL)
+            model.duplicate(url: url, directoryURL: directoryURL)
 
         case .newFile(let parentURL):
-            let fm = FileManager.default
-            var destination = parentURL.appendingPathComponent("Untitled")
-            var suffix = 2
-            while fm.fileExists(atPath: destination.path) {
-                destination = parentURL.appendingPathComponent("Untitled \(suffix)")
-                suffix += 1
-            }
-            fm.createFile(atPath: destination.path, contents: nil)
-            model.load(directoryURL: directoryURL)
-            expandedIDs.insert(parentURL.path)
+            let parent = model.createNewFile(in: parentURL, directoryURL: directoryURL)
+            expandedIDs.insert(parent.path)
 
         case .newFolder(let parentURL):
-            let fm = FileManager.default
-            var destination = parentURL.appendingPathComponent("New Folder")
-            var suffix = 2
-            while fm.fileExists(atPath: destination.path) {
-                destination = parentURL.appendingPathComponent("New Folder \(suffix)")
-                suffix += 1
-            }
-            try? fm.createDirectory(at: destination, withIntermediateDirectories: false)
-            model.load(directoryURL: directoryURL)
-            expandedIDs.insert(parentURL.path)
+            let parent = model.createNewFolder(in: parentURL, directoryURL: directoryURL)
+            expandedIDs.insert(parent.path)
         }
     }
 }

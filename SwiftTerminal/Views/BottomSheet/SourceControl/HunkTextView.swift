@@ -122,9 +122,7 @@ final class HunkNSTextView: NSTextView {
 
             // Draw line background
             if let kind = self.lineData[lineIdx].kind {
-                let bgColor: NSColor = kind == .added
-                    ? .systemGreen.withAlphaComponent(0.12)
-                    : .systemRed.withAlphaComponent(0.12)
+                let bgColor: NSColor = kind.color.withAlphaComponent(0.12)
                 var fullLineRect = lineRect
                 fullLineRect.origin.x = gutterWidth
                 fullLineRect.size.width = self.bounds.width - gutterWidth

@@ -4,6 +4,20 @@ import AppKit
 /// Covers keywords, strings, comments, numbers, and types for common languages.
 enum SyntaxHighlighter {
 
+    nonisolated(unsafe) private static var regexCache: [String: NSRegularExpression] = [:]
+
+    private static func cachedRegex(pattern: String, options: NSRegularExpression.Options) -> NSRegularExpression? {
+        let key = "\(pattern)|\(options.rawValue)"
+        if let cached = regexCache[key] {
+            return cached
+        }
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: options) else {
+            return nil
+        }
+        regexCache[key] = regex
+        return regex
+    }
+
     struct Theme {
         var keyword = NSColor.systemPink
         var string = NSColor.systemRed
@@ -31,7 +45,7 @@ enum SyntaxHighlighter {
 
         let rules = self.rules(for: fileExtension, theme: theme)
         for rule in rules {
-            let regex = try? NSRegularExpression(pattern: rule.pattern, options: rule.options)
+            let regex = cachedRegex(pattern: rule.pattern, options: rule.options)
             regex?.enumerateMatches(in: source, range: fullRange) { match, _, _ in
                 guard let range = match?.range else { return }
                 attributed.addAttribute(.foregroundColor, value: rule.color, range: range)

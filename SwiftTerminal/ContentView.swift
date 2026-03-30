@@ -1,7 +1,9 @@
 import SwiftUI
+import SwiftData
 
 struct ContentView: View {
     @Environment(AppState.self) private var appState
+    @Query private var workspaces: [Workspace]
     @State private var editorPanel = EditorPanel()
     @State private var searchText = ""
 
@@ -30,5 +32,16 @@ struct ContentView: View {
         }
         .environment(editorPanel)
         .focusedSceneValue(\.editorPanel, editorPanel)
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToSession)) { notification in
+            guard let workspaceID = notification.userInfo?["workspaceID"] as? String,
+                  let terminalID = notification.userInfo?["terminalID"] as? String else { return }
+
+            if let workspace = workspaces.first(where: { $0.id.uuidString == workspaceID }) {
+                appState.selectedWorkspace = workspace
+                if let terminal = workspace.terminals.first(where: { $0.id.uuidString == terminalID }) {
+                    appState.selectedTerminal = terminal
+                }
+            }
+        }
     }
 }

@@ -66,23 +66,32 @@ struct FileItem: Identifiable, Hashable {
         }
     }
 
-    static func buildTree(at directoryURL: URL, showHiddenFiles: Bool = false) -> [FileItem] {
+    static func buildTree(at directoryURL: URL, showHiddenFiles: Bool = false, maxDepth: Int = 15) -> [FileItem] {
+        buildTree(at: directoryURL, showHiddenFiles: showHiddenFiles, maxDepth: maxDepth, currentDepth: 0)
+    }
+
+    private static func buildTree(at directoryURL: URL, showHiddenFiles: Bool, maxDepth: Int, currentDepth: Int) -> [FileItem] {
         guard let contents = try? FileManager.default.contentsOfDirectory(
             at: directoryURL,
             includingPropertiesForKeys: [.isDirectoryKey],
             options: showHiddenFiles ? [] : [.skipsHiddenFiles]
         ) else { return [] }
 
+        let atDepthLimit = currentDepth + 1 >= maxDepth
+
         return contents
             .filter { !ignoredNames.contains($0.lastPathComponent) }
             .compactMap { url -> FileItem? in
                 let values = try? url.resourceValues(forKeys: [.isDirectoryKey])
                 let isDir = values?.isDirectory ?? false
+                let children: [FileItem]? = isDir
+                    ? (atDepthLimit ? nil : buildTree(at: url, showHiddenFiles: showHiddenFiles, maxDepth: maxDepth, currentDepth: currentDepth + 1))
+                    : nil
                 return FileItem(
                     name: url.lastPathComponent,
                     url: url,
                     isDirectory: isDir,
-                    children: isDir ? buildTree(at: url, showHiddenFiles: showHiddenFiles) : nil
+                    children: children
                 )
             }
             .sorted { lhs, rhs in

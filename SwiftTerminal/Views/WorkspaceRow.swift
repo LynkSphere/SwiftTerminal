@@ -47,6 +47,31 @@ struct WorkspaceRow: View {
         }
         .contextMenu {
             RenameButton()
+
+            Menu("Project Type") {
+                ForEach(ProjectType.allCases, id: \.self) { type in
+                    Button {
+                        workspace.projectType = type
+                    } label: {
+                        Label {
+                            Text(type.displayName)
+                        } icon: {
+                            if workspace.projectType == type {
+                                Image(systemName: "checkmark")
+                            } else if !type.iconName.isEmpty {
+                                Image(type.iconName)
+                            }
+                        }
+                    }
+                }
+
+                Divider()
+
+                Button("Auto-Detect") {
+                    workspace.detectProjectType()
+                }
+            }
+
             Divider()
             Button(role: .destructive) {
                 if appState.selectedWorkspace === workspace {

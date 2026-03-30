@@ -11,7 +11,6 @@ final class Terminal {
     var workspace: Workspace
 
     @Attribute(.ephemeral) var hasBellNotification = false
-    @Attribute(.ephemeral) var shellTitle: String?
     @Transient var localProcessTerminalView: LocalProcessTerminalView?
 
     init(workspace: Workspace, title: String = "Terminal", currentDirectory: String? = nil, sortOrder: Int = 0) {
@@ -88,10 +87,6 @@ final class Terminal {
         guard let tv = localProcessTerminalView else { return }
         tv.getTerminal().resetToInitialState()
         tv.send(txt: "\u{0C}")
-    }
-
-    func clearNotification() {
-        hasBellNotification = false
     }
 
     private func childProcesses() -> [(pid: pid_t, name: String)] {

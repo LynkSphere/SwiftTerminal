@@ -1,5 +1,4 @@
 import Foundation
-import Observation
 
 @Observable
 final class FileTreeModel {
@@ -47,6 +46,55 @@ final class FileTreeModel {
                let found = findItem(id: id, in: children) { return found }
         }
         return nil
+    }
+
+    // MARK: - File Operations
+
+    func moveToTrash(url: URL, directoryURL: URL) {
+        try? FileManager.default.trashItem(at: url, resultingItemURL: nil)
+        load(directoryURL: directoryURL)
+    }
+
+    func duplicate(url: URL, directoryURL: URL) {
+        let fm = FileManager.default
+        let directory = url.deletingLastPathComponent()
+        let name = url.deletingPathExtension().lastPathComponent
+        let ext = url.pathExtension
+        var suffix = 2
+        var destination: URL
+        repeat {
+            let newName = ext.isEmpty ? "\(name) \(suffix)" : "\(name) \(suffix).\(ext)"
+            destination = directory.appendingPathComponent(newName)
+            suffix += 1
+        } while fm.fileExists(atPath: destination.path)
+        try? fm.copyItem(at: url, to: destination)
+        load(directoryURL: directoryURL)
+    }
+
+    func createNewFile(in parentURL: URL, directoryURL: URL) -> URL {
+        let fm = FileManager.default
+        var destination = parentURL.appendingPathComponent("Untitled")
+        var suffix = 2
+        while fm.fileExists(atPath: destination.path) {
+            destination = parentURL.appendingPathComponent("Untitled \(suffix)")
+            suffix += 1
+        }
+        fm.createFile(atPath: destination.path, contents: nil)
+        load(directoryURL: directoryURL)
+        return parentURL
+    }
+
+    func createNewFolder(in parentURL: URL, directoryURL: URL) -> URL {
+        let fm = FileManager.default
+        var destination = parentURL.appendingPathComponent("New Folder")
+        var suffix = 2
+        while fm.fileExists(atPath: destination.path) {
+            destination = parentURL.appendingPathComponent("New Folder \(suffix)")
+            suffix += 1
+        }
+        try? fm.createDirectory(at: destination, withIntermediateDirectories: false)
+        load(directoryURL: directoryURL)
+        return parentURL
     }
 
     private func applyStatuses(to tree: inout [FileItem]) {

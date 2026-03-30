@@ -25,18 +25,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         completionHandler([.banner, .sound])
     }
 
-    // Handle notification click — navigate to the session that triggered it
+    // Handle notification click — navigate to the workspace/terminal that triggered it
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let userInfo = response.notification.request.content.userInfo
-        if let sessionIDString = userInfo["sessionID"] as? String {
+        if let workspaceID = userInfo["workspaceID"] as? String,
+           let terminalID = userInfo["terminalID"] as? String {
             NotificationCenter.default.post(
                 name: .navigateToSession,
                 object: nil,
-                userInfo: ["sessionID": sessionIDString]
+                userInfo: [
+                    "workspaceID": workspaceID,
+                    "terminalID": terminalID,
+                ]
             )
         }
         NSApplication.shared.dockTile.badgeLabel = nil

@@ -75,7 +75,6 @@ final class FoldingManager {
         for (lineIdx, line) in lines.enumerated() {
             let lineNum = lineIdx + 1
             let chars = Array(line)
-            let inLineComment = false
             var i = 0
 
             while i < chars.count {
@@ -99,8 +98,6 @@ final class FoldingManager {
                     if c == stringDelim { inString = false }
                     i += 1; continue
                 }
-
-                if inLineComment { break }
 
                 if c == "/" && next == "/" { break }
                 if c == "/" && next == "*" {

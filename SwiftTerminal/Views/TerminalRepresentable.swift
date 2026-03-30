@@ -122,10 +122,7 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
 
         func sizeChanged(source: LocalProcessTerminalView, newCols: Int, newRows: Int) {}
 
-        func setTerminalTitle(source: LocalProcessTerminalView, title: String) {
-            guard let tab = viewMap[ObjectIdentifier(source)]?.tab else { return }
-            tab.shellTitle = title
-        }
+        func setTerminalTitle(source: LocalProcessTerminalView, title: String) {}
 
         func processTerminated(source: TerminalView, exitCode: Int32?) {}
 

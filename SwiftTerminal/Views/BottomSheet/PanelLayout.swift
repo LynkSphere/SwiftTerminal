@@ -10,7 +10,7 @@ struct PanelLayout<Title: View, Actions: View, Content: View>: View {
     @Environment(EditorPanel.self) private var panel
     @Environment(\.openWindow) private var openWindow
     @Environment(\.isDetachedEditor) private var isDetached
-    @AppStorage("editorPanelHeight_v3") private var panelHeight: Double = 250
+    @AppStorage("editorPanelHeight") private var panelHeight: Double = 250
 
     @ViewBuilder let title: Title
     @ViewBuilder let actions: Actions
@@ -87,11 +87,17 @@ struct PanelLayout<Title: View, Actions: View, Content: View>: View {
         .gesture(resizeGesture)
     }
 
+    @State private var dragStartHeight: Double?
+
     private var resizeGesture: some Gesture {
         DragGesture(minimumDistance: 1)
             .onChanged { value in
-                let delta = -value.translation.height
-                panelHeight = max(100, panelHeight + delta)
+                if dragStartHeight == nil { dragStartHeight = panelHeight }
+                let proposed = (dragStartHeight ?? panelHeight) - value.translation.height
+                panelHeight = min(max(100, proposed), 800)
+            }
+            .onEnded { _ in
+                dragStartHeight = nil
             }
     }
 }

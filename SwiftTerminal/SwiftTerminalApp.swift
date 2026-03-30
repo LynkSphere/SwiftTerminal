@@ -9,7 +9,15 @@ struct SwiftTerminalApp: App {
     @State private var appState = AppState()
 
     init() {
-        self.container = try! ModelContainer(for: Workspace.self)
+        self.container = Self.makeContainer()
+    }
+
+    private static func makeContainer() -> ModelContainer {
+        do {
+            return try ModelContainer(for: Workspace.self)
+        } catch {
+            fatalError("Failed to create ModelContainer: \(error)")
+        }
     }
 
     var body: some Scene {

@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct GitInspectorView: View {
     let directoryURL: URL
@@ -29,18 +28,43 @@ struct GitInspectorView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
+            .overlay(alignment: .bottom) {
+                if let error = model.errorMessage {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.yellow)
+                        Text(error)
+                            .lineLimit(3)
+                        Spacer()
+                        Button {
+                            model.errorMessage = nil
+                        } label: {
+                            Image(systemName: "xmark")
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .font(.caption)
+                    .padding(8)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+                    .padding(8)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .task {
+                        try? await Task.sleep(for: .seconds(5))
+                        if model.errorMessage == error {
+                            model.errorMessage = nil
+                        }
+                    }
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: model.errorMessage)
             .task(id: directoryURL) {
                 await model.refresh(directoryURL: directoryURL)
                 if selectedRepoURL == nil {
                     selectedRepoURL = model.snapshots.first?.repositoryRootURL
                 }
             }
-            .task(id: directoryURL, priority: .low) {
-                while !Task.isCancelled {
-                    try? await Task.sleep(for: .seconds(5))
-                    guard !Task.isCancelled else { break }
-                    await model.refresh(directoryURL: directoryURL)
-                }
+            .gitPolling(id: directoryURL) {
+                await model.refresh(directoryURL: directoryURL)
             }
             .alert("Discard Changes?", isPresented: discardAlertBinding) {
                 Button("Discard", role: .destructive) {
@@ -201,21 +225,6 @@ struct GitInspectorView: View {
                     }
                 }
             } label: {
-//                HStack(spacing: 4) {
-//                    Image(systemName: "arrow.triangle.branch")
-////                        .font(.caption)
-//                        .imageScale(.small)
-//                    Text(selectedSnapshot?.branchName ?? "No Branch")
-//                        .font(.subheadline)
-//                        .lineLimit(1)
-//                }
-//                .foregroundStyle(.primary)
-//                .frame(maxWidth: .infinity, alignment: .leading)
-//                .contentShape(Rectangle())
-                
-//                Label(selectedSnapshot?.branchName ?? "No Branch", systemImage: "arrow.triangle.branch")
-//                    .font(.caption)
-//                    .foregroundStyle(.secondary)
                 Label {
                     Text(selectedSnapshot?.branchName ?? "No Branch")
                         .font(.caption)
