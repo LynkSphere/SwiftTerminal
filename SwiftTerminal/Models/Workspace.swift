@@ -23,12 +23,6 @@ final class Workspace {
         projectType = ProjectType.detect(at: url)
     }
 
-    @Relationship(deleteRule: .cascade, inverse: \ChatSession.workspace)
-    var unsortedSessions: [ChatSession] = []
-    var sessions: [ChatSession] {
-        unsortedSessions.sorted { $0.createdAt > $1.createdAt }
-    }
-
     @Relationship(deleteRule: .cascade, inverse: \Terminal.workspace)
     var unsortedTerminals: [Terminal] = []
     var terminals: [Terminal] {
@@ -41,29 +35,6 @@ final class Workspace {
         self.sortOrder = sortOrder
     }
     
-    // MARK: - Session Management
-
-    @discardableResult
-    func newSession() -> ChatSession {
-        let cs = ChatSession(workspace: self)
-        unsortedSessions.append(cs)
-        return cs
-    }
-
-    /// Returns an existing empty session or creates a new one.
-    func emptyOrNewSession() -> ChatSession {
-        if let empty = sessions.first(where: { $0.externalSessionID == nil }) {
-            return empty
-        }
-        return newSession()
-    }
-
-    func removeSession(_ cs: ChatSession) {
-        cs.service?.stop()
-        unsortedSessions.removeAll { $0.id == cs.id }
-        cs.modelContext?.delete(cs)
-    }
-
     // MARK: - Terminal Management
 
     @discardableResult
