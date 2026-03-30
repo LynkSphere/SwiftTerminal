@@ -27,6 +27,7 @@ struct SessionRow: View {
             } else {
                 Text(session.name ?? "New Session")
                     .lineLimit(1)
+                    .shimmerWithoutRedact(when: session.service?.isStreaming == true)
             }
         }
         .badge(session.hasNotification ? "" : nil)
@@ -63,6 +64,17 @@ struct SessionRow: View {
             } label: {
                 Label("Delete", systemImage: "trash")
                     .labelStyle(.iconOnly)
+            }
+        }
+        .swipeActions(edge: .leading) {
+            if session.service?.queryActive == true {
+                Button {
+                    session.resolveService().disconnectProcess()
+                } label: {
+                    Label("Stop", systemImage: "stop.fill")
+                        .labelStyle(.iconOnly)
+                }
+                .tint(.orange)
             }
         }
     }
