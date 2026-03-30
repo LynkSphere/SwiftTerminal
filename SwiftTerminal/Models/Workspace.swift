@@ -67,8 +67,20 @@ final class Workspace {
     // MARK: - Terminal Management
 
     @discardableResult
-    func addTerminal() -> Terminal {
-        let tab = Terminal(workspace: self, currentDirectory: directory, sortOrder: unsortedTerminals.count)
+    func addTerminal(currentDirectory: String? = nil, after current: Terminal? = nil) -> Terminal {
+        let ordered = terminals
+        let insertIndex: Int
+        if let current, let idx = ordered.firstIndex(where: { $0 === current }) {
+            insertIndex = idx + 1
+        } else {
+            insertIndex = ordered.count
+        }
+
+        for t in ordered where t.sortOrder >= insertIndex {
+            t.sortOrder += 1
+        }
+
+        let tab = Terminal(workspace: self, currentDirectory: currentDirectory ?? directory, sortOrder: insertIndex)
         unsortedTerminals.append(tab)
         return tab
     }
@@ -77,5 +89,17 @@ final class Workspace {
         tab.terminate()
         unsortedTerminals.removeAll { $0.id == tab.id }
         tab.modelContext?.delete(tab)
+    }
+
+    func terminalBefore(_ terminal: Terminal) -> Terminal? {
+        let ordered = terminals
+        guard let idx = ordered.firstIndex(where: { $0 === terminal }), idx > 0 else { return nil }
+        return ordered[idx - 1]
+    }
+
+    func terminalAfter(_ terminal: Terminal) -> Terminal? {
+        let ordered = terminals
+        guard let idx = ordered.firstIndex(where: { $0 === terminal }), idx + 1 < ordered.count else { return nil }
+        return ordered[idx + 1]
     }
 }

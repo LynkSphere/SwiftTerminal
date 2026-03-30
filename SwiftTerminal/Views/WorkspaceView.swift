@@ -13,13 +13,10 @@ struct WorkspaceDetailView: View {
         }
         .toolbar {
             Button {
-                if let terminal = appState.selectedTerminal {
-                    terminal.clearTerminal()
-                }
+                appState.selectedTerminal?.clearTerminal()
             } label: {
                 Image(systemName: "clear")
             }
-            .keyboardShortcut("k", modifiers: .command)
         }
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .navigationTitle(workspace.name)

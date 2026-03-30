@@ -14,7 +14,10 @@ struct DocumentTabBar: View {
         HStack(spacing: 5) {
             tabStrip
             Button {
-                let terminal = workspace.addTerminal()
+                let terminal = workspace.addTerminal(
+                    currentDirectory: appState.selectedTerminal?.liveCurrentDirectory,
+                    after: appState.selectedTerminal
+                )
                 appState.selectedTerminal = terminal
             } label: {
                 Image(systemName: "plus")

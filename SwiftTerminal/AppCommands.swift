@@ -8,6 +8,32 @@ struct AppCommands: Commands {
     var body: some Commands {
         CommandGroup(replacing: .toolbar) {
             Button {
+                appState.selectedTerminal?.increaseFontSize()
+            } label: {
+                Label("Zoom In", systemImage: "plus.magnifyingglass")
+            }
+            .keyboardShortcut("+", modifiers: .command)
+            .disabled(appState.selectedTerminal?.localProcessTerminalView == nil)
+
+            Button {
+                appState.selectedTerminal?.decreaseFontSize()
+            } label: {
+                Label("Zoom Out", systemImage: "minus.magnifyingglass")
+            }
+            .keyboardShortcut("-", modifiers: .command)
+            .disabled(appState.selectedTerminal?.localProcessTerminalView == nil)
+
+            Button {
+                appState.selectedTerminal?.resetFontSize()
+            } label: {
+                Label("Actual Size", systemImage: "1.magnifyingglass")
+            }
+            .keyboardShortcut("0", modifiers: .command)
+            .disabled(appState.selectedTerminal?.localProcessTerminalView == nil)
+
+            Divider()
+
+            Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     editorPanel?.toggle()
                 }
@@ -79,6 +105,80 @@ struct AppCommands: Commands {
                 NSApp.sendAction(#selector(NSTextView.performFindPanelAction(_:)), to: nil, from: item)
             }
             .keyboardShortcut("f", modifiers: [.command, .option])
+        }
+
+        CommandMenu("Terminal") {
+            Button {
+                appState.selectedTerminal?.clearTerminal()
+            } label: {
+                Label("Clear Terminal", systemImage: "clear")
+            }
+            .keyboardShortcut("k", modifiers: .command)
+            .disabled(appState.selectedTerminal?.localProcessTerminalView == nil)
+        }
+
+        CommandMenu("Tabs") {
+            Button {
+                guard let workspace = appState.selectedWorkspace else { return }
+                let terminal = workspace.addTerminal(
+                    currentDirectory: appState.selectedTerminal?.liveCurrentDirectory,
+                    after: appState.selectedTerminal
+                )
+                appState.selectedTerminal = terminal
+            } label: {
+                Label("New Tab", systemImage: "plus.square")
+            }
+            .keyboardShortcut("t", modifiers: .command)
+            .disabled(appState.selectedWorkspace == nil)
+
+            Button {
+                guard let workspace = appState.selectedWorkspace else { return }
+                let terminal = workspace.addTerminal(
+                    currentDirectory: workspace.directory,
+                    after: appState.selectedTerminal
+                )
+                appState.selectedTerminal = terminal
+            } label: {
+                Label("New Tab in Workspace Directory", systemImage: "plus.square.on.square")
+            }
+            .keyboardShortcut("n", modifiers: .command)
+            .disabled(appState.selectedWorkspace == nil)
+
+            Button {
+                guard let workspace = appState.selectedWorkspace,
+                      let terminal = appState.selectedTerminal else { return }
+                let next = workspace.terminalAfter(terminal) ?? workspace.terminalBefore(terminal)
+                workspace.closeTerminal(terminal)
+                appState.selectedTerminal = next
+            } label: {
+                Label("Close Tab", systemImage: "xmark.square")
+            }
+            .keyboardShortcut("w", modifiers: .command)
+            .disabled((appState.selectedWorkspace?.terminals.count ?? 0) < 2)
+
+            Divider()
+
+            Button {
+                guard let workspace = appState.selectedWorkspace,
+                      let current = appState.selectedTerminal,
+                      let prev = workspace.terminalBefore(current) else { return }
+                appState.selectedTerminal = prev
+            } label: {
+                Label("Select Previous Tab", systemImage: "chevron.left.square")
+            }
+            .keyboardShortcut("[", modifiers: [.command, .shift])
+            .disabled((appState.selectedWorkspace?.terminals.count ?? 0) < 2)
+
+            Button {
+                guard let workspace = appState.selectedWorkspace,
+                      let current = appState.selectedTerminal,
+                      let next = workspace.terminalAfter(current) else { return }
+                appState.selectedTerminal = next
+            } label: {
+                Label("Select Next Tab", systemImage: "chevron.right.square")
+            }
+            .keyboardShortcut("]", modifiers: [.command, .shift])
+            .disabled((appState.selectedWorkspace?.terminals.count ?? 0) < 2)
         }
     }
 }
