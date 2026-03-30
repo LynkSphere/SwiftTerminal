@@ -43,6 +43,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         completionHandler()
     }
 
+    static func sendNotification(workspaceID: UUID, terminalID: UUID) {
+        let content = UNMutableNotificationContent()
+        content.title = "Terminal"
+        content.body = "Terminal needs attention"
+        content.sound = .default
+        content.userInfo = [
+            "terminalID": terminalID.uuidString,
+            "workspaceID": workspaceID.uuidString,
+        ]
+
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: nil
+        )
+        UNUserNotificationCenter.current().add(request)
+    }
+
+    static func bounceDockIcon() {
+        NSApplication.shared.requestUserAttention(.criticalRequest)
+    }
+
+    static func updateBadge(count: Int) {
+        if count > 0 {
+            NSApplication.shared.dockTile.badgeLabel = "\(count)"
+        } else {
+            NSApplication.shared.dockTile.badgeLabel = nil
+        }
+    }
+
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         let alert = NSAlert()
         alert.messageText = "Quit SwiftTerminal?"

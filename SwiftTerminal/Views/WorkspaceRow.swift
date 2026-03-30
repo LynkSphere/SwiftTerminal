@@ -10,9 +10,8 @@ struct WorkspaceRow: View {
     @State private var isRenaming = false
     @FocusState private var isNameFieldFocused: Bool
 
-    private var terminalCount: Int {
-        workspace.terminals.count
-    }
+    @State private var busyCount = 0
+    @State private var hasBell = false
 
     var body: some View {
         HStack(spacing: 8) {
@@ -37,7 +36,15 @@ struct WorkspaceRow: View {
                     .lineLimit(1)
             }
         }
-        .badge(terminalCount > 0 ? terminalCount : 0)
+        .badge(busyCount)
+        .badgeProminence(hasBell ? .increased : .standard)
+        .task {
+            while !Task.isCancelled {
+                busyCount = workspace.terminals.filter(\.hasChildProcess).count
+                hasBell = workspace.terminals.contains(where: \.hasBellNotification)
+                try? await Task.sleep(for: .seconds(2))
+            }
+        }
         .contextMenu {
             RenameButton()
             Divider()

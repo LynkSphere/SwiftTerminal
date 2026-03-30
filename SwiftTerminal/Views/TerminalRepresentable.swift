@@ -6,6 +6,7 @@ import SwiftTerm
 /// tab switches without being destroyed/recreated.
 struct TerminalContainerRepresentable: NSViewRepresentable {
     let tab: Terminal
+    let appState: AppState
 
     func makeNSView(context: Context) -> NSView {
         let container = NSView(frame: .zero)
@@ -21,7 +22,7 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
             terminalView = existing
             coordinator.register(existing, for: tab)
         } else {
-            terminalView = coordinator.createTerminalView(for: tab)
+            terminalView = coordinator.createTerminalView(for: tab, appState: appState)
         }
 
         terminalView.processDelegate = coordinator
@@ -62,16 +63,19 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
             viewMap[ObjectIdentifier(view)] = (id: tab.id, tab: tab)
         }
 
-        func createTerminalView(for tab: Terminal) -> LocalProcessTerminalView {
+        func createTerminalView(for tab: Terminal, appState: AppState) -> LocalProcessTerminalView {
             let tv = LocalProcessTerminalView(frame: .zero)
-            tv.onBell = { [weak tab, weak tv] in
+            tv.onBell = { [weak tab, weak tv, weak appState] in
                 Task { @MainActor in
                     guard let tab else { return }
-                    let isVisible = tv.map { !$0.isHidden && $0.window != nil } ?? false
+                    let isSelected = appState?.selectedTerminal === tab
+                    let isVisible = isSelected && (tv.map { !$0.isHidden && $0.window != nil } ?? false)
                     if !isVisible {
                         tab.hasBellNotification = true
                     }
-                    NSApplication.shared.requestUserAttention(.criticalRequest)
+                    AppDelegate.bounceDockIcon()
+                    AppDelegate.updateBadge(count: 1)
+                    AppDelegate.sendNotification(workspaceID: tab.workspace.id, terminalID: tab.id)
                 }
             }
 

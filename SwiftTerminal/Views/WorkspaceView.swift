@@ -7,7 +7,7 @@ struct WorkspaceDetailView: View {
     var body: some View {
         VStack {
             if let terminal = appState.selectedTerminal {
-                TerminalContainerRepresentable(tab: terminal)
+                TerminalContainerRepresentable(tab: terminal, appState: appState)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
@@ -24,6 +24,9 @@ struct WorkspaceDetailView: View {
         }
         .task(id: workspace) {
             appState.selectedTerminal = workspace.terminals.first ?? workspace.addTerminal()
+        }
+        .onChange(of: appState.selectedTerminal) {
+            appState.selectedTerminal?.hasBellNotification = false
         }
     }
 }
