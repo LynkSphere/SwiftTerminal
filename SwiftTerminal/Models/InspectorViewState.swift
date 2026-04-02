@@ -12,7 +12,6 @@ final class InspectorViewState {
 @Observable
 final class CommandsInspectorState {
     var runner = CommandRunner()
-    var selectedEntry: CommandEntry?
     var showAddSheet = false
 }
 

@@ -5,10 +5,9 @@ struct CommandsInspectorView: View {
     @Bindable var state: CommandsInspectorState
 
     var body: some View {
-        List(selection: $state.selectedEntry) {
+        List {
             ForEach(workspace.commands) { entry in
                 CommandEntryRow(entry: entry, runner: state.runner)
-                    .tag(entry)
             }
             .onMove { from, to in
                 reorder(from: from, to: to)

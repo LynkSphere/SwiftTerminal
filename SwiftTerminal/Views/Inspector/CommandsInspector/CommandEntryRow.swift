@@ -6,8 +6,8 @@ struct CommandEntryRow: View {
     let runner: CommandRunner
     @Environment(AppState.self) private var appState
 
-    @State private var outputExpanded = false
     @State private var showEditSheet = false
+    @State private var showFullOutput = false
 
     private var isRunning: Bool {
         runner.isRunning(entry)
@@ -19,7 +19,7 @@ struct CommandEntryRow: View {
     }
 
     var body: some View {
-        DisclosureGroup(isExpanded: $outputExpanded) {
+        DisclosureGroup {
             if let runState = runner[entry], !runState.output.isEmpty {
                 outputView(runState.output)
             }
@@ -49,11 +49,6 @@ struct CommandEntryRow: View {
         }
         .sheet(isPresented: $showEditSheet) {
             CommandEntrySheet(workspace: entry.workspace, entry: entry)
-        }
-        .onChange(of: isRunning) { _, running in
-            if running {
-                outputExpanded = true
-            }
         }
     }
 
@@ -92,8 +87,9 @@ struct CommandEntryRow: View {
     // MARK: - Output
 
     private func outputView(_ output: String) -> some View {
-        ScrollView(.vertical) {
-            Text(output)
+        let truncated = output.count > 500 ? String(output.suffix(500)) : output
+        return ScrollView(.vertical) {
+            Text(truncated)
                 .font(.system(.caption2, design: .monospaced))
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .textSelection(.enabled)
@@ -101,7 +97,45 @@ struct CommandEntryRow: View {
         .frame(maxHeight: 120)
         .contentMargins(6)
         .background(.background.secondary, in: .rect(cornerRadius: 6))
+        .overlay(alignment: .topTrailing) {
+            if output.count > 500 {
+                Button {
+                    showFullOutput = true
+                } label: {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                }
+                .controlSize(.small)
+            }
+        }
         .padding(.leading, -15)
+        .sheet(isPresented: $showFullOutput) {
+            fullOutputSheet(output)
+        }
+    }
+
+    private func fullOutputSheet(_ output: String) -> some View {
+        NavigationStack {
+            ScrollView {
+                Text(output)
+                    .font(.system(.caption, design: .monospaced))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+            }
+            .contentMargins(10)
+            .navigationTitle(entry.name)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { showFullOutput = false }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Copy") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(output, forType: .string)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: 500, maxHeight: 400)
     }
 
     // MARK: - Context Menu
