@@ -11,6 +11,10 @@ struct AppCommands: Commands {
 
     var body: some Commands {
         if mainWindowActive {
+            SidebarCommands()
+            
+            InspectorCommands()
+            
             // Override the system's File > Close (Cmd+W) to close the active tab instead of the window
             CommandGroup(after: .newItem) {
                 Button {
@@ -82,7 +86,7 @@ struct AppCommands: Commands {
             CommandMenu("Inspector") {
                 Button {
                     appState.showingInspector = true
-                    appState.selectedInspectorTab = .files
+                    appState.selectedWorkspace?.inspectorState.selectedTab = .files
                 } label: {
                     Label("Files Navigator", systemImage: "folder")
                 }
@@ -90,7 +94,7 @@ struct AppCommands: Commands {
 
                 Button {
                     appState.showingInspector = true
-                    appState.selectedInspectorTab = .git
+                    appState.selectedWorkspace?.inspectorState.selectedTab = .git
                 } label: {
                     Label("Git Navigator", systemImage: "point.topleft.down.curvedto.point.bottomright.up")
                 }
@@ -98,7 +102,7 @@ struct AppCommands: Commands {
 
                 Button {
                     appState.showingInspector = true
-                    appState.selectedInspectorTab = .search
+                    appState.selectedWorkspace?.inspectorState.selectedTab = .search
                 } label: {
                     Label("Search Navigator", systemImage: "magnifyingglass")
                 }
@@ -106,7 +110,7 @@ struct AppCommands: Commands {
 
                 Button {
                     appState.showingInspector = true
-                    appState.selectedInspectorTab = .commands
+                    appState.selectedWorkspace?.inspectorState.selectedTab = .commands
                 } label: {
                     Label("Command Runner", systemImage: "apple.terminal")
                 }
@@ -116,7 +120,7 @@ struct AppCommands: Commands {
 
                 Button {
                     appState.showingInspector = true
-                    appState.selectedInspectorTab = .search
+                    appState.selectedWorkspace?.inspectorState.selectedTab = .search
                 } label: {
                     Label("Find in Files", systemImage: "doc.text.magnifyingglass")
                 }

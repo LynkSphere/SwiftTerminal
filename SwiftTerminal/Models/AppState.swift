@@ -7,7 +7,6 @@ final class AppState {
 
     // Inspector state
     var showingInspector = true
-    var selectedInspectorTab: InspectorTab = .files
 
     // Close tab confirmation
     var terminalPendingClose: Terminal?

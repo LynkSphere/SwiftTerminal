@@ -69,10 +69,6 @@ struct CommandEntryRow: View {
             Image(systemName: code == 0 ? "checkmark.circle.fill" : "xmark.circle.fill")
                 .foregroundStyle(code == 0 ? .green : .red)
                 .font(.caption)
-        } else {
-            Image(systemName: "circle")
-                .foregroundStyle(.quaternary)
-                .font(.caption)
         }
     }
 

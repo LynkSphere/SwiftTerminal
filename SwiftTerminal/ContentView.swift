@@ -26,7 +26,7 @@ struct ContentView: View {
         }
         .inspector(isPresented: Bindable(appState).showingInspector) {
             if let workspace = appState.selectedWorkspace {
-                InspectorView(directoryURL: workspace.url)
+                InspectorView(workspace: workspace)
                     .id(workspace.url)
                     .inspectorColumnWidth(min: 240, ideal: 240, max: 360)
             }

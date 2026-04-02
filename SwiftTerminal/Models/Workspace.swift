@@ -11,6 +11,8 @@ final class Workspace {
     var projectTypeRaw: String = ProjectType.unknown.rawValue
     var scratchPad: String = ""
 
+    @Transient var inspectorState = InspectorViewState()
+
     var url: URL {
         URL(fileURLWithPath: directory)
     }

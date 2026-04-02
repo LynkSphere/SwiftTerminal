@@ -78,6 +78,7 @@ struct WorkspaceRow: View {
                     appState.selectedWorkspace = nil
                     appState.selectedTerminal = nil
                 }
+                workspace.inspectorState.commands.runner.stopAll()
                 modelContext.delete(workspace)
             } label: {
                 Label("Delete", systemImage: "trash")

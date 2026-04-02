@@ -1,15 +1,14 @@
 import Foundation
 
-@MainActor
 @Observable
 final class InspectorViewState {
+    var selectedTab: InspectorTab = .files
     var fileTree = FileTreeInspectorState()
     var search = SearchInspectorState()
     var git = GitInspectorState()
     var commands = CommandsInspectorState()
 }
 
-@MainActor
 @Observable
 final class CommandsInspectorState {
     var runner = CommandRunner()
@@ -17,7 +16,6 @@ final class CommandsInspectorState {
     var showAddSheet = false
 }
 
-@MainActor
 @Observable
 final class FileTreeInspectorState {
     var model = FileTreeModel()
@@ -26,7 +24,6 @@ final class FileTreeInspectorState {
     var savedExpandedIDs: Set<String>?
 }
 
-@MainActor
 @Observable
 final class SearchInspectorState {
     var model = SearchInspectorModel()
@@ -39,7 +36,6 @@ enum GitInspectorDiscardTarget {
     case all(GitRepositoryStatusSnapshot)
 }
 
-@MainActor
 @Observable
 final class GitInspectorState {
     var model = GitInspectorModel()
