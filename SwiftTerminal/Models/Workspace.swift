@@ -98,6 +98,16 @@ final class Workspace {
         return entry
     }
 
+    var defaultCommand: CommandEntry? {
+        commands.first { $0.isDefault }
+    }
+
+    func setDefaultCommand(_ entry: CommandEntry) {
+        for cmd in unsortedCommands {
+            cmd.isDefault = cmd.id == entry.id
+        }
+    }
+
     func removeCommand(_ entry: CommandEntry) {
         unsortedCommands.removeAll { $0.id == entry.id }
         entry.modelContext?.delete(entry)

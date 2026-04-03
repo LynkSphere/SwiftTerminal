@@ -7,6 +7,7 @@ final class CommandEntry {
     var name: String = ""
     var command: String = ""
     var sortOrder: Int = 0
+    var isDefault: Bool = false
     var workspace: Workspace
 
     @Transient var runner = CommandRunner()

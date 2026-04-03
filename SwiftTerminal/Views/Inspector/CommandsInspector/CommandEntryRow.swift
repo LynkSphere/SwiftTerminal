@@ -3,39 +3,33 @@ import SwiftTerm
 
 struct CommandEntryRow: View {
     let entry: CommandEntry
+    @Binding var selection: CommandEntry?
     @Environment(AppState.self) private var appState
 
     @State private var showEditSheet = false
-    @State private var showFullOutput = false
 
     private var runner: CommandRunner { entry.runner }
     private var isRunning: Bool { runner.isRunning }
 
     var body: some View {
-        DisclosureGroup {
-            if !runner.output.isEmpty {
-                outputView(runner.output)
-            }
-        } label: {
-            HStack(spacing: 6) {
-                VStack(alignment: .leading, spacing: 1) {
-                    HStack(spacing: 6) {
-                        Text(entry.name)
-                            .font(.callout)
-                            .lineLimit(1)
-                        statusIndicator
-                    }
-
-                    Text(entry.command)
-                        .font(.subheadline)
-                        .foregroundStyle(.tertiary)
+        HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 6) {
+                    Text(entry.name)
+                        .font(.callout)
                         .lineLimit(1)
+                    statusIndicator
                 }
 
-                Spacer()
-
-                actionButtons
+                Text(entry.command)
+                    .font(.subheadline)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
             }
+
+            Spacer()
+
+            actionButtons
         }
         .contextMenu {
             contextMenuItems
@@ -68,67 +62,13 @@ struct CommandEntryRow: View {
                 runner.stop()
             } else {
                 entry.run()
+                selection = entry
             }
         } label: {
             Image(systemName: isRunning ? "stop.fill" : "play.fill")
-                // .font(.caption)
                 .contentTransition(.symbolEffect(.replace))
         }
         .buttonStyle(.borderless)
-    }
-
-    // MARK: - Output
-
-    private func outputView(_ output: String) -> some View {
-        let truncated = output.count > 500 ? String(output.suffix(500)) : output
-        return ScrollView(.vertical) {
-            Text(truncated)
-                .font(.system(.caption2, design: .monospaced))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .textSelection(.enabled)
-        }
-        .frame(maxHeight: 120)
-        .contentMargins(6)
-        .background(.background.secondary, in: .rect(cornerRadius: 6))
-        .overlay(alignment: .topTrailing) {
-            if output.count > 500 {
-                Button {
-                    showFullOutput = true
-                } label: {
-                    Image(systemName: "arrow.up.left.and.arrow.down.right")
-                }
-                .controlSize(.small)
-            }
-        }
-        .padding(.leading, -15)
-        .sheet(isPresented: $showFullOutput) {
-            fullOutputSheet(output)
-        }
-    }
-
-    private func fullOutputSheet(_ output: String) -> some View {
-        NavigationStack {
-            ScrollView {
-                Text(output)
-                    .font(.system(.caption, design: .monospaced))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .textSelection(.enabled)
-            }
-            .contentMargins(10)
-            .navigationTitle(entry.name)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { showFullOutput = false }
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Copy") {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(output, forType: .string)
-                    }
-                }
-            }
-        }
-        .frame(maxWidth: 500, maxHeight: 400)
     }
 
     // MARK: - Context Menu
@@ -154,6 +94,13 @@ struct CommandEntryRow: View {
         }
 
         Divider()
+
+        Button {
+            entry.workspace.setDefaultCommand(entry)
+        } label: {
+            Label("Set as Run Command", systemImage: entry.isDefault ? "checkmark" : "play.circle")
+        }
+        .disabled(entry.isDefault)
 
         Button {
             showEditSheet = true

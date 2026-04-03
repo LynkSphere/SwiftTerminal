@@ -3,31 +3,15 @@ import SwiftUI
 struct CommandsInspectorView: View {
     let workspace: Workspace
 
+    @State private var selection: CommandEntry?
     @State private var showAddSheet = false
 
     var body: some View {
-        List {
-            ForEach(workspace.commands) { entry in
-                CommandEntryRow(entry: entry)
-            }
-            .onMove { from, to in
-                reorder(from: from, to: to)
-            }
-            .listRowSeparator(.hidden)
-        }
-        .scrollContentBackground(.hidden)
-        .overlay {
-            if workspace.commands.isEmpty {
-                ContentUnavailableView {
-                    Label("No Commands", systemImage: "terminal")
-                } description: {
-                    Text("Add commands like build, run, or test.")
-                } actions: {
-                    Button("Add Command") {
-                        showAddSheet = true
-                    }
-                }
-            }
+        VSplitView {
+            commandList
+            outputPanel
+                .frame(minHeight: 200)
+                .frame(maxWidth: .infinity)
         }
         .safeAreaBar(edge: .top) {
             HStack {
@@ -53,11 +37,31 @@ struct CommandsInspectorView: View {
         }
     }
 
-    private func reorder(from source: IndexSet, to destination: Int) {
-        var ordered = workspace.commands
-        ordered.move(fromOffsets: source, toOffset: destination)
-        for (i, entry) in ordered.enumerated() {
-            entry.sortOrder = i
+    private var commandList: some View {
+        List(workspace.commands, selection: $selection) { entry in
+            CommandEntryRow(entry: entry, selection: $selection)
+                .tag(entry)
+                .listRowSeparator(.hidden)
+        }
+        .safeAreaInset(edge: .top) {
+            Color.clear.frame(height: 50)
+        }
+        .scrollContentBackground(.hidden)
+    }
+
+    @ViewBuilder
+    private var outputPanel: some View {
+        if let entry = selection {
+            let runner = entry.runner
+            if runner.output.isEmpty && !runner.isRunning {
+                Text("No output")
+                    .foregroundStyle(.tertiary)
+                    .font(.callout)
+            } else {
+                CommandOutputView(text: runner.output)
+            }
+        } else {
+            Color.clear
         }
     }
 }

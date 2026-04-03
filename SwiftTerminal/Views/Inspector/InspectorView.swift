@@ -9,8 +9,23 @@ struct InspectorView: View {
     var body: some View {
         tabContent
             .toolbar {
-                ToolbarSpacer(.flexible)
+                if let defaultCommand = workspace.defaultCommand {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            if defaultCommand.runner.isRunning {
+                                defaultCommand.runner.stop()
+                            } else {
+                                defaultCommand.run()
+                            }
+                        } label: {
+                            Image(systemName: defaultCommand.runner.isRunning ? "stop.fill" : "play.fill")
+                                .contentTransition(.symbolEffect(.replace))
+                        }
+                    }
+                }
 
+                ToolbarSpacer(.flexible)
+              
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         appState.showingInspector.toggle()

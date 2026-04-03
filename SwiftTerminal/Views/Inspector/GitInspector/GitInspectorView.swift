@@ -156,6 +156,19 @@ struct GitInspectorView: View {
                 }
             }
         }
+        .contextMenu(forSelectionType: String.self) { items in
+            if let id = items.first, let (file, _, _) = resolveFile(id: id) {
+                Button { editorPanel.openFile(file.fileURL) } label: {
+                    Label("Open File", systemImage: "doc")
+                }
+            }
+        } primaryAction: { items in
+            for id in items {
+                if let (file, _, _) = resolveFile(id: id) {
+                    editorPanel.openFile(file.fileURL)
+                }
+            }
+        }
         .scrollContentBackground(.hidden)
         .safeAreaBar(edge: .top) {
             VStack(spacing: 8) {

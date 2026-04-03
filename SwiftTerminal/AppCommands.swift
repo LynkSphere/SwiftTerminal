@@ -114,7 +114,38 @@ struct AppCommands: Commands {
                 } label: {
                     Label("Command Runner", systemImage: "apple.terminal")
                 }
-                .keyboardShortcut("3", modifiers: .command)
+                .keyboardShortcut("4", modifiers: .command)
+
+                Divider()
+
+                Button {
+                    guard let workspace = appState.selectedWorkspace,
+                          let command = workspace.defaultCommand else { return }
+                    if command.runner.isRunning {
+                        command.runner.stop()
+                    } else {
+                        command.run()
+                    }
+                    appState.showingInspector = true
+                    workspace.inspectorState.selectedTab = .commands
+                } label: {
+                    if appState.selectedWorkspace?.defaultCommand?.runner.isRunning == true {
+                        Label("Stop", systemImage: "stop.fill")
+                    } else {
+                        Label("Run", systemImage: "play.fill")
+                    }
+                }
+                .keyboardShortcut("r", modifiers: .command)
+                .disabled(appState.selectedWorkspace?.defaultCommand == nil)
+
+                if appState.selectedWorkspace?.defaultCommand?.runner.isRunning == true {
+                    Button {
+                        appState.selectedWorkspace?.defaultCommand?.runner.stop()
+                    } label: {
+                        Label("Stop", systemImage: "stop.fill")
+                    }
+                    .keyboardShortcut("d", modifiers: .command)
+                }
 
                 Divider()
 
@@ -154,16 +185,6 @@ struct AppCommands: Commands {
             }
 
             CommandMenu("Terminal") {
-                Button {
-                    appState.selectedTerminal?.clearTerminal()
-                } label: {
-                    Label("Clear Terminal", systemImage: "clear")
-                }
-                .keyboardShortcut("k", modifiers: .command)
-                .disabled(appState.selectedTerminal?.localProcessTerminalView == nil)
-            }
-
-            CommandMenu("Tabs") {
                 Button {
                     guard let workspace = appState.selectedWorkspace else { return }
                     let terminal = workspace.addTerminal(
@@ -213,6 +234,16 @@ struct AppCommands: Commands {
                 }
                 .keyboardShortcut("]", modifiers: [.command, .shift])
                 .disabled((appState.selectedWorkspace?.terminals.count ?? 0) < 2)
+
+                Divider()
+
+                Button {
+                    appState.selectedTerminal?.clearTerminal()
+                } label: {
+                    Label("Clear Terminal", systemImage: "clear")
+                }
+                .keyboardShortcut("k", modifiers: .command)
+                .disabled(appState.selectedTerminal?.localProcessTerminalView == nil)
             }
         }
     }
