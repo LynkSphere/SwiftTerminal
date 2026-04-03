@@ -64,11 +64,29 @@ enum SyntaxHighlighter {
     }
 
     private static func rules(for ext: String, theme: Theme) -> [Rule] {
+        // HTML/XML/SVG get their own dedicated rule set
+        if ["html", "xml", "svg"].contains(ext) {
+            return markupRules(theme: theme)
+        }
+
+        // CSS/SCSS/LESS get their own dedicated rule set
+        if ["css", "scss", "less"].contains(ext) {
+            return cssRules(theme: theme)
+        }
+
+        // Markdown
+        if ["md", "markdown"].contains(ext) {
+            return markdownRules(theme: theme)
+        }
+
         let keywords = self.keywords(for: ext)
         var rules: [Rule] = []
 
-        // Numbers
-        rules.append(Rule(pattern: #"\b\d+(\.\d+)?\b"#, color: theme.number))
+        // Numbers (hex, binary, octal, float, plain int)
+        rules.append(Rule(pattern: #"\b0[xX][0-9a-fA-F_]+\b"#, color: theme.number))
+        rules.append(Rule(pattern: #"\b0[bB][01_]+\b"#, color: theme.number))
+        rules.append(Rule(pattern: #"\b0[oO][0-7_]+\b"#, color: theme.number))
+        rules.append(Rule(pattern: #"\b\d[\d_]*(\.\d[\d_]*)?\b"#, color: theme.number))
 
         // Types (capitalized identifiers)
         rules.append(Rule(pattern: #"\b[A-Z][A-Za-z0-9_]*\b"#, color: theme.type))
@@ -79,7 +97,7 @@ enum SyntaxHighlighter {
             rules.append(Rule(pattern: #"\b(?:"# + joined + #")\b"#, color: theme.keyword))
         }
 
-        // Preprocessor / attributes
+        // Language-specific preprocessor / attributes / extras
         switch ext {
         case "swift":
             rules.append(Rule(pattern: #"@\w+"#, color: theme.preprocessor))
@@ -87,30 +105,166 @@ enum SyntaxHighlighter {
         case "c", "cpp", "h", "hpp", "m", "mm":
             rules.append(Rule(pattern: #"^\s*#\w+.*$"#, color: theme.preprocessor, options: .anchorsMatchLines))
         case "py":
-            rules.append(Rule(pattern: #"@\w+"#, color: theme.preprocessor))
+            rules.append(Rule(pattern: #"@[\w.]+"#, color: theme.preprocessor))
+        case "rs":
+            // Rust lifetimes 'a, attributes #[...], macros name!
+            rules.append(Rule(pattern: #"'\b[a-z_]\w*\b"#, color: theme.preprocessor))
+            rules.append(Rule(pattern: #"#\[[\s\S]*?\]"#, color: theme.preprocessor, options: .dotMatchesLineSeparators))
+            rules.append(Rule(pattern: #"\b\w+!"#, color: theme.preprocessor))
+        case "go":
+            // Go tags in struct fields
+            rules.append(Rule(pattern: #"`[^`]*`"#, color: theme.string))
+        case "rb":
+            // Ruby symbols :name
+            rules.append(Rule(pattern: #":\w+"#, color: theme.number))
+        case "sh", "bash", "zsh":
+            // Shell variables $VAR, ${VAR}
+            rules.append(Rule(pattern: #"\$\{?\w+\}?"#, color: theme.type))
+        case "yml", "yaml":
+            // YAML keys (word before colon at start of line)
+            rules.append(Rule(pattern: #"^\s*[\w.-]+(?=\s*:)"#, color: theme.keyword, options: .anchorsMatchLines))
+        case "toml":
+            // TOML section headers [section] and keys
+            rules.append(Rule(pattern: #"^\s*\[[\w.-]+\]"#, color: theme.preprocessor, options: .anchorsMatchLines))
+            rules.append(Rule(pattern: #"^\s*[\w.-]+(?=\s*=)"#, color: theme.keyword, options: .anchorsMatchLines))
         default:
             break
         }
 
-        // Strings (double-quoted, single-quoted, backtick for JS/TS)
-        rules.append(Rule(pattern: #""(?:[^"\\]|\\.)*""#, color: theme.string))
-        rules.append(Rule(pattern: #"'(?:[^'\\]|\\.)*'"#, color: theme.string))
-        if ["js", "ts", "jsx", "tsx"].contains(ext) {
+        // Strings — language-specific multi-line first, then standard
+        switch ext {
+        case "swift":
+            // Swift multi-line string literal """..."""
+            rules.append(Rule(pattern: #"\"\"\"[\s\S]*?\"\"\""#, color: theme.string, options: .dotMatchesLineSeparators))
+            // Swift raw strings #"..."#
+            rules.append(Rule(pattern: ##"#"(?:[^"\\]|\\.)*"#"##, color: theme.string))
+            rules.append(Rule(pattern: #""(?:[^"\\]|\\.)*""#, color: theme.string))
+        case "py":
+            // Python triple-quoted strings (must come before single-quoted)
+            rules.append(Rule(pattern: #"\"\"\"[\s\S]*?\"\"\""#, color: theme.string, options: .dotMatchesLineSeparators))
+            rules.append(Rule(pattern: #"'''[\s\S]*?'''"#, color: theme.string, options: .dotMatchesLineSeparators))
+            // Python f-strings f"..." / f'...'
+            rules.append(Rule(pattern: #"[fFrRbBuU]*"(?:[^"\\]|\\.)*""#, color: theme.string))
+            rules.append(Rule(pattern: #"[fFrRbBuU]*'(?:[^'\\]|\\.)*'"#, color: theme.string))
+        case "rs":
+            // Rust raw strings r"...", r#"..."#
+            rules.append(Rule(pattern: "r#+\"[\\s\\S]*?\"#+", color: theme.string, options: .dotMatchesLineSeparators))
+            rules.append(Rule(pattern: #""(?:[^"\\]|\\.)*""#, color: theme.string))
+            rules.append(Rule(pattern: #"'(?:[^'\\]|\\.)*'"#, color: theme.string))
+        case "js", "jsx", "ts", "tsx", "mjs":
+            rules.append(Rule(pattern: #""(?:[^"\\]|\\.)*""#, color: theme.string))
+            rules.append(Rule(pattern: #"'(?:[^'\\]|\\.)*'"#, color: theme.string))
             rules.append(Rule(pattern: #"`(?:[^`\\]|\\.)*`"#, color: theme.string, options: .dotMatchesLineSeparators))
+        default:
+            rules.append(Rule(pattern: #""(?:[^"\\]|\\.)*""#, color: theme.string))
+            rules.append(Rule(pattern: #"'(?:[^'\\]|\\.)*'"#, color: theme.string))
         }
 
-        // Multi-line comments (applied before single-line so they take precedence)
-        rules.append(Rule(pattern: #"/\*[\s\S]*?\*/"#, color: theme.comment, options: .dotMatchesLineSeparators))
-
-        // Single-line comments
+        // Comments — multi-line first, then single-line
         switch ext {
-        case "py", "rb", "sh", "bash", "zsh", "yml", "yaml", "toml":
+        case "py":
+            // Python # comments (triple-quotes already handled as strings above)
             rules.append(Rule(pattern: #"#.*$"#, color: theme.comment, options: .anchorsMatchLines))
-        case "html", "xml", "svg":
-            rules.append(Rule(pattern: #"<!--[\s\S]*?-->"#, color: theme.comment, options: .dotMatchesLineSeparators))
+        case "rb":
+            rules.append(Rule(pattern: #"=begin[\s\S]*?=end"#, color: theme.comment, options: .dotMatchesLineSeparators))
+            rules.append(Rule(pattern: #"#.*$"#, color: theme.comment, options: .anchorsMatchLines))
+        case "sh", "bash", "zsh", "yml", "yaml", "toml":
+            rules.append(Rule(pattern: #"#.*$"#, color: theme.comment, options: .anchorsMatchLines))
         default:
+            rules.append(Rule(pattern: #"/\*[\s\S]*?\*/"#, color: theme.comment, options: .dotMatchesLineSeparators))
             rules.append(Rule(pattern: #"//.*$"#, color: theme.comment, options: .anchorsMatchLines))
         }
+
+        return rules
+    }
+
+    // MARK: - Markup Rules (HTML/XML/SVG)
+
+    private static func markupRules(theme: Theme) -> [Rule] {
+        var rules: [Rule] = []
+
+        // Tag names <tagname ...> and </tagname>
+        rules.append(Rule(pattern: #"</?(\w[\w.-]*)"#, color: theme.keyword))
+
+        // Attribute names
+        rules.append(Rule(pattern: #"\b([\w-]+)\s*="#, color: theme.type))
+
+        // Attribute values (quoted strings)
+        rules.append(Rule(pattern: #""[^"]*""#, color: theme.string))
+        rules.append(Rule(pattern: #"'[^']*'"#, color: theme.string))
+
+        // Entities &amp; etc
+        rules.append(Rule(pattern: #"&\w+;"#, color: theme.number))
+
+        // HTML comments
+        rules.append(Rule(pattern: #"<!--[\s\S]*?-->"#, color: theme.comment, options: .dotMatchesLineSeparators))
+
+        return rules
+    }
+
+    // MARK: - CSS Rules
+
+    private static func cssRules(theme: Theme) -> [Rule] {
+        var rules: [Rule] = []
+
+        // Selectors (tag names, .class, #id)
+        rules.append(Rule(pattern: #"[.#][\w-]+"#, color: theme.keyword))
+
+        // Property names
+        rules.append(Rule(pattern: #"\b[\w-]+(?=\s*:)"#, color: theme.type))
+
+        // Numbers with units
+        rules.append(Rule(pattern: #"\b\d[\d.]*(%|px|em|rem|vh|vw|pt|cm|mm|in|deg|s|ms)?\b"#, color: theme.number))
+
+        // Colors #hex
+        rules.append(Rule(pattern: #"#[0-9a-fA-F]{3,8}\b"#, color: theme.number))
+
+        // Strings
+        rules.append(Rule(pattern: #""[^"]*""#, color: theme.string))
+        rules.append(Rule(pattern: #"'[^']*'"#, color: theme.string))
+
+        // @rules
+        rules.append(Rule(pattern: #"@[\w-]+"#, color: theme.preprocessor))
+
+        // !important
+        rules.append(Rule(pattern: #"!important"#, color: theme.preprocessor))
+
+        // Comments
+        rules.append(Rule(pattern: #"/\*[\s\S]*?\*/"#, color: theme.comment, options: .dotMatchesLineSeparators))
+
+        return rules
+    }
+
+    // MARK: - Markdown Rules
+
+    private static func markdownRules(theme: Theme) -> [Rule] {
+        var rules: [Rule] = []
+
+        // Headings # ## ### etc
+        rules.append(Rule(pattern: #"^#{1,6}\s+.*$"#, color: theme.keyword, options: .anchorsMatchLines))
+
+        // Bold **text** and __text__
+        rules.append(Rule(pattern: #"\*\*[^*]+\*\*"#, color: theme.type))
+        rules.append(Rule(pattern: #"__[^_]+__"#, color: theme.type))
+
+        // Italic *text* and _text_
+        rules.append(Rule(pattern: #"(?<!\*)\*(?!\*)[^*]+\*(?!\*)"#, color: theme.string))
+
+        // Inline code `code`
+        rules.append(Rule(pattern: #"`[^`]+`"#, color: theme.number))
+
+        // Code fence markers ```
+        rules.append(Rule(pattern: #"^```.*$"#, color: theme.number, options: .anchorsMatchLines))
+
+        // Links [text](url)
+        rules.append(Rule(pattern: #"\[([^\]]+)\]\([^)]+\)"#, color: theme.preprocessor))
+
+        // Blockquotes > text
+        rules.append(Rule(pattern: #"^>\s+.*$"#, color: theme.comment, options: .anchorsMatchLines))
+
+        // List markers - * + and numbered 1.
+        rules.append(Rule(pattern: #"^\s*[-*+]\s"#, color: theme.keyword, options: .anchorsMatchLines))
+        rules.append(Rule(pattern: #"^\s*\d+\.\s"#, color: theme.keyword, options: .anchorsMatchLines))
 
         return rules
     }
@@ -187,6 +341,17 @@ enum SyntaxHighlighter {
                 "not", "in", "then", "require", "include", "extend", "attr_accessor", "attr_reader",
                 "attr_writer", "private", "protected", "public", "lambda", "proc",
             ]
+        case "sh", "bash", "zsh":
+            return [
+                "if", "then", "else", "elif", "fi", "case", "esac", "for", "while", "until",
+                "do", "done", "in", "function", "select", "return", "exit", "break", "continue",
+                "local", "export", "readonly", "declare", "typeset", "unset", "shift",
+                "source", "eval", "exec", "trap", "set", "true", "false",
+            ]
+        case "yml", "yaml":
+            return ["true", "false", "null", "yes", "no", "on", "off"]
+        case "toml":
+            return ["true", "false"]
         case "json":
             return ["true", "false", "null"]
         case "m", "mm":
