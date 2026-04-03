@@ -10,7 +10,9 @@ final class CommandEntry {
     var isDefault: Bool = false
     var workspace: Workspace
 
-    @Transient var runner = CommandRunner()
+    var runner: CommandRunner {
+        CommandRunner.runner(for: id)
+    }
 
     init(workspace: Workspace, name: String, command: String, sortOrder: Int = 0) {
         self.workspace = workspace

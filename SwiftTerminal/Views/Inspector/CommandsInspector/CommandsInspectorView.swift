@@ -9,8 +9,9 @@ struct CommandsInspectorView: View {
     var body: some View {
         VSplitView {
             commandList
+                .layoutPriority(1)
             outputPanel
-                .frame(minHeight: 200)
+                .frame(minHeight: 285, maxHeight: .infinity)
                 .frame(maxWidth: .infinity)
         }
         .safeAreaBar(edge: .top) {
@@ -39,7 +40,7 @@ struct CommandsInspectorView: View {
 
     private var commandList: some View {
         List(workspace.commands, selection: $selection) { entry in
-            CommandEntryRow(entry: entry, selection: $selection)
+            CommandEntryRow(entry: entry, runner: entry.runner, selection: $selection)
                 .tag(entry)
                 .listRowSeparator(.hidden)
         }

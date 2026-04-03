@@ -109,6 +109,7 @@ final class Workspace {
     }
 
     func removeCommand(_ entry: CommandEntry) {
+        CommandRunner.remove(for: entry.id)
         unsortedCommands.removeAll { $0.id == entry.id }
         entry.modelContext?.delete(entry)
     }

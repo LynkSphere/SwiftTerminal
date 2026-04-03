@@ -23,7 +23,6 @@ struct CommandOutputView: NSViewRepresentable {
         scrollView.hasHorizontalScroller = false
         scrollView.drawsBackground = false
         scrollView.autohidesScrollers = true
-
         return scrollView
     }
 

@@ -3,6 +3,20 @@ import Foundation
 @Observable
 final class CommandRunner {
 
+    private static var registry: [UUID: CommandRunner] = [:]
+
+    static func runner(for id: UUID) -> CommandRunner {
+        if let existing = registry[id] { return existing }
+        let runner = CommandRunner()
+        registry[id] = runner
+        return runner
+    }
+
+    static func remove(for id: UUID) {
+        registry[id]?.stop()
+        registry.removeValue(forKey: id)
+    }
+
     private(set) var process: Process?
     private(set) var pipe: Pipe?
     private(set) var output: String = ""

@@ -3,23 +3,22 @@ import SwiftTerm
 
 struct CommandEntryRow: View {
     let entry: CommandEntry
+    var runner: CommandRunner
     @Binding var selection: CommandEntry?
     @Environment(AppState.self) private var appState
 
     @State private var showEditSheet = false
 
-    private var runner: CommandRunner { entry.runner }
     private var isRunning: Bool { runner.isRunning }
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
+            statusIndicator
+
             VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 6) {
-                    Text(entry.name)
-                        .font(.callout)
-                        .lineLimit(1)
-                    statusIndicator
-                }
+                Text(entry.name)
+                    .font(.callout)
+                    .lineLimit(1)
 
                 Text(entry.command)
                     .font(.subheadline)
@@ -45,12 +44,12 @@ struct CommandEntryRow: View {
     private var statusIndicator: some View {
         if isRunning {
             ProgressView()
-                .controlSize(.mini)
-                .frame(width: 14, height: 14)
+                .controlSize(.small)
+                // .frame(width: 16, height: 16)
         } else if let code = runner.exitCode {
             Image(systemName: code == 0 ? "checkmark.circle.fill" : "xmark.circle.fill")
                 .foregroundStyle(code == 0 ? .green : .red)
-                .font(.caption)
+                .font(.callout)
         }
     }
 
