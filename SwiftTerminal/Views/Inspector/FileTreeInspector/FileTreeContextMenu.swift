@@ -1,34 +1,51 @@
 import SwiftUI
 
+// MARK: - Action Enum
+
 enum FileTreeAction {
+    case openFile(URL)
     case revealInFinder(URL)
+    case rename(FileItem)
+    case commitRename(FileItem, String)
     case moveToTrash(URL)
     case duplicate(URL)
     case newFile(URL)
     case newFolder(URL)
 }
 
+// MARK: - Context Menu
+
 struct FileTreeContextMenu: View {
     let item: FileItem
-    let onAction: (FileTreeAction) -> Void
+    @Environment(\.fileTreeAction) private var onAction
 
     private var parentURL: URL {
         item.isDirectory ? item.url : item.url.deletingLastPathComponent()
     }
 
     var body: some View {
+        if !item.isDirectory {
+            Button { onAction(.openFile(item.url)) } label: {
+                Label("Open File", systemImage: "doc")
+            }
+        }
+
         Button { onAction(.revealInFinder(item.url)) } label: {
             Label("Reveal in Finder", systemImage: "folder")
         }
 
         Divider()
 
-        Button { onAction(.moveToTrash(item.url)) } label: {
-            Label("Move to Trash", systemImage: "trash")
+        Button { onAction(.rename(item)) } label: {
+            Label("Rename", systemImage: "pencil")
         }
 
         Button { onAction(.duplicate(item.url)) } label: {
             Label("Duplicate", systemImage: "doc.on.doc")
+        }
+
+        Button(role: .destructive) { onAction(.moveToTrash(item.url)) } label: {
+            Label("Move to Trash", systemImage: "trash")
         }
 
         Divider()

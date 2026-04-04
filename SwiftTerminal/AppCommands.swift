@@ -126,8 +126,8 @@ struct AppCommands: Commands {
                     } else {
                         command.run()
                     }
-                    appState.showingInspector = true
-                    workspace.inspectorState.selectedTab = .commands
+                    // appState.showingInspector = true
+                    // workspace.inspectorState.selectedTab = .commands
                 } label: {
                     let running = appState.selectedWorkspace?.defaultCommand?.runner.isRunning == true
                     Label(running ? "Stop" : "Run", systemImage: running ? "stop.fill" : "play.fill")

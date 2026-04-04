@@ -65,7 +65,9 @@ struct InspectorView: View {
         case .search:
             SearchInspectorView(directoryURL: workspace.url, state: state.search)
         case .git:
-            GitInspectorView(directoryURL: workspace.url, state: state.git)
+            GitInspectorView(directoryURL: workspace.url, state: state.git) { url in
+                state.revealInFileTree(url, relativeTo: workspace.url)
+            }
         case .commands:
             CommandsInspectorView(workspace: workspace)
         }

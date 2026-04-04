@@ -71,6 +71,7 @@ final class FileTreeModel {
         load(directoryURL: directoryURL)
     }
 
+    @discardableResult
     func createNewFile(in parentURL: URL, directoryURL: URL) -> URL {
         let fm = FileManager.default
         var destination = parentURL.appendingPathComponent("Untitled")
@@ -81,9 +82,10 @@ final class FileTreeModel {
         }
         fm.createFile(atPath: destination.path, contents: nil)
         load(directoryURL: directoryURL)
-        return parentURL
+        return destination
     }
 
+    @discardableResult
     func createNewFolder(in parentURL: URL, directoryURL: URL) -> URL {
         let fm = FileManager.default
         var destination = parentURL.appendingPathComponent("New Folder")
@@ -94,7 +96,21 @@ final class FileTreeModel {
         }
         try? fm.createDirectory(at: destination, withIntermediateDirectories: false)
         load(directoryURL: directoryURL)
-        return parentURL
+        return destination
+    }
+
+    func rename(url: URL, to newName: String, directoryURL: URL) -> URL? {
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed != url.lastPathComponent else { return nil }
+        let destination = url.deletingLastPathComponent().appendingPathComponent(trimmed)
+        guard !FileManager.default.fileExists(atPath: destination.path) else { return nil }
+        do {
+            try FileManager.default.moveItem(at: url, to: destination)
+            load(directoryURL: directoryURL)
+            return destination
+        } catch {
+            return nil
+        }
     }
 
     private func applyStatuses(to tree: inout [FileItem]) {

@@ -3,6 +3,7 @@ import SwiftUI
 struct GitInspectorView: View {
     let directoryURL: URL
     @Bindable var state: GitInspectorState
+    var onShowInFileTree: ((URL) -> Void)?
 
     @Environment(EditorPanel.self) private var editorPanel
 
@@ -157,9 +158,14 @@ struct GitInspectorView: View {
             }
         }
         .contextMenu(forSelectionType: String.self) { items in
-            if let id = items.first, let (file, _, _) = resolveFile(id: id) {
-                Button { editorPanel.openFile(file.fileURL) } label: {
-                    Label("Open File", systemImage: "doc")
+            if let id = items.first, let (file, stage, snapshot) = resolveFile(id: id) {
+                let staged = stage == .staged
+                if !id.hasPrefix("commit:") {
+                    GitFileContextMenu(files: [file], staged: staged, snapshot: snapshot, onAction: handleAction)
+                } else if file.kind != .deleted {
+                    Button { onShowInFileTree?(file.fileURL) } label: {
+                        Label("Show in File Tree", systemImage: "sidebar.trailing")
+                    }
                 }
             }
         } primaryAction: { items in
@@ -466,8 +472,8 @@ struct GitInspectorView: View {
             state.discardTarget = .all(snapshot)
         case .commit:
             performSourceControlAction()
-        case .openFile(let url):
-            editorPanel.openFile(url)
+        case .showInFileTree(let url):
+            onShowInFileTree?(url)
         case .push(let snapshot):
             Task { await state.model.push(snapshot: snapshot); await state.model.refresh(directoryURL: directoryURL) }
         }

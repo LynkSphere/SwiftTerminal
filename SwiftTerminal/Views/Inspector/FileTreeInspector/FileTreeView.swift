@@ -10,10 +10,12 @@ struct FileTreeView: View {
     var body: some View {
         List(selection: $state.selectedID) {
             ForEach(state.model.displayItems) { item in
-                FileNodeView(item: item, expandedIDs: $state.expandedIDs, onAction: handleAction)
+                FileNodeView(item: item)
                     .tag(item.id)
             }
         }
+        .environment(state)
+        .environment(\.fileTreeAction, handleAction)
         .scrollContentBackground(.hidden)
         .contextMenu {
             Button { handleAction(.newFile(directoryURL)) } label: {
@@ -46,16 +48,13 @@ struct FileTreeView: View {
         }
         .onChange(of: state.model.searchText) { oldValue, newValue in
             if !newValue.isEmpty && oldValue.isEmpty {
-                // Starting a search — save expansion state and expand all
                 if state.savedExpandedIDs == nil {
                     state.savedExpandedIDs = state.expandedIDs
                 }
                 expandAllFolders(in: state.model.displayItems)
             } else if !newValue.isEmpty {
-                // Search text changed — expand all filtered results
                 expandAllFolders(in: state.model.displayItems)
             } else if newValue.isEmpty && !oldValue.isEmpty && !state.model.showChangedOnly {
-                // Search cleared and no other filter active — restore
                 if let saved = state.savedExpandedIDs {
                     state.expandedIDs = saved
                     state.savedExpandedIDs = nil
@@ -82,7 +81,6 @@ struct FileTreeView: View {
             }
             expandAllFolders(in: state.model.displayItems)
         } else if state.model.searchText.isEmpty, let saved = state.savedExpandedIDs {
-            // Only restore if search is also inactive
             state.expandedIDs = saved
             state.savedExpandedIDs = nil
         }
@@ -100,12 +98,24 @@ struct FileTreeView: View {
         }
     }
 
-    // MARK: - Context Menu Actions
+    // MARK: - Actions
 
     private func handleAction(_ action: FileTreeAction) {
         switch action {
+        case .openFile(let url):
+            editorPanel.openFile(url)
+
         case .revealInFinder(let url):
             NSWorkspace.shared.activateFileViewerSelecting([url])
+
+        case .rename(let item):
+            state.renamingID = item.id
+
+        case .commitRename(let item, let newName):
+            state.renamingID = nil
+            if let newURL = state.model.rename(url: item.url, to: newName, directoryURL: directoryURL) {
+                state.selectedID = newURL.path
+            }
 
         case .moveToTrash(let url):
             state.model.moveToTrash(url: url, directoryURL: directoryURL)
@@ -114,12 +124,16 @@ struct FileTreeView: View {
             state.model.duplicate(url: url, directoryURL: directoryURL)
 
         case .newFile(let parentURL):
-            let parent = state.model.createNewFile(in: parentURL, directoryURL: directoryURL)
-            state.expandedIDs.insert(parent.path)
+            let fileURL = state.model.createNewFile(in: parentURL, directoryURL: directoryURL)
+            state.expandedIDs.insert(parentURL.path)
+            state.selectedID = fileURL.path
+            state.renamingID = fileURL.path
 
         case .newFolder(let parentURL):
-            let parent = state.model.createNewFolder(in: parentURL, directoryURL: directoryURL)
-            state.expandedIDs.insert(parent.path)
+            let folderURL = state.model.createNewFolder(in: parentURL, directoryURL: directoryURL)
+            state.expandedIDs.insert(parentURL.path)
+            state.selectedID = folderURL.path
+            state.renamingID = folderURL.path
         }
     }
 }

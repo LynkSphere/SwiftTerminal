@@ -36,6 +36,9 @@ struct WorkspaceDetailView: View {
             BottomSheetView(directoryURL: workspace.url)
         }
         .environment(workspace.editorPanel)
+        .environment(\.showInFileTree) { url in
+            workspace.inspectorState.revealInFileTree(url, relativeTo: workspace.url)
+        }
         .task(id: workspace) {
             appState.selectedTerminal = workspace.terminals.first ?? workspace.addTerminal()
         }

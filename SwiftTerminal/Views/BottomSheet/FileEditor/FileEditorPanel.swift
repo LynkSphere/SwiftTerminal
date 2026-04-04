@@ -10,6 +10,7 @@ struct FileEditorPanel: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var gutterDiff: GutterDiffResult = .empty
+    @Environment(\.showInFileTree) private var showInFileTree
 
     private var hasUnsavedChanges: Bool {
         isLoaded && content != savedContent
@@ -31,6 +32,13 @@ struct FileEditorPanel: View {
                     .help("Unsaved changes")
             }
         } actions: {
+            Button { showInFileTree(fileURL) } label: {
+                Image(systemName: "sidebar.trailing")
+            }
+            .buttonStyle(.borderless)
+            .keyboardShortcut("j", modifiers: [.command, .shift])
+            .help("Show in File Tree")
+
             Button { panel.saveRequested = true } label: {
                 Image(systemName: "opticaldiscdrive")
             }

@@ -11,7 +11,7 @@ enum GitAction {
     case discard([GitChangedFile], GitRepositoryStatusSnapshot)
     case discardAll(GitRepositoryStatusSnapshot)
     case commit
-    case openFile(URL)
+    case showInFileTree(URL)
     case push(GitRepositoryStatusSnapshot)
 }
 
@@ -99,11 +99,11 @@ struct GitFileContextMenu: View {
         }
         .disabled(snapshot.stagedFiles.isEmpty)
         
-        if let file = files.first, files.count == 1 {
+        if let file = files.first, files.count == 1, file.kind != .deleted {
             Divider()
-            
-            Button { onAction(.openFile(file.fileURL)) } label: {
-                Label("Open File", systemImage: "doc")
+
+            Button { onAction(.showInFileTree(file.fileURL)) } label: {
+                Label("Show in File Tree", systemImage: "sidebar.trailing")
             }
         }
     }

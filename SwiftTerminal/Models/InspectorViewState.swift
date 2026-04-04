@@ -6,6 +6,20 @@ final class InspectorViewState {
     var fileTree = FileTreeInspectorState()
     var search = SearchInspectorState()
     var git = GitInspectorState()
+
+    func revealInFileTree(_ url: URL, relativeTo rootURL: URL) {
+        // Expand all ancestor folders
+        var parent = url.deletingLastPathComponent()
+        while parent.path.hasPrefix(rootURL.path) && parent != rootURL {
+            fileTree.expandedIDs.insert(parent.path)
+            parent = parent.deletingLastPathComponent()
+        }
+        selectedTab = .files
+        // Delay selection so the FileTreeView's List is rendered first
+        DispatchQueue.main.async { [self] in
+            fileTree.selectedID = url.path
+        }
+    }
 }
 
 @Observable
@@ -15,6 +29,7 @@ final class FileTreeInspectorState {
     var expandedIDs: Set<String> = []
     var savedExpandedIDs: Set<String>?
     var searchFocusTrigger = 0
+    var renamingID: String?
 }
 
 @Observable
