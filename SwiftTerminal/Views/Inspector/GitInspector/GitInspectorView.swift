@@ -434,6 +434,16 @@ struct GitInspectorView: View {
         ForEach(files.map { (id: "\(prefix):\($0.repositoryRelativePath)", file: $0) }, id: \.id) { entry in
             FileLabel(name: entry.file.fileURL.lastPathComponent, icon: entry.file.fileURL.fileIcon) {
                 GitStatusBadge(kind: entry.file.kind, staged: staged)
+                    .overlay {
+                        Menu {
+                            GitFileContextMenu(files: [entry.file], staged: staged, snapshot: snapshot, onAction: handleAction)
+                        } label: {
+                            Color.clear
+                                .contentShape(Rectangle())
+                        }
+                        .menuStyle(.borderlessButton)
+                        .menuIndicator(.hidden)
+                    }
             }
             .tag(entry.id)
             .contextMenu {

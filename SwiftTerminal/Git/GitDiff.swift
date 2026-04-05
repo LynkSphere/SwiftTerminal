@@ -168,6 +168,8 @@ struct GitDiffPresentation {
     var lineNumbers: [Int: GitDiffLineNumbers]
     var hunkSeparatorLines: Set<Int>
 
+    var firstChangedLine: Int? { lineKinds.keys.min() }
+
     init(raw: String) {
         let parsed = Self.parse(raw)
         self.string = parsed.string
@@ -417,6 +419,23 @@ struct GitDiffCommand: GitCommand {
                 ["diff", "--no-color", "--no-ext-diff", "--", reference.repositoryRelativePath]
             case .commit(let hash):
                 ["show", "--format=", "--no-color", "--no-ext-diff", hash, "--", reference.repositoryRelativePath]
+        }
+    }
+
+    func parse(output: String) throws -> String { output }
+}
+
+struct GitFullContextDiffCommand: GitCommand {
+    let reference: GitDiffReference
+
+    var arguments: [String] {
+        switch reference.stage {
+            case .staged:
+                ["diff", "--no-color", "--no-ext-diff", "-U99999", "--cached", "--", reference.repositoryRelativePath]
+            case .unstaged:
+                ["diff", "--no-color", "--no-ext-diff", "-U99999", "--", reference.repositoryRelativePath]
+            case .commit(let hash):
+                ["show", "--format=", "--no-color", "--no-ext-diff", "-U99999", hash, "--", reference.repositoryRelativePath]
         }
     }
 

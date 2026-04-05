@@ -159,6 +159,21 @@ actor GitRepository {
         return GitDiffPresentation(raw: raw)
     }
 
+    func fullContextDiffPresentation(for reference: GitDiffReference) async throws -> GitDiffPresentation {
+        if reference.kind == .untracked {
+            return try self.presentationForUntrackedFile(reference)
+        }
+
+        let raw = try await self.executor.execute(
+            GitFullContextDiffCommand(reference: reference),
+            at: reference.repositoryRootURL
+        )
+        guard !raw.isEmpty else {
+            return GitDiffPresentation(message: "No diff available.")
+        }
+        return GitDiffPresentation(raw: raw)
+    }
+
     func stage(paths: [String], at repositoryRootURL: URL) async throws {
         try await self.executor.execute(GitStageCommand(paths: paths), at: repositoryRootURL)
     }

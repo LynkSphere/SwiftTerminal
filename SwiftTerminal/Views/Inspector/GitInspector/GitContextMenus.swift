@@ -92,13 +92,6 @@ struct GitFileContextMenu: View {
         }
         .disabled(staged)
 
-        Divider()
-
-        Button { onAction(.commit) } label: {
-            Label("Commit...", systemImage: "checkmark.circle")
-        }
-        .disabled(snapshot.stagedFiles.isEmpty)
-        
         if let file = files.first, files.count == 1, file.kind != .deleted {
             Divider()
 

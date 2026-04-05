@@ -10,14 +10,18 @@ struct HighlightedTextEditor: NSViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
-    func makeNSView(context: Context) -> NSScrollView {
+    func makeNSView(context: Context) -> NSView {
+        let container = NSView()
+        container.autoresizesSubviews = true
+
+        let minimapWidth: CGFloat = 16
         let scrollView = NSScrollView()
-        scrollView.hasVerticalScroller = true
-        scrollView.hasHorizontalScroller = true
-        scrollView.autohidesScrollers = true
+        scrollView.hasVerticalScroller = false
+        scrollView.hasHorizontalScroller = false
         scrollView.borderType = .noBorder
         scrollView.drawsBackground = false
         scrollView.contentView.drawsBackground = false
+        scrollView.autoresizingMask = [.width, .height]
 
         let contentSize = scrollView.contentSize
         let textContainer = NSTextContainer(containerSize: NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude))
@@ -65,6 +69,34 @@ struct HighlightedTextEditor: NSViewRepresentable {
         textView.fileExtension = fileExtension
         context.coordinator.textView = textView
 
+        // Minimap
+        let minimap = EditorMinimap()
+        minimap.autoresizingMask = [.minXMargin, .height]
+        minimap.onScrollToFraction = { [weak scrollView] fraction in
+            guard let scrollView, let doc = scrollView.documentView else { return }
+            let totalH = doc.frame.height
+            let visH = scrollView.contentView.bounds.height
+            let targetY = max(0, min(fraction * totalH - visH / 2, totalH - visH))
+            scrollView.contentView.setBoundsOrigin(
+                NSPoint(x: scrollView.contentView.bounds.origin.x, y: targetY)
+            )
+            scrollView.reflectScrolledClipView(scrollView.contentView)
+        }
+        context.coordinator.minimap = minimap
+        context.coordinator.minimapWidth = minimapWidth
+
+        // Layout: scroll view fills container minus minimap width, minimap on right
+        container.addSubview(scrollView)
+        container.addSubview(minimap)
+        context.coordinator.scrollView = scrollView
+
+        // Observe scroll to update minimap viewport
+        scrollView.contentView.postsBoundsChangedNotifications = true
+        NotificationCenter.default.addObserver(
+            context.coordinator, selector: #selector(Coordinator.scrollDidChange(_:)),
+            name: NSView.boundsDidChangeNotification, object: scrollView.contentView
+        )
+
         // Initial content + fold computation
         let highlighted = SyntaxHighlighter.highlight(text, fileExtension: fileExtension, fontSize: fontSize)
         textView.textStorage?.setAttributedString(highlighted)
@@ -81,14 +113,32 @@ struct HighlightedTextEditor: NSViewRepresentable {
             }
         }
 
-        return scrollView
+        // Ensure scroll starts at x=0 so the gutter is visible
+        DispatchQueue.main.async {
+            scrollView.contentView.setBoundsOrigin(
+                NSPoint(x: 0, y: scrollView.contentView.bounds.origin.y)
+            )
+        }
+
+        return container
     }
 
-    func updateNSView(_ scrollView: NSScrollView, context: Context) {
-        guard let textView = scrollView.documentView as? EditorTextView else { return }
+    func updateNSView(_ container: NSView, context: Context) {
+        guard let textView = context.coordinator.textView else { return }
+        let scrollView = context.coordinator.scrollView
+        let minimap = context.coordinator.minimap
+        let minimapWidth = context.coordinator.minimapWidth
+
+        // Update layout
+        let bounds = container.bounds
+        scrollView?.frame = NSRect(x: 0, y: 0, width: bounds.width - minimapWidth, height: bounds.height)
+        minimap?.frame = NSRect(x: bounds.width - minimapWidth, y: 0, width: minimapWidth, height: bounds.height)
 
         textView.gutterDiff = gutterDiff
         textView.needsDisplay = true
+
+        // Update minimap markers
+        context.coordinator.updateMinimapMarkers(gutterDiff: gutterDiff, text: textView.string)
 
         // Only update if the binding changed externally (not from editing)
         if !context.coordinator.isEditing, textView.string != text {
@@ -101,7 +151,6 @@ struct HighlightedTextEditor: NSViewRepresentable {
         // Apply pending highlight request
         if let request = highlightRequest, request != context.coordinator.lastAppliedHighlight {
             context.coordinator.lastAppliedHighlight = request
-            // Delay slightly to ensure layout is complete after content load
             DispatchQueue.main.async {
                 textView.scrollToLineAndHighlight(
                     lineNumber: request.lineNumber,
@@ -114,11 +163,30 @@ struct HighlightedTextEditor: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextViewDelegate {
         let parent: HighlightedTextEditor
         weak var textView: EditorTextView?
+        weak var scrollView: NSScrollView?
+        weak var minimap: EditorMinimap?
+        var minimapWidth: CGFloat = 16
         var isEditing = false
         var lastAppliedHighlight: HighlightRequest?
         private var rehighlightTask: DispatchWorkItem?
 
         init(_ parent: HighlightedTextEditor) { self.parent = parent }
+
+        @objc func scrollDidChange(_ notification: Notification) {
+            guard let scrollView else { return }
+            minimap?.updateViewport(from: scrollView)
+        }
+
+        func updateMinimapMarkers(gutterDiff: GutterDiffResult, text: String) {
+            guard let minimap else { return }
+            let lineCount = max(text.components(separatedBy: "\n").count, 1)
+            minimap.totalLines = lineCount
+            let colors: [Int: NSColor] = gutterDiff.markers.mapValues { $0.color }
+            minimap.setMarkers(colors)
+            if let scrollView {
+                minimap.updateViewport(from: scrollView)
+            }
+        }
 
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }

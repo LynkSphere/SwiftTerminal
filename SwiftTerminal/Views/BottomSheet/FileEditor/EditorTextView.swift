@@ -4,6 +4,11 @@ enum EditorTextViewConstants {
     static let gutterWidth: CGFloat = 48
     static let markerBarWidth: CGFloat = 3
     static let foldColumnWidth: CGFloat = 12
+
+    // Diff mode gutter layout (single line number, no fold column)
+    static let diffGutterWidth: CGFloat = 52
+    static let diffNumEndX: CGFloat = 42
+    static let diffMarkerX: CGFloat = 46
 }
 
 // MARK: - Editor Text View with Gutter
@@ -12,6 +17,12 @@ final class EditorTextView: NSTextView {
     var gutterDiff: GutterDiffResult = .empty
     var fileExtension: String = ""
     let foldingManager = FoldingManager()
+
+    // Diff mode
+    var diffLineKinds: [Int: GitDiffLineKind] = [:]
+    var diffLineNumbers: [Int: GitDiffLineNumbers] = [:]
+    var isDiffMode: Bool { !diffLineKinds.isEmpty }
+    var diffGutterClickHandler: ((Int, NSPoint) -> Void)?
 
     var editorFontSize: CGFloat = 12
     var lineNumberFontSize: CGFloat = 11
@@ -428,6 +439,98 @@ final class EditorTextView: NSTextView {
 
         guard let layoutManager, let textContainer else { return }
 
+        if isDiffMode {
+            drawDiffBackground(in: rect, layoutManager: layoutManager, textContainer: textContainer)
+        } else {
+            drawEditorBackground(in: rect, layoutManager: layoutManager, textContainer: textContainer)
+        }
+    }
+
+    // MARK: - Diff Mode Background
+
+    private func drawDiffBackground(in rect: NSRect, layoutManager: NSLayoutManager, textContainer: NSTextContainer) {
+        let constants = EditorTextViewConstants.self
+        let containerOrigin = textContainerOrigin
+        let text = string as NSString
+        guard text.length > 0 else { return }
+
+        let visibleGlyphRange = layoutManager.glyphRange(forBoundingRect: rect, in: textContainer)
+        let visibleCharRange = layoutManager.characterRange(forGlyphRange: visibleGlyphRange, actualGlyphRange: nil)
+
+        let lineNumAttrs: [NSAttributedString.Key: Any] = [
+            .font: lineNumberFont,
+            .foregroundColor: NSColor.secondaryLabelColor,
+        ]
+
+        var startLineNumber = 1
+        if visibleCharRange.location > 0 {
+            let preText = text.substring(to: visibleCharRange.location)
+            startLineNumber = preText.components(separatedBy: "\n").count
+        }
+
+        var lineNumber = startLineNumber
+        var charIndex = visibleCharRange.location
+        let endChar = NSMaxRange(visibleCharRange)
+
+        while charIndex <= endChar && charIndex < text.length {
+            let lineRange = text.lineRange(for: NSRange(location: charIndex, length: 0))
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: lineRange, actualCharacterRange: nil)
+
+            if glyphRange.location != NSNotFound {
+                var lineRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+                lineRect.origin.x += containerOrigin.x
+                lineRect.origin.y += containerOrigin.y
+
+                let isVisible = lineRect.height > 1
+                    && lineRect.minY + lineRect.height >= rect.minY && lineRect.minY <= rect.maxY
+
+                if isVisible {
+                    let lineKind = diffLineKinds[lineNumber]
+                    let lineNums = diffLineNumbers[lineNumber]
+
+                    // Draw line background for changed lines
+                    if let kind = lineKind {
+                        let bgColor = kind.color.withAlphaComponent(0.12)
+                        var bgRect = lineRect
+                        bgRect.origin.x = constants.diffGutterWidth
+                        bgRect.size.width = max(bounds.width, enclosingScrollView?.contentSize.width ?? bounds.width) - constants.diffGutterWidth
+                        bgColor.setFill()
+                        bgRect.fill()
+
+                        // Also tint the gutter area
+                        let gutterBg = kind.color.withAlphaComponent(0.06)
+                        gutterBg.setFill()
+                        NSRect(x: 0, y: lineRect.minY, width: constants.diffGutterWidth, height: lineRect.height).fill()
+                    }
+
+                    let yCenter = lineRect.minY + (lineRect.height - ("0" as NSString).size(withAttributes: lineNumAttrs).height) / 2
+
+                    // Single line number: prefer new, fall back to old (for removed lines)
+                    let lineNum = lineNums?.new ?? lineNums?.old
+                    if let num = lineNum {
+                        let str = "\(num)" as NSString
+                        let size = str.size(withAttributes: lineNumAttrs)
+                        str.draw(at: NSPoint(x: constants.diffNumEndX - size.width, y: yCenter), withAttributes: lineNumAttrs)
+                    }
+
+                    // Draw marker bar for changed lines
+                    if let kind = lineKind {
+                        kind.color.setFill()
+                        NSRect(x: constants.diffMarkerX, y: lineRect.minY, width: 3, height: lineRect.height).fill()
+                    }
+                }
+            }
+
+            lineNumber += 1
+            let nextIndex = NSMaxRange(lineRange)
+            if nextIndex <= charIndex { break }
+            charIndex = nextIndex
+        }
+    }
+
+    // MARK: - Editor Mode Background
+
+    private func drawEditorBackground(in rect: NSRect, layoutManager: NSLayoutManager, textContainer: NSTextContainer) {
         let gutterWidth = EditorTextViewConstants.gutterWidth
         let markerBarWidth = EditorTextViewConstants.markerBarWidth
         let foldColWidth = EditorTextViewConstants.foldColumnWidth
@@ -595,8 +698,46 @@ final class EditorTextView: NSTextView {
 
     // MARK: - Click handling for gutter diff popover
 
+    // MARK: - Scroll to line
+
+    func scrollToLine(_ lineNumber: Int) {
+        let text = string as NSString
+        guard text.length > 0 else { return }
+        var currentLine = 1
+        var lineStart = 0
+        while currentLine < lineNumber && lineStart < text.length {
+            let lineRange = text.lineRange(for: NSRange(location: lineStart, length: 0))
+            lineStart = NSMaxRange(lineRange)
+            currentLine += 1
+        }
+        let lineRange = text.lineRange(for: NSRange(location: lineStart, length: 0))
+        scrollRangeToVisible(lineRange)
+    }
+
     override func mouseDown(with event: NSEvent) {
         let localPoint = convert(event.locationInWindow, from: nil)
+
+        // Diff mode gutter click
+        if isDiffMode {
+            guard localPoint.x < EditorTextViewConstants.diffGutterWidth else {
+                super.mouseDown(with: event)
+                return
+            }
+            guard let layoutManager, let textContainer else { return }
+            let text = string as NSString
+            guard text.length > 0 else { return }
+            let containerOrigin = textContainerOrigin
+            let textPoint = NSPoint(x: containerOrigin.x, y: localPoint.y - containerOrigin.y)
+            let charIndex = layoutManager.characterIndex(
+                for: textPoint, in: textContainer,
+                fractionOfDistanceBetweenInsertionPoints: nil
+            )
+            let preText = text.substring(to: min(charIndex, text.length))
+            let clickedLine = preText.components(separatedBy: "\n").count
+            diffGutterClickHandler?(clickedLine, localPoint)
+            return
+        }
+
         let gutterWidth = EditorTextViewConstants.gutterWidth
         let foldColStart = gutterWidth - EditorTextViewConstants.foldColumnWidth
 

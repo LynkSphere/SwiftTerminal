@@ -19,6 +19,7 @@ struct GitStatusBadge: View {
             .font(.system(size: 9, weight: .medium, design: .rounded))
             .foregroundStyle(staged ? .white : color)
             .frame(width: 16, height: 16)
+            .contentShape(RoundedRectangle(cornerRadius: 3))
             .background {
                 if staged {
                     RoundedRectangle(cornerRadius: 3)
