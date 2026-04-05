@@ -11,6 +11,7 @@ struct FileTreeView: View {
         List(selection: $state.selectedID) {
             ForEach(state.model.displayItems) { item in
                 FileNodeView(item: item)
+                    .id(nodeSignature(for: item))
                     .tag(item.id)
             }
         }
@@ -28,7 +29,12 @@ struct FileTreeView: View {
             Toggle("Show Hidden Files", isOn: $showHiddenFiles)
         }
         .safeAreaBar(edge: .bottom) {
-            SearchBar(text: $state.model.searchText, placeholder: "Search for Files", focusTrigger: state.searchFocusTrigger) {
+            SearchBar(
+                text: $state.model.searchText,
+                placeholder: "Search for Files",
+                focusTrigger: state.searchFocusTrigger,
+                onSubmit: submitSearch
+            ) {
                 Button(action: toggleChangedFilter) {
                     Image(systemName: state.model.showChangedOnly ? "plusminus.circle.fill" : "plusminus.circle")
                         .foregroundStyle(state.model.showChangedOnly ? Color.accentColor : .secondary)
@@ -46,7 +52,7 @@ struct FileTreeView: View {
         .gitPolling(id: directoryURL) {
             await state.model.refreshGit(directoryURL: directoryURL)
         }
-        .onChange(of: state.model.searchText) { oldValue, newValue in
+        .onChange(of: state.model.submittedSearchText) { oldValue, newValue in
             if !newValue.isEmpty && oldValue.isEmpty {
                 if state.savedExpandedIDs == nil {
                     state.savedExpandedIDs = state.expandedIDs
@@ -74,17 +80,27 @@ struct FileTreeView: View {
         }
     }
 
+    private func nodeSignature(for item: FileItem) -> String {
+        let status = item.gitStatus?.rawValue ?? "_"
+        let children = item.children.map { $0.map(nodeSignature(for:)).joined(separator: ",") } ?? ""
+        return "\(item.id)#\(status){\(children)}"
+    }
+
     private func toggleChangedFilter() {
         if !state.model.showChangedOnly {
             if state.savedExpandedIDs == nil {
                 state.savedExpandedIDs = state.expandedIDs
             }
             expandAllFolders(in: state.model.displayItems)
-        } else if state.model.searchText.isEmpty, let saved = state.savedExpandedIDs {
+        } else if state.model.submittedSearchText.isEmpty, let saved = state.savedExpandedIDs {
             state.expandedIDs = saved
             state.savedExpandedIDs = nil
         }
         state.model.showChangedOnly.toggle()
+    }
+
+    private func submitSearch() {
+        state.model.submitSearch()
     }
 
     private func expandAllFolders(in items: [FileItem]) {

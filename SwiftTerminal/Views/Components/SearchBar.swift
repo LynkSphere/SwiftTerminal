@@ -23,6 +23,7 @@ struct SearchBar<Trailing: View>: View {
             if !text.isEmpty {
                 Button {
                     text = ""
+                    onSubmit?()
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)

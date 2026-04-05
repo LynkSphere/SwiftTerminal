@@ -4,6 +4,7 @@ import Foundation
 final class FileTreeModel {
     private(set) var items: [FileItem] = []
     private(set) var gitStatuses: [URL: GitChangeKind] = [:]
+    private(set) var submittedSearchText = ""
 
     var searchText = ""
     var showChangedOnly = false
@@ -11,17 +12,21 @@ final class FileTreeModel {
 
     var changedURLs: Set<URL> { Set(gitStatuses.keys) }
 
-    var isFiltering: Bool { !searchText.isEmpty || showChangedOnly }
+    var isFiltering: Bool { !submittedSearchText.isEmpty || showChangedOnly }
 
     var displayItems: [FileItem] {
         guard isFiltering else { return items }
         return items.compactMap {
             $0.filtered(
-                searchText: searchText,
+                searchText: submittedSearchText,
                 changedURLs: changedURLs,
                 showChangedOnly: showChangedOnly
             )
         }
+    }
+
+    func submitSearch() {
+        submittedSearchText = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     func load(directoryURL: URL) {
