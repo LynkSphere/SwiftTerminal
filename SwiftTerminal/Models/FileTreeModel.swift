@@ -38,8 +38,10 @@ final class FileTreeModel {
     func refreshGit(directoryURL: URL) async {
         guard let statuses = try? await GitRepository.shared.changedFileStatuses(in: directoryURL)
         else { return }
+        guard statuses != gitStatuses else { return }
         gitStatuses = statuses
-        var tree = FileItem.buildTree(at: directoryURL, showHiddenFiles: showHiddenFiles)
+        var tree = items
+        clearStatuses(&tree)
         applyStatuses(to: &tree)
         items = tree
     }
@@ -115,6 +117,12 @@ final class FileTreeModel {
             return destination
         } catch {
             return nil
+        }
+    }
+
+    private func clearStatuses(_ tree: inout [FileItem]) {
+        for i in tree.indices {
+            tree[i].clearGitStatuses()
         }
     }
 

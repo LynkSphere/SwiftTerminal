@@ -15,7 +15,10 @@ final class GitInspectorModel {
         errorMessage = nil
 
         do {
-            snapshots = try await GitRepository.shared.statusSnapshots(in: directoryURL)
+            let newSnapshots = try await GitRepository.shared.statusSnapshots(in: directoryURL)
+            if newSnapshots != snapshots {
+                snapshots = newSnapshots
+            }
         } catch {
             errorMessage = error.localizedDescription
         }

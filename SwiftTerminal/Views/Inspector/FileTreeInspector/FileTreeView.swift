@@ -11,7 +11,6 @@ struct FileTreeView: View {
         List(selection: $state.selectedID) {
             ForEach(state.model.displayItems) { item in
                 FileNodeView(item: item)
-                    .id(nodeSignature(for: item))
                     .tag(item.id)
             }
         }
@@ -78,12 +77,6 @@ struct FileTreeView: View {
             else { return }
             editorPanel.openFile(item.url)
         }
-    }
-
-    private func nodeSignature(for item: FileItem) -> String {
-        let status = item.gitStatus?.rawValue ?? "_"
-        let children = item.children.map { $0.map(nodeSignature(for:)).joined(separator: ",") } ?? ""
-        return "\(item.id)#\(status){\(children)}"
     }
 
     private func toggleChangedFilter() {

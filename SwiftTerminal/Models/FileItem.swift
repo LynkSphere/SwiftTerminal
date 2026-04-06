@@ -18,7 +18,7 @@ struct FileItem: Identifiable, Hashable {
     }
 
     static func == (lhs: FileItem, rhs: FileItem) -> Bool {
-        lhs.url == rhs.url && lhs.gitStatus == rhs.gitStatus
+        lhs.url == rhs.url && lhs.gitStatus == rhs.gitStatus && lhs.children == rhs.children
     }
 
     func hash(into hasher: inout Hasher) {
@@ -42,6 +42,15 @@ struct FileItem: Identifiable, Hashable {
         var copy = self
         copy.children = filteredChildren
         return copy
+    }
+
+    /// Clears git statuses from this item and all descendants.
+    mutating func clearGitStatuses() {
+        gitStatus = nil
+        if var kids = children {
+            for i in kids.indices { kids[i].clearGitStatuses() }
+            children = kids
+        }
     }
 
     /// Applies git statuses to this item and all descendants.
