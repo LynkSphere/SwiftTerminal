@@ -10,9 +10,22 @@ struct DocumentTabBar: View {
     @State private var renamingTab: Terminal?
     @State private var processNames: [UUID: String] = [:]
 
+    // Read the stored relationship directly to ensure SwiftData observation fires
+    private var terminals: [Terminal] {
+        workspace.unsortedTerminals.sorted { $0.sortOrder < $1.sortOrder }
+    }
+
     var body: some View {
+        let terminals = self.terminals
+        if terminals.count > 1 {
+            tabContent(terminals: terminals)
+        }
+    }
+
+    @ViewBuilder
+    private func tabContent(terminals: [Terminal]) -> some View {
         HStack(spacing: 5) {
-            tabStrip
+            tabStrip(terminals: terminals)
             Button {
                 let terminal = workspace.addTerminal(
                     currentDirectory: appState.selectedTerminal?.liveCurrentDirectory,
@@ -33,7 +46,7 @@ struct DocumentTabBar: View {
         .task {
             while !Task.isCancelled {
                 var names: [UUID: String] = [:]
-                for terminal in workspace.terminals {
+                for terminal in workspace.unsortedTerminals {
                     if let name = terminal.foregroundProcessName {
                         names[terminal.id] = name
                     }
@@ -51,9 +64,9 @@ struct DocumentTabBar: View {
         }
     }
 
-    private var tabStrip: some View {
+    private func tabStrip(terminals: [Terminal]) -> some View {
         GeometryReader { proxy in
-            let tabCount = max(workspace.terminals.count, 1)
+            let tabCount = max(terminals.count, 1)
             let separatorWidth: CGFloat = 5
             let totalSeparators = CGFloat(max(tabCount - 1, 0)) * separatorWidth
             let tabWidth = max((proxy.size.width - totalSeparators) / CGFloat(tabCount), 140)
@@ -61,11 +74,11 @@ struct DocumentTabBar: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 0) {
-                    ForEach(Array(workspace.terminals.enumerated()), id: \.element.id) { index, terminal in
+                    ForEach(Array(terminals.enumerated()), id: \.element.id) { index, terminal in
                         if index > 0 {
-                            separator(before: index)
+                            separator(before: index, in: terminals)
                         }
-                        tabItem(terminal, width: tabWidth)
+                        tabItem(terminal, width: tabWidth, in: terminals)
                     }
                 }
                 .frame(minWidth: contentWidth, alignment: .leading)
@@ -84,7 +97,7 @@ struct DocumentTabBar: View {
     }
 
     @ViewBuilder
-    private func tabItem(_ terminal: Terminal, width: CGFloat) -> some View {
+    private func tabItem(_ terminal: Terminal, width: CGFloat, in terminals: [Terminal]) -> some View {
         let isSelected = appState.selectedTerminal === terminal
         let isHovered = hoveredTabID == terminal.id
 
@@ -121,9 +134,9 @@ struct DocumentTabBar: View {
             )
             .contentShape(.capsule)
         }
-        .animation(.default, value: workspace.terminals.map(\.id))
+        .animation(.default, value: terminals.map(\.id))
         .overlay(alignment: .leading) {
-            if isHovered && workspace.terminals.count > 1 {
+            if isHovered && terminals.count > 1 {
                 Button {
                     closeTerminal(terminal)
                 } label: {
@@ -161,11 +174,10 @@ struct DocumentTabBar: View {
         }
     }
 
-    private func separator(before index: Int) -> some View {
-        let ordered = workspace.terminals
-        let show = index > 0 && index < ordered.count
-            && appState.selectedTerminal !== ordered[index - 1]
-            && appState.selectedTerminal !== ordered[index]
+    private func separator(before index: Int, in terminals: [Terminal]) -> some View {
+        let show = index > 0 && index < terminals.count
+            && appState.selectedTerminal !== terminals[index - 1]
+            && appState.selectedTerminal !== terminals[index]
 
         return Rectangle()
             .fill(.separator)
@@ -184,7 +196,7 @@ struct DocumentTabBar: View {
 
     private func performClose(_ terminal: Terminal) {
         if appState.selectedTerminal === terminal {
-            let terminals = workspace.terminals
+            let terminals = self.terminals
             if let idx = terminals.firstIndex(where: { $0 === terminal }) {
                 if idx + 1 < terminals.count {
                     appState.selectedTerminal = terminals[idx + 1]

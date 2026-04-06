@@ -10,6 +10,7 @@ struct WorkspaceDetailView: View {
             if let terminal = appState.selectedTerminal {
                 TerminalContainerRepresentable(tab: terminal, appState: appState)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.bottom, 30)
             }
         }
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
@@ -28,11 +29,9 @@ struct WorkspaceDetailView: View {
         .navigationTitle(workspace.name)
         .navigationSubtitle(workspace.directory.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
         .safeAreaBar(edge: .top, spacing: 0) {
-            if workspace.terminals.count > 1 {
-                DocumentTabBar(workspace: workspace)
-            }
+            DocumentTabBar(workspace: workspace)
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+        .overlay(alignment: .bottom) {
             BottomSheetView(directoryURL: workspace.url)
         }
         .environment(workspace.editorPanel)
