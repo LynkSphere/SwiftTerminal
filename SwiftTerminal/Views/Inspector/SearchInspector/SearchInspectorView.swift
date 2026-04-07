@@ -42,13 +42,11 @@ struct SearchInspectorView: View {
         .onChange(of: state.selectedID) { _, newID in
             guard let id = newID else { return }
 
-            // Check if a file result was selected
             if let fileResult = state.model.results.first(where: { $0.id == id }) {
                 editorPanel.openFile(fileResult.fileURL)
                 return
             }
 
-            // Check if a match was selected
             for fileResult in state.model.results {
                 if let match = fileResult.matches.first(where: { $0.id == id }) {
                     editorPanel.openFileAndHighlight(
@@ -74,7 +72,7 @@ struct SearchInspectorView: View {
         }
     }
 
-    private func binding(for id: UUID) -> Binding<Bool> {
+    private func binding(for id: String) -> Binding<Bool> {
         Binding(
             get: { state.expandedIDs.contains(id) },
             set: { isExpanded in

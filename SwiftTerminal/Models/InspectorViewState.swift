@@ -35,8 +35,8 @@ final class FileTreeInspectorState {
 @Observable
 final class SearchInspectorState {
     var model = SearchInspectorModel()
-    var expandedIDs: Set<UUID> = []
-    var selectedID: UUID?
+    var expandedIDs: Set<String> = []
+    var selectedID: String?
     var searchFocusTrigger = 0
 }
 

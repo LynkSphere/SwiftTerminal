@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 
 struct SearchFileResult: Identifiable {
-    let id = UUID()
+    var id: String { relativePath }
     let fileURL: URL
     let fileName: String
     let relativePath: String
@@ -10,8 +10,9 @@ struct SearchFileResult: Identifiable {
 }
 
 struct SearchMatch: Identifiable {
-    let id = UUID()
+    var id: String { "\(relativePath):\(lineNumber):\(columnRange.lowerBound)" }
     let fileURL: URL
+    let relativePath: String
     let lineNumber: Int
     let columnRange: Range<Int>
     let highlightedContent: AttributedString
@@ -51,6 +52,7 @@ final class SearchInspectorModel {
                   let content = String(data: data, encoding: .utf8)
             else { continue }
 
+            let relativePath = String(fileURL.path.dropFirst(basePath.count + 1))
             var matches: [SearchMatch] = []
             let lines = content.components(separatedBy: .newlines)
 
@@ -64,6 +66,7 @@ final class SearchInspectorModel {
                     let colEnd = trimmedLine.distance(from: trimmedLine.startIndex, to: matchRange.upperBound)
                     matches.append(SearchMatch(
                         fileURL: fileURL,
+                        relativePath: relativePath,
                         lineNumber: index + 1,
                         columnRange: colStart..<colEnd,
                         highlightedContent: Self.highlight(line: trimmedLine, match: matchRange)
@@ -72,7 +75,6 @@ final class SearchInspectorModel {
             }
 
             if !matches.isEmpty {
-                let relativePath = String(fileURL.path.dropFirst(basePath.count + 1))
                 fileResults.append(SearchFileResult(
                     fileURL: fileURL,
                     fileName: fileURL.lastPathComponent,
