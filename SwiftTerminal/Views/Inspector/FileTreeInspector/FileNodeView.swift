@@ -23,8 +23,8 @@ struct FileNodeView: View {
                 }
             } label: {
                 FileRowView(item: item)
+                    .contextMenu { FileTreeContextMenu(item: item) }
             }
-            .contextMenu { FileTreeContextMenu(item: item) }
             .listRowSeparator(.hidden)
         } else {
             FileRowView(item: item)
