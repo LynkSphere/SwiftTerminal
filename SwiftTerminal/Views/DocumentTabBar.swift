@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct DocumentTabBar: View {
     @Environment(AppState.self) private var appState
@@ -7,6 +6,10 @@ struct DocumentTabBar: View {
     let workspace: Workspace
     @State private var hoveredTabID: UUID?
     @State private var draggedTabID: UUID?
+    @State private var dragOriginalIndex: Int?
+    @State private var dragCurrentIndex: Int?
+    @State private var dragOffset: CGFloat = 0
+    @State private var lastDragTranslation: CGFloat = 0
     @State private var renamingTab: Terminal?
     @State private var processNames: [UUID: String] = [:]
 
@@ -71,6 +74,7 @@ struct DocumentTabBar: View {
             let totalSeparators = CGFloat(max(tabCount - 1, 0)) * separatorWidth
             let tabWidth = max((proxy.size.width - totalSeparators) / CGFloat(tabCount), 140)
             let contentWidth = CGFloat(tabCount) * tabWidth + totalSeparators
+            let tabStride = tabWidth + separatorWidth
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 0) {
@@ -78,7 +82,7 @@ struct DocumentTabBar: View {
                         if index > 0 {
                             separator(before: index, in: terminals)
                         }
-                        tabItem(terminal, width: tabWidth, in: terminals)
+                        tabItem(terminal, index: index, width: tabWidth, tabStride: tabStride, in: terminals)
                     }
                 }
                 .frame(minWidth: contentWidth, alignment: .leading)
@@ -97,9 +101,11 @@ struct DocumentTabBar: View {
     }
 
     @ViewBuilder
-    private func tabItem(_ terminal: Terminal, width: CGFloat, in terminals: [Terminal]) -> some View {
+    private func tabItem(_ terminal: Terminal, index: Int, width: CGFloat, tabStride: CGFloat, in terminals: [Terminal]) -> some View {
         let isSelected = appState.selectedTerminal === terminal
         let isHovered = hoveredTabID == terminal.id
+        let isDragging = draggedTabID == terminal.id
+        let computedOffset = computedDragOffset(for: terminal, at: index, tabStride: tabStride)
 
         Button {
             appState.selectedTerminal = terminal
@@ -134,9 +140,11 @@ struct DocumentTabBar: View {
             )
             .contentShape(.capsule)
         }
-        .animation(.default, value: terminals.map(\.id))
+        .offset(x: computedOffset)
+        .zIndex(isDragging ? 1 : 0)
+        .animation(.default, value: terminals.count)
         .overlay(alignment: .leading) {
-            if isHovered && terminals.count > 1 {
+            if isHovered && terminals.count > 1 && draggedTabID == nil {
                 Button {
                     closeTerminal(terminal)
                 } label: {
@@ -157,21 +165,115 @@ struct DocumentTabBar: View {
                 Label("Rename", systemImage: "pencil")
             }
         }
-        .onDrag {
-            draggedTabID = terminal.id
-            return NSItemProvider(object: terminal.id.uuidString as NSString)
-        }
-        .onDrop(
-            of: [UTType.text],
-            delegate: TabDropDelegate(
-                targetTerminal: terminal,
-                workspace: workspace,
-                draggedTabID: $draggedTabID
-            )
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 4)
+                .onChanged { value in
+                    handleDragChanged(terminal: terminal, translation: value.translation.width, tabStride: tabStride)
+                }
+                .onEnded { _ in
+                    handleDragEnded(tabStride: tabStride)
+                }
         )
         .onHover { isHovering in
             hoveredTabID = isHovering ? terminal.id : (hoveredTabID == terminal.id ? nil : hoveredTabID)
         }
+    }
+
+    private func computedDragOffset(for terminal: Terminal, at index: Int, tabStride: CGFloat) -> CGFloat {
+        if terminal.id == draggedTabID {
+            return dragOffset
+        }
+        guard let original = dragOriginalIndex, let current = dragCurrentIndex else {
+            return 0
+        }
+        if original < current {
+            // Dragged tab moved right; tabs in (original, current] shift left to make room
+            if index > original && index <= current {
+                return -tabStride
+            }
+        } else if original > current {
+            // Dragged tab moved left; tabs in [current, original) shift right
+            if index >= current && index < original {
+                return tabStride
+            }
+        }
+        return 0
+    }
+
+    private func handleDragChanged(terminal: Terminal, translation: CGFloat, tabStride: CGFloat) {
+        if draggedTabID != terminal.id {
+            let sorted = self.terminals
+            guard let originalIdx = sorted.firstIndex(where: { $0.id == terminal.id }) else { return }
+            draggedTabID = terminal.id
+            dragOriginalIndex = originalIdx
+            dragCurrentIndex = originalIdx
+            dragOffset = 0
+            lastDragTranslation = 0
+        }
+
+        guard let originalIdx = dragOriginalIndex else { return }
+        let count = self.terminals.count
+
+        let delta = translation - lastDragTranslation
+        lastDragTranslation = translation
+
+        // Update the dragged tab's offset instantly so it tracks the cursor.
+        // Clamp so the tab can never leave the bounds of the strip.
+        let minOffset = -CGFloat(originalIdx) * tabStride
+        let maxOffset = CGFloat(count - 1 - originalIdx) * tabStride
+        dragOffset = min(max(dragOffset + delta, minOffset), maxOffset)
+
+        // Compute which slot the dragged tab is currently sitting in. When this
+        // changes we animate the displacement of the other tabs only — the
+        // dragged tab itself stays glued to the cursor.
+        let stepsMoved = Int((dragOffset / tabStride).rounded())
+        let newCurrent = max(0, min(count - 1, originalIdx + stepsMoved))
+        if newCurrent != dragCurrentIndex {
+            withAnimation(.snappy(duration: 0.2)) {
+                dragCurrentIndex = newCurrent
+            }
+        }
+    }
+
+    private func handleDragEnded(tabStride: CGFloat) {
+        guard let draggedID = draggedTabID,
+              let originalIdx = dragOriginalIndex,
+              let currentIdx = dragCurrentIndex else {
+            resetDragState()
+            return
+        }
+
+        lastDragTranslation = 0
+
+        // Commit the reorder, compensate the offset for the layout shift, and
+        // animate the dragged tab into its final slot — all in one transaction
+        // so the dragged tab slides smoothly to rest instead of snapping.
+        withAnimation(.snappy(duration: 0.22)) {
+            if originalIdx != currentIdx {
+                let sorted = self.terminals
+                if let dragged = sorted.first(where: { $0.id == draggedID }) {
+                    var newOrder = sorted
+                    newOrder.remove(at: originalIdx)
+                    newOrder.insert(dragged, at: currentIdx)
+                    for (i, terminal) in newOrder.enumerated() {
+                        terminal.sortOrder = i
+                    }
+                }
+            }
+            dragOriginalIndex = nil
+            dragCurrentIndex = nil
+            dragOffset = 0
+        } completion: {
+            draggedTabID = nil
+        }
+    }
+
+    private func resetDragState() {
+        draggedTabID = nil
+        dragOriginalIndex = nil
+        dragCurrentIndex = nil
+        dragOffset = 0
+        lastDragTranslation = 0
     }
 
     private func separator(before index: Int, in terminals: [Terminal]) -> some View {
@@ -209,38 +311,4 @@ struct DocumentTabBar: View {
         }
         workspace.closeTerminal(terminal)
     }
-}
-
-private struct TabDropDelegate: DropDelegate {
-    let targetTerminal: Terminal
-    let workspace: Workspace
-    @Binding var draggedTabID: UUID?
-
-    func dropEntered(info: DropInfo) {
-        guard let draggedTabID,
-              let draggedTerminal = workspace.terminals.first(where: { $0.id == draggedTabID }),
-              let targetIndex = workspace.terminals.firstIndex(where: { $0 === targetTerminal }) else { return }
-
-        withAnimation {
-            // Swap sort orders
-            let draggedOrder = draggedTerminal.sortOrder
-            draggedTerminal.sortOrder = targetTerminal.sortOrder
-            targetTerminal.sortOrder = draggedOrder
-        }
-    }
-
-    func performDrop(info: DropInfo) -> Bool {
-        draggedTabID = nil
-        // Normalize sort orders
-        for (i, terminal) in workspace.terminals.enumerated() {
-            terminal.sortOrder = i
-        }
-        return true
-    }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: .move)
-    }
-
-    func dropExited(info: DropInfo) {}
 }
