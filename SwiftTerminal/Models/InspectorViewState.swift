@@ -59,4 +59,5 @@ final class GitInspectorState {
     var stashMessage = ""
     var stagedExpanded = true
     var unstagedExpanded = true
+    var expandedCommitHashes: Set<String> = []
 }
