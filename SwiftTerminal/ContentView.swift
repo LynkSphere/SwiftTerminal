@@ -5,6 +5,8 @@ struct ContentView: View {
     @Environment(AppState.self) private var appState
     @Query private var workspaces: [Workspace]
     @State private var searchText = ""
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @State private var showingOnboarding = false
 
     var body: some View {
         NavigationSplitView {
@@ -33,6 +35,16 @@ struct ContentView: View {
         }
         .focusedSceneValue(\.editorPanel, appState.selectedWorkspace?.editorPanel)
         .focusedSceneValue(\.isMainWindow, true)
+        .sheet(isPresented: $showingOnboarding) {
+            hasCompletedOnboarding = true
+        } content: {
+            OnboardingView()
+        }
+        .task {
+            if !hasCompletedOnboarding {
+                showingOnboarding = true
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToSession)) { notification in
             guard let workspaceID = notification.userInfo?["workspaceID"] as? String,
                   let terminalID = notification.userInfo?["terminalID"] as? String else { return }
