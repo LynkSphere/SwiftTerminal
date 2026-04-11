@@ -7,6 +7,7 @@ struct SwiftTerminalApp: App {
 
     let container: ModelContainer
     @State private var appState = AppState()
+    @State private var updater = UpdaterManager()
 
     init() {
         self.container = Self.makeContainer()
@@ -29,7 +30,7 @@ struct SwiftTerminalApp: App {
         }
         .defaultSize(width: 900, height: 600)
         .commands {
-            AppCommands(appState: appState)
+            AppCommands(appState: appState, updater: updater)
         }
 
         WindowGroup("Editor", for: EditorPanelContent.self) { $content in
@@ -43,6 +44,7 @@ struct SwiftTerminalApp: App {
 
         Settings {
             SettingsView()
+                .environment(updater)
         }
     }
 }

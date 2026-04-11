@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AppCommands: Commands {
     @Bindable var appState: AppState
+    let updater: UpdaterManager
     @FocusedValue(\.editorPanel) private var editorPanel
     @FocusedValue(\.isMainWindow) private var isMainWindow
     @AppStorage("showHiddenFiles") var showHiddenFiles = false
@@ -10,6 +11,16 @@ struct AppCommands: Commands {
     private var mainWindowActive: Bool { isMainWindow == true }
 
     var body: some Commands {
+        // Sparkle "Check for Updates…" — placed right after the standard About item in the
+        // app menu. Lives outside the `mainWindowActive` gate so it stays available
+        // regardless of which window is focused.
+        CommandGroup(after: .appInfo) {
+            Button("Check for Updates…") {
+                updater.checkForUpdates()
+            }
+            .disabled(!updater.canCheckForUpdates)
+        }
+
         if mainWindowActive {
             SidebarCommands()
             
