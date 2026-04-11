@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		08BEFC282F74722D009C370D /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 08BEFC272F74722D009C370D /* SwiftTerm */; };
 		08BEFC2A2F74722D009C370E /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 08BEFC292F74722D009C370E /* Sparkle */; };
+		08BEFC2D2F74722D009C370F /* Aptabase in Frameworks */ = {isa = PBXBuildFile; productRef = 08BEFC2C2F74722D009C370F /* Aptabase */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -30,6 +31,7 @@
 			files = (
 				08BEFC282F74722D009C370D /* SwiftTerm in Frameworks */,
 				08BEFC2A2F74722D009C370E /* Sparkle in Frameworks */,
+				08BEFC2D2F74722D009C370F /* Aptabase in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -74,6 +76,7 @@
 			packageProductDependencies = (
 				08BEFC272F74722D009C370D /* SwiftTerm */,
 				08BEFC292F74722D009C370E /* Sparkle */,
+				08BEFC2C2F74722D009C370F /* Aptabase */,
 			);
 			productName = SwiftTerminal;
 			productReference = 08D10C4A2F64897100754649 /* SwiftTerminal.app */;
@@ -106,6 +109,7 @@
 			packageReferences = (
 				08BEFC262F74722D009C370D /* XCRemoteSwiftPackageReference "SwiftTerm" */,
 				08BEFC2B2F74722D009C370E /* XCRemoteSwiftPackageReference "Sparkle" */,
+				08BEFC2E2F74722D009C370F /* XCRemoteSwiftPackageReference "aptabase-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 08D10C4B2F64897100754649 /* Products */;
@@ -414,6 +418,14 @@
 				minimumVersion = 2.6.0;
 			};
 		};
+		08BEFC2E2F74722D009C370F /* XCRemoteSwiftPackageReference "aptabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/aptabase/aptabase-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.3.11;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -426,6 +438,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 08BEFC2B2F74722D009C370E /* XCRemoteSwiftPackageReference "Sparkle" */;
 			productName = Sparkle;
+		};
+		08BEFC2C2F74722D009C370F /* Aptabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 08BEFC2E2F74722D009C370F /* XCRemoteSwiftPackageReference "aptabase-swift" */;
+			productName = Aptabase;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

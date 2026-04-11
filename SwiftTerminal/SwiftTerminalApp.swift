@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Aptabase
 
 @main
 struct SwiftTerminalApp: App {
@@ -11,6 +12,11 @@ struct SwiftTerminalApp: App {
 
     init() {
         self.container = Self.makeContainer()
+        if let key = Bundle.main.object(forInfoDictionaryKey: "APTABASE_APP_KEY") as? String,
+           !key.isEmpty, !key.hasPrefix("A-US-XXXX") {
+            Aptabase.shared.initialize(appKey: key)
+            Aptabase.shared.trackEvent("app_started")
+        }
     }
 
     private static func makeContainer() -> ModelContainer {

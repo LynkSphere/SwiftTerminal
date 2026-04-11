@@ -2,7 +2,7 @@
 <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/" version="2.0">
     <channel>
         <title>SwiftTerminal</title>
-        <link>https://raw.githubusercontent.com/SilverMarcs/SwiftTerminal/main/appcast.xml</link>
+        <link>https://raw.githubusercontent.com/LynkSphere/SwiftTerminal/main/appcast.xml</link>
         <description>Most recent updates to SwiftTerminal</description>
         <language>en</language>
     
@@ -15,7 +15,7 @@
             <sparkle:shortVersionString>1.0.2</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.2</sparkle:minimumSystemVersion>
             <enclosure
-                url="https://github.com/SilverMarcs/SwiftTerminal/releases/download/v1.0.2/SwiftTerminal-1.0.2.dmg"
+                url="https://github.com/LynkSphere/SwiftTerminal/releases/download/v1.0.2/SwiftTerminal-1.0.2.dmg"
                 length="5920839"
                 type="application/x-apple-diskimage"
                 sparkle:edSignature="yz5/RCL1Ac+DViemnU4Pz/3FpY6UBhTAUVk76ygkJ6BikuaG1XYUerKJvX7lr+AS+WjXVOGb6E1KdvooaxgxDw==" />
@@ -27,7 +27,7 @@
             <sparkle:shortVersionString>1.0.1</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.2</sparkle:minimumSystemVersion>
             <enclosure
-                url="https://github.com/SilverMarcs/SwiftTerminal/releases/download/v1.0.1/SwiftTerminal-1.0.1.dmg"
+                url="https://github.com/LynkSphere/SwiftTerminal/releases/download/v1.0.1/SwiftTerminal-1.0.1.dmg"
                 length="5915779"
                 type="application/x-apple-diskimage"
                 sparkle:edSignature="14bxg/TukTnwpQqngj/QoAZu49DkrtUbHb2vVhzOiSsbK3je7mVCMQEEFryE+ih+7KSI8IpDBPbAnom98mnKDA==" />
@@ -39,7 +39,7 @@
             <sparkle:shortVersionString>1.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.2</sparkle:minimumSystemVersion>
             <enclosure
-                url="https://github.com/SilverMarcs/SwiftTerminal/releases/download/v1.0/SwiftTerminal-1.0.zip"
+                url="https://github.com/LynkSphere/SwiftTerminal/releases/download/v1.0/SwiftTerminal-1.0.zip"
                 length="5468376"
                 type="application/octet-stream"
                 sparkle:edSignature="qM6Wr4zHVZAX8pthPSNLOp1e3J20cWOdfG4OI8/wXfEQhhtZfrYH7W7k4/qlP7fkQmuIdj5BhPflIeVxWh1BAg==" />
