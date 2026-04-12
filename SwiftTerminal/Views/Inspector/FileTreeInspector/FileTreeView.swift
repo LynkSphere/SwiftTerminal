@@ -6,6 +6,7 @@ struct FileTreeView: View {
 
     @Environment(EditorPanel.self) private var editorPanel
     @AppStorage("showHiddenFiles") private var showHiddenFiles = false
+    @State private var pendingTrashURL: URL?
 
     var body: some View {
         List(selection: $state.selectedID) {
@@ -48,8 +49,26 @@ struct FileTreeView: View {
             state.model.load(directoryURL: directoryURL)
             await state.model.refreshGit(directoryURL: directoryURL)
         }
+        .watchFileSystem(at: directoryURL) {
+            state.model.load(directoryURL: directoryURL)
+        }
         .gitPolling(id: directoryURL) {
             await state.model.refreshGit(directoryURL: directoryURL)
+        }
+        .alert(
+            "Move to Trash?",
+            isPresented: Binding(
+                get: { pendingTrashURL != nil },
+                set: { if !$0 { pendingTrashURL = nil } }
+            ),
+            presenting: pendingTrashURL
+        ) { url in
+            Button("Move to Trash", role: .destructive) {
+                state.model.moveToTrash(url: url, directoryURL: directoryURL)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { url in
+            Text("Are you sure you want to move \u{201C}\(url.lastPathComponent)\u{201D} to the Trash?")
         }
         .onChange(of: state.model.submittedSearchText) { oldValue, newValue in
             if !newValue.isEmpty && oldValue.isEmpty {
@@ -127,7 +146,7 @@ struct FileTreeView: View {
             }
 
         case .moveToTrash(let url):
-            state.model.moveToTrash(url: url, directoryURL: directoryURL)
+            pendingTrashURL = url
 
         case .duplicate(let url):
             state.model.duplicate(url: url, directoryURL: directoryURL)
