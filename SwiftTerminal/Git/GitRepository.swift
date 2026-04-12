@@ -182,6 +182,17 @@ actor GitRepository {
         return GitDiffPresentation(raw: raw)
     }
 
+    /// Returns the raw binary content of a file at a given git ref.
+    /// - For unstaged diffs the "old" version lives in the index (`:path`).
+    /// - For staged diffs the "old" version is HEAD (`HEAD:path`).
+    /// - For commit diffs, the "old" is `commit^:path` and "new" is `commit:path`.
+    func fileData(at relativePath: String, ref: String, repositoryRootURL: URL) async throws -> Data {
+        try await self.executor.runRawData(
+            arguments: ["show", "\(ref):\(relativePath)"],
+            at: repositoryRootURL
+        )
+    }
+
     func stage(paths: [String], at repositoryRootURL: URL) async throws {
         try await self.executor.execute(GitStageCommand(paths: paths), at: repositoryRootURL)
     }

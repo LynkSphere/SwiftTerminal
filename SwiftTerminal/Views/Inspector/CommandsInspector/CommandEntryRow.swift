@@ -31,6 +31,7 @@ struct CommandEntryRow: View {
 
             actionButtons
         }
+        .padding(.horizontal, 5)
         .contextMenu {
             contextMenuItems
         }

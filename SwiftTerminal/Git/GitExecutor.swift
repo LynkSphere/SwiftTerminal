@@ -19,6 +19,15 @@ struct GitExecutor: Sendable {
         return try command.parse(output: result.standardOutput)
     }
 
+    func runRawData(arguments: [String], at directoryURL: URL) async throws -> Data {
+        let result = try await runBinary(arguments: arguments, at: directoryURL)
+        guard result.terminationStatus == 0 else {
+            let message = String(data: result.standardError, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            throw GitError.commandFailed(command: "git " + arguments.joined(separator: " "), message: message)
+        }
+        return result.standardOutput
+    }
+
     private func run(arguments: [String], at directoryURL: URL) async throws -> ExecutionResult {
         let process = Process()
         process.executableURL = self.executableURL
@@ -62,10 +71,58 @@ struct GitExecutor: Sendable {
             terminationStatus: await terminationStatus
         )
     }
+
+    private func runBinary(arguments: [String], at directoryURL: URL) async throws -> BinaryExecutionResult {
+        let process = Process()
+        process.executableURL = self.executableURL
+        process.arguments = arguments
+        process.currentDirectoryURL = directoryURL
+
+        let standardOutputPipe = Pipe()
+        let standardErrorPipe = Pipe()
+        process.standardOutput = standardOutputPipe
+        process.standardError = standardErrorPipe
+
+        var environment = ProcessInfo.processInfo.environment
+        environment["GIT_TERMINAL_PROMPT"] = "0"
+        environment["LC_ALL"] = "C"
+        process.environment = environment
+
+        do {
+            try process.run()
+        } catch {
+            throw GitError.gitUnavailable
+        }
+
+        let standardOutputHandle = standardOutputPipe.fileHandleForReading
+        let standardErrorHandle = standardErrorPipe.fileHandleForReading
+        async let standardOutputData = Task.detached(priority: .userInitiated) {
+            standardOutputHandle.readDataToEndOfFile()
+        }.value
+        async let standardErrorData = Task.detached(priority: .userInitiated) {
+            standardErrorHandle.readDataToEndOfFile()
+        }.value
+        async let terminationStatus = Task.detached(priority: .userInitiated) {
+            process.waitUntilExit()
+            return process.terminationStatus
+        }.value
+
+        return BinaryExecutionResult(
+            standardOutput: await standardOutputData,
+            standardError: await standardErrorData,
+            terminationStatus: await terminationStatus
+        )
+    }
 }
 
 private struct ExecutionResult: Sendable {
     var standardOutput: String
     var standardError: String
+    var terminationStatus: Int32
+}
+
+private struct BinaryExecutionResult: Sendable {
+    var standardOutput: Data
+    var standardError: Data
     var terminationStatus: Int32
 }

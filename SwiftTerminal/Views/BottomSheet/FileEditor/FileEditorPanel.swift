@@ -15,6 +15,7 @@ struct FileEditorPanel: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var unsupported: UnsupportedReason?
+    @State private var preview: PreviewContent?
     @State private var gutterDiff: GutterDiffResult = .empty
     @State private var gitState = FileGitState()
     @Environment(\.showInFileTree) private var showInFileTree
@@ -24,13 +25,20 @@ struct FileEditorPanel: View {
         case binary
     }
 
+    private enum PreviewContent {
+        case image(NSImage)
+    }
+
     /// Files larger than this are not loaded into the editor at all.
     private static let maxEditableBytes: Int64 = 5 * 1024 * 1024
 
+    /// Image extensions that can be previewed inline.
+    private static let imageExtensions: Set<String> = [
+        "png", "jpg", "jpeg", "gif", "heic", "heif", "webp", "tiff", "tif", "bmp", "ico", "icns", "svg",
+    ]
+
     /// Extensions that we never try to read as text — skip the load entirely.
     private static let binaryExtensions: Set<String> = [
-        // images
-        "png", "jpg", "jpeg", "gif", "heic", "heif", "webp", "tiff", "tif", "bmp", "ico", "icns",
         // audio / video
         "mp4", "mov", "avi", "mkv", "webm", "m4v", "mp3", "wav", "flac", "m4a", "aac", "ogg",
         // archives
@@ -97,6 +105,8 @@ struct FileEditorPanel: View {
                     repositoryRootURL: directoryURL,
                     onReloadFromDisk: { loadFile() }
                 )
+            } else if let preview {
+                previewView(preview)
             } else if let unsupported {
                 unsupportedView(unsupported)
             } else if let errorMessage {
@@ -147,12 +157,24 @@ struct FileEditorPanel: View {
         isLoaded = false
         errorMessage = nil
         unsupported = nil
+        preview = nil
         gutterDiff = .empty
         gitState = FileGitState()
         panel.isDirty = false
 
-        // Skip well-known binary file types entirely — never attempt to read.
         let ext = fileURL.pathExtension.lowercased()
+
+        // Try to load previewable file types.
+        if Self.imageExtensions.contains(ext) {
+            if let image = NSImage(contentsOf: fileURL) {
+                preview = .image(image)
+            } else {
+                unsupported = .binary
+            }
+            return
+        }
+
+        // Skip well-known binary file types entirely — never attempt to read.
         if Self.binaryExtensions.contains(ext) {
             unsupported = .binary
             return
@@ -190,6 +212,20 @@ struct FileEditorPanel: View {
             refreshGitState()
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    @ViewBuilder
+    private func previewView(_ content: PreviewContent) -> some View {
+        switch content {
+        case .image(let image):
+            ScrollView([.horizontal, .vertical]) {
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -277,3 +313,4 @@ struct FileEditorPanel: View {
         return state
     }
 }
+
