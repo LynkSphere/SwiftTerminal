@@ -107,16 +107,22 @@ struct PanelLayout<Title: View, Actions: View, Content: View>: View {
     }
 
     @State private var dragStartHeight: Double?
+    @State private var dragStartY: CGFloat?
 
     private var resizeGesture: some Gesture {
-        DragGesture(minimumDistance: 1)
+        DragGesture(minimumDistance: 1, coordinateSpace: .global)
             .onChanged { value in
-                if dragStartHeight == nil { dragStartHeight = panelHeight }
-                let proposed = (dragStartHeight ?? panelHeight) - value.translation.height
-                panelHeight = min(max(100, proposed), 800)
+                if dragStartHeight == nil {
+                    dragStartHeight = panelHeight
+                    dragStartY = value.startLocation.y
+                }
+                guard let startHeight = dragStartHeight, let startY = dragStartY else { return }
+                let delta = startY - value.location.y
+                panelHeight = min(max(100, startHeight + delta), 800)
             }
             .onEnded { _ in
                 dragStartHeight = nil
+                dragStartY = nil
             }
     }
 }
