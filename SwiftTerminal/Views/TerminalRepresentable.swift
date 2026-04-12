@@ -75,7 +75,9 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
                     }
                     AppDelegate.bounceDockIcon()
                     AppDelegate.updateBadge(count: 1)
-                    AppDelegate.sendNotification(workspaceID: tab.workspace.id, terminalID: tab.id)
+                    if let workspaceID = tab.workspace?.id {
+                        AppDelegate.sendNotification(workspaceID: workspaceID, terminalID: tab.id)
+                    }
                 }
             }
 

@@ -1,9 +1,8 @@
 import SwiftUI
-import SwiftData
 
 struct WorkspaceRow: View {
     @Environment(AppState.self) private var appState
-    @Environment(\.modelContext) private var modelContext
+    @Environment(WorkspaceStore.self) private var store
 
     let workspace: Workspace
 
@@ -78,9 +77,7 @@ struct WorkspaceRow: View {
                     appState.selectedWorkspace = nil
                     appState.selectedTerminal = nil
                 }
-                workspace.commands.forEach { $0.runner.stop() }
-                workspace.unsortedTerminals.forEach { $0.terminate() }
-                modelContext.delete(workspace)
+                store.deleteWorkspace(workspace)
             } label: {
                 Label("Delete", systemImage: "trash")
             }

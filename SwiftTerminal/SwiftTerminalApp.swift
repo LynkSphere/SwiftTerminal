@@ -1,17 +1,15 @@
 import SwiftUI
-import SwiftData
 import Aptabase
 
 @main
 struct SwiftTerminalApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
-    let container: ModelContainer
+    @State private var workspaceStore = WorkspaceStore()
     @State private var appState = AppState()
     @State private var updater = UpdaterManager()
 
     init() {
-        self.container = Self.makeContainer()
         if let key = Bundle.main.object(forInfoDictionaryKey: "APTABASE_APP_KEY") as? String,
            !key.isEmpty, !key.hasPrefix("A-US-XXXX") {
             Aptabase.shared.initialize(appKey: key)
@@ -19,19 +17,11 @@ struct SwiftTerminalApp: App {
         }
     }
 
-    private static func makeContainer() -> ModelContainer {
-        do {
-            return try ModelContainer(for: Workspace.self)
-        } catch {
-            fatalError("Failed to create ModelContainer: \(error)")
-        }
-    }
-
     var body: some Scene {
         Window("SwiftTerminal", id: "swiftterminal") {
             ContentView()
                 .environment(appState)
-                .modelContainer(container)
+                .environment(workspaceStore)
                 .frame(minWidth: 600, minHeight: 400)
         }
         .defaultSize(width: 900, height: 600)

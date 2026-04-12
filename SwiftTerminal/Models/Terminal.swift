@@ -1,16 +1,19 @@
 import AppKit
-import SwiftData
+import Observation
 import SwiftTerm
 
-@Model
-final class Terminal {
-    var id = UUID()
-    var title: String = "Terminal"
+@Observable
+final class Terminal: Identifiable, Hashable, Codable {
+    var id: UUID
+    var title: String
     var currentDirectory: String?
-    var sortOrder: Int = 0
-    var workspace: Workspace
 
-    @Attribute(.ephemeral) var hasBellNotification = false
+    @ObservationIgnored
+    weak var workspace: Workspace?
+
+    /// Not encoded; reset per launch.
+    @ObservationIgnored
+    var hasBellNotification = false
 
     var localProcessTerminalView: LocalProcessTerminalView? {
         get { TerminalProcessRegistry.view(for: id) }
@@ -23,11 +26,41 @@ final class Terminal {
         }
     }
 
-    init(workspace: Workspace, title: String = "Terminal", currentDirectory: String? = nil, sortOrder: Int = 0) {
+    init(workspace: Workspace, title: String = "Terminal", currentDirectory: String? = nil) {
+        self.id = UUID()
         self.workspace = workspace
         self.title = title
         self.currentDirectory = currentDirectory
-        self.sortOrder = sortOrder
+    }
+
+    // MARK: - Codable
+
+    private enum CodingKeys: String, CodingKey {
+        case id, title, currentDirectory
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try c.decode(UUID.self, forKey: .id)
+        self.title = try c.decodeIfPresent(String.self, forKey: .title) ?? "Terminal"
+        self.currentDirectory = try c.decodeIfPresent(String.self, forKey: .currentDirectory)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(title, forKey: .title)
+        try c.encodeIfPresent(currentDirectory, forKey: .currentDirectory)
+    }
+
+    // MARK: - Hashable
+
+    static func == (lhs: Terminal, rhs: Terminal) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 
     var displayDirectory: String {

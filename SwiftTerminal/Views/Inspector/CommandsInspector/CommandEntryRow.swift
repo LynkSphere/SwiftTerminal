@@ -35,7 +35,9 @@ struct CommandEntryRow: View {
             contextMenuItems
         }
         .sheet(isPresented: $showEditSheet) {
-            CommandEntrySheet(workspace: entry.workspace, entry: entry)
+            if let workspace = entry.workspace {
+                CommandEntrySheet(workspace: workspace, entry: entry)
+            }
         }
     }
 
@@ -96,7 +98,7 @@ struct CommandEntryRow: View {
         Divider()
 
         Button {
-            entry.workspace.setDefaultCommand(entry)
+            entry.workspace?.setDefaultCommand(entry)
         } label: {
             Label("Set as Run Command", systemImage: entry.isDefault ? "checkmark" : "play.circle")
         }
@@ -112,14 +114,14 @@ struct CommandEntryRow: View {
 
         Button(role: .destructive) {
             runner.stop()
-            entry.workspace.removeCommand(entry)
+            entry.workspace?.removeCommand(entry)
         } label: {
             Label("Delete", systemImage: "trash")
         }
     }
 
     private func runInNewTerminal() {
-        let workspace = entry.workspace
+        guard let workspace = entry.workspace else { return }
         let terminal = workspace.addTerminal()
         appState.selectedTerminal = terminal
         Task {

@@ -254,9 +254,7 @@ struct DocumentTabBar: View {
                     var newOrder = sorted
                     newOrder.remove(at: originalIdx)
                     newOrder.insert(dragged, at: currentIdx)
-                    for (i, terminal) in newOrder.enumerated() {
-                        terminal.sortOrder = i
-                    }
+                    workspace.reorderTerminals(newOrder)
                 }
             }
             dragOriginalIndex = nil

@@ -14,9 +14,36 @@ struct FileEditorPanel: View {
     @State private var isLoaded = false
     @State private var isSaving = false
     @State private var errorMessage: String?
+    @State private var unsupported: UnsupportedReason?
     @State private var gutterDiff: GutterDiffResult = .empty
     @State private var gitState = FileGitState()
     @Environment(\.showInFileTree) private var showInFileTree
+
+    private enum UnsupportedReason {
+        case tooLarge(bytes: Int64)
+        case binary
+    }
+
+    /// Files larger than this are not loaded into the editor at all.
+    private static let maxEditableBytes: Int64 = 5 * 1024 * 1024
+
+    /// Extensions that we never try to read as text — skip the load entirely.
+    private static let binaryExtensions: Set<String> = [
+        // images
+        "png", "jpg", "jpeg", "gif", "heic", "heif", "webp", "tiff", "tif", "bmp", "ico", "icns",
+        // audio / video
+        "mp4", "mov", "avi", "mkv", "webm", "m4v", "mp3", "wav", "flac", "m4a", "aac", "ogg",
+        // archives
+        "zip", "tar", "gz", "tgz", "bz2", "xz", "7z", "rar", "dmg", "iso",
+        // databases / executables
+        "sqlite", "sqlite3", "db", "pdf", "exe", "dylib", "so", "o", "a",
+        // office documents
+        "xlsx", "xls", "docx", "doc", "pptx", "ppt", "pages", "numbers", "key", "keynote",
+        // ml / data binary
+        "parquet", "arrow", "feather", "npy", "npz", "pkl", "h5", "hdf5",
+        // fonts
+        "ttf", "otf", "woff", "woff2",
+    ]
 
     private var hasUnsavedChanges: Bool {
         isLoaded && content != savedContent
@@ -70,6 +97,8 @@ struct FileEditorPanel: View {
                     repositoryRootURL: directoryURL,
                     onReloadFromDisk: { loadFile() }
                 )
+            } else if let unsupported {
+                unsupportedView(unsupported)
             } else if let errorMessage {
                 ContentUnavailableView {
                     Label("Cannot Open File", systemImage: "exclamationmark.triangle")
@@ -117,13 +146,42 @@ struct FileEditorPanel: View {
         savedContent = ""
         isLoaded = false
         errorMessage = nil
+        unsupported = nil
         gutterDiff = .empty
         gitState = FileGitState()
         panel.isDirty = false
+
+        // Skip well-known binary file types entirely — never attempt to read.
+        let ext = fileURL.pathExtension.lowercased()
+        if Self.binaryExtensions.contains(ext) {
+            unsupported = .binary
+            return
+        }
+
+        // Refuse anything past the size cap before allocating memory.
+        let fileSize: Int64
+        do {
+            let values = try fileURL.resourceValues(forKeys: [.fileSizeKey])
+            fileSize = Int64(values.fileSize ?? 0)
+        } catch {
+            errorMessage = error.localizedDescription
+            return
+        }
+        if fileSize > Self.maxEditableBytes {
+            unsupported = .tooLarge(bytes: fileSize)
+            return
+        }
+
         do {
             let data = try Data(contentsOf: fileURL)
+            // Quick binary sniff: a NUL byte in the first 8KB means it's not text.
+            let sniffCount = min(data.count, 8192)
+            if data.prefix(sniffCount).contains(0) {
+                unsupported = .binary
+                return
+            }
             guard let string = String(data: data, encoding: .utf8) else {
-                errorMessage = "Binary file — cannot display."
+                unsupported = .binary
                 return
             }
             content = string
@@ -132,6 +190,48 @@ struct FileEditorPanel: View {
             refreshGitState()
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    @ViewBuilder
+    private func unsupportedView(_ reason: UnsupportedReason) -> some View {
+        ContentUnavailableView {
+            Label(unsupportedTitle(reason), systemImage: unsupportedSymbol(reason))
+        } description: {
+            Text(unsupportedDescription(reason))
+        } actions: {
+            HStack {
+                Button("Reveal in Finder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([fileURL])
+                }
+                Button("Open with Default App") {
+                    NSWorkspace.shared.open(fileURL)
+                }
+            }
+        }
+    }
+
+    private func unsupportedTitle(_ reason: UnsupportedReason) -> String {
+        switch reason {
+        case .tooLarge: return "File Too Large"
+        case .binary: return "Preview Not Available"
+        }
+    }
+
+    private func unsupportedSymbol(_ reason: UnsupportedReason) -> String {
+        switch reason {
+        case .tooLarge: return "doc.badge.ellipsis"
+        case .binary: return "doc"
+        }
+    }
+
+    private func unsupportedDescription(_ reason: UnsupportedReason) -> String {
+        switch reason {
+        case .tooLarge(let bytes):
+            let formatted = ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+            return "\(fileURL.lastPathComponent) is \(formatted) — too large to open in the editor."
+        case .binary:
+            return "\(fileURL.lastPathComponent) can't be displayed as text."
         }
     }
 

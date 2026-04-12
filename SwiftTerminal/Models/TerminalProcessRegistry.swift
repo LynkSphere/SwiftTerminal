@@ -3,12 +3,10 @@ import SwiftTerm
 
 /// Owns the live `LocalProcessTerminalView` for each terminal tab.
 ///
-/// SwiftData `@Model` instances can be refaulted or replaced when nothing is
-/// observing them — for example after a workspace switch — which would tear
-/// down any `@Transient` view reference and kill the underlying shell process.
 /// Keying the views off `Terminal.id` in a static registry decouples shell
-/// process lifetime from SwiftData instance lifetime, mirroring the pattern
-/// `CommandRunner` already uses for command execution state.
+/// process lifetime from the lifetime of any individual `Terminal` instance,
+/// mirroring the pattern `CommandRunner` already uses for command execution
+/// state.
 enum TerminalProcessRegistry {
     private static var views: [UUID: LocalProcessTerminalView] = [:]
 
