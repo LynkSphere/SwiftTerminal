@@ -25,6 +25,7 @@ struct GitInspectorCommitArea: View {
                 Image(systemName: currentAction.systemImage)
                     .contentTransition(.symbolEffect(.replace))
             }
+            .offset(y: 1)
             .buttonStyle(.borderedProminent)
             .help(currentAction.label)
             .disabled(currentAction == .commit && (state.commitMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || snapshot?.stagedFiles.isEmpty != false))
