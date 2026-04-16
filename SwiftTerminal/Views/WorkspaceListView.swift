@@ -4,6 +4,7 @@ import AppKit
 struct WorkspaceListView: View {
     @Environment(AppState.self) private var appState
     @Environment(WorkspaceStore.self) private var store
+    @AppStorage("hideSettingsButton") private var hideSettingsButton = false
 
     let searchText: String
 
@@ -37,13 +38,15 @@ struct WorkspaceListView: View {
                 }
                 .buttonStyle(.plain)
 
-                SettingsLink {
-                    Image(systemName: "gearshape")
-                        .frame(width: 20, height: 20)
-                        .contentShape(Rectangle())
+                if !hideSettingsButton {
+                    SettingsLink {
+                        Image(systemName: "gearshape")
+                            .frame(width: 20, height: 20)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Settings")
                 }
-                .buttonStyle(.plain)
-                .help("Settings")
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)

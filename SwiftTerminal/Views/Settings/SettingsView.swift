@@ -17,6 +17,11 @@ struct SettingsView: View {
                 .tabItem {
                     Label("Shortcuts", systemImage: "keyboard")
                 }
+
+            CreditsSettingsView()
+                .tabItem {
+                    Label("Credits", systemImage: "heart")
+                }
         }
         .frame(width: 480, height: 400)
     }

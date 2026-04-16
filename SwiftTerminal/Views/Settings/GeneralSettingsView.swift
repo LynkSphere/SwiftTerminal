@@ -3,18 +3,16 @@ import SwiftUI
 
 struct GeneralSettingsView: View {
     @AppStorage("hideTabBarWithSingleTab") private var hideTabBarWithSingleTab = false
+    @AppStorage("hideSettingsButton") private var hideSettingsButton = false
     @AppStorage("editorWrapLines") private var editorWrapLines = true
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage(TerminalProcessRegistry.fontSizeKey) private var terminalFontSize: Double = Double(TerminalProcessRegistry.defaultFontSize)
 
     var body: some View {
         Form {
-            Section {
+            Section("Appearance") {
                 Toggle("Hide tab bar when only one tab is open", isOn: $hideTabBarWithSingleTab)
-            } header: {
-                Text("Tabs")
-            } footer: {
-                Text("When enabled, the tab bar is hidden in workspaces that have a single terminal tab.")
+                Toggle("Hide settings button from sidebar", isOn: $hideSettingsButton)
             }
 
             Section {
@@ -52,8 +50,10 @@ struct GeneralSettingsView: View {
 
             #if DEBUG
             Section {
-                Button("Reset Onboarding Flag") {
-                    hasCompletedOnboarding = false
+                LabeledContent("Reset Onboarding") {
+                    Button("Launch") {
+                        hasCompletedOnboarding = false
+                    }
                 }
             } header: {
                 Text("Debug")
@@ -61,10 +61,6 @@ struct GeneralSettingsView: View {
                 Text("Resets the onboarding flag so the welcome sheet appears again on next launch.")
             }
             #endif
-
-            LynkSphereByline()
-                .frame(maxWidth: .infinity)
-                .listRowBackground(Color.clear)
         }
         .formStyle(.grouped)
     }
