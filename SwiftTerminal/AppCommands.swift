@@ -3,6 +3,7 @@ import SwiftUI
 struct AppCommands: Commands {
     @Bindable var appState: AppState
     let updater: UpdaterManager
+    @Environment(\.openWindow) private var openWindow
     @FocusedValue(\.editorPanel) private var editorPanel
     @FocusedValue(\.isMainWindow) private var isMainWindow
     @AppStorage("showHiddenFiles") var showHiddenFiles = false
@@ -11,6 +12,14 @@ struct AppCommands: Commands {
     private var mainWindowActive: Bool { isMainWindow == true }
 
     var body: some Commands {
+        // Replace the default "About SwiftTerminal" item with one that opens our
+        // custom About window scene.
+        CommandGroup(replacing: .appInfo) {
+            Button("About SwiftTerminal") {
+                openWindow(id: "about")
+            }
+        }
+
         // Sparkle "Check for Updates…" — placed right after the standard About item in the
         // app menu. Lives outside the `mainWindowActive` gate so it stays available
         // regardless of which window is focused.

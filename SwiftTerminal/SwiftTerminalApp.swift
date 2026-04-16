@@ -29,6 +29,17 @@ struct SwiftTerminalApp: App {
         .defaultSize(width: 875, height: 625)
         .restorationBehavior(.disabled)
 
+        Window("About SwiftTerminal", id: "about") {
+            AboutView()
+                .containerBackground(.regularMaterial, for: .window)
+                .toolbar(removing: .title)
+                .toolbarBackground(.hidden, for: .windowToolbar)
+                .windowMinimizeBehavior(.disabled)
+        }
+        .windowBackgroundDragBehavior(.enabled)
+        .windowResizability(.contentSize)
+        .restorationBehavior(.disabled)
+
         Settings {
             SettingsView()
                 .environment(updater)

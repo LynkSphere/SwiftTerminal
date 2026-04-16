@@ -1,5 +1,5 @@
 {
-  "originHash" : "8c79c3106ecdde5424126d3c620115771195a17cb40da040f3960acfa223dd8e",
+  "originHash" : "333eaeca7ba0129de9a431b65eedb660a123e42e5be8059cee5c233e41d2b53a",
   "pins" : [
     {
       "identity" : "highlightr",
@@ -34,7 +34,7 @@
       "location" : "https://github.com/SilverMarcs/SwiftTerm",
       "state" : {
         "branch" : "feature",
-        "revision" : "8c962c4b44d93d02b1b7e2faa4de0b1b8f8a96eb"
+        "revision" : "d52f1ccd74a6a631d89df68e37ba438cc7aa23de"
       }
     }
   ],
