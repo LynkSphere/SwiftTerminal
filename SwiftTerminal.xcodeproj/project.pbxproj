@@ -107,7 +107,7 @@
 			mainGroup = 08D10C412F64897100754649;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				08BEFC262F74722D009C370D /* XCRemoteSwiftPackageReference "SwiftTerm" */,
+				08BEFC262F74722D009C370D /* XCLocalSwiftPackageReference "../Frameworks/SwiftTerm" */,
 				08BEFC2B2F74722D009C370E /* XCRemoteSwiftPackageReference "Sparkle" */,
 				08BEFC302F74722D009C3710 /* XCRemoteSwiftPackageReference "Highlightr" */,
 			);
@@ -401,15 +401,14 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		08BEFC262F74722D009C370D /* XCRemoteSwiftPackageReference "SwiftTerm" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/SilverMarcs/SwiftTerm";
-			requirement = {
-				branch = feature;
-				kind = branch;
-			};
+/* Begin XCLocalSwiftPackageReference section */
+		08BEFC262F74722D009C370D /* XCLocalSwiftPackageReference "../Frameworks/SwiftTerm" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Frameworks/SwiftTerm;
 		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
 		08BEFC2B2F74722D009C370E /* XCRemoteSwiftPackageReference "Sparkle" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sparkle-project/Sparkle";
@@ -431,7 +430,6 @@
 /* Begin XCSwiftPackageProductDependency section */
 		08BEFC272F74722D009C370D /* SwiftTerm */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 08BEFC262F74722D009C370D /* XCRemoteSwiftPackageReference "SwiftTerm" */;
 			productName = SwiftTerm;
 		};
 		08BEFC292F74722D009C370E /* Sparkle */ = {

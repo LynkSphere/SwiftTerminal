@@ -71,7 +71,7 @@ struct DocumentTabBar: View {
             let tabCount = max(terminals.count, 1)
             let separatorWidth: CGFloat = 5
             let totalSeparators = CGFloat(max(tabCount - 1, 0)) * separatorWidth
-            let tabWidth = max((proxy.size.width - totalSeparators) / CGFloat(tabCount), 140)
+            let tabWidth = max((proxy.size.width - totalSeparators) / CGFloat(tabCount), 90)
             let contentWidth = CGFloat(tabCount) * tabWidth + totalSeparators
             let tabStride = tabWidth + separatorWidth
 
@@ -134,8 +134,8 @@ struct DocumentTabBar: View {
             .frame(width: width)
             .background(
                 Capsule()
-                    .fill(isSelected ? AnyShapeStyle(.quaternary) : isHovered ? AnyShapeStyle(.quinary) : AnyShapeStyle(.clear))
-                    .strokeBorder(isSelected ? AnyShapeStyle(.separator) : AnyShapeStyle(.clear))
+                    .fill(isSelected ? (colorScheme == .dark ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.background.secondary)) : isHovered ? AnyShapeStyle(.quinary) : AnyShapeStyle(.clear))
+                    .strokeBorder(isSelected ? (colorScheme == .dark ? AnyShapeStyle(.separator) : AnyShapeStyle(.background)) : AnyShapeStyle(.clear))
             )
             .contentShape(.capsule)
         }

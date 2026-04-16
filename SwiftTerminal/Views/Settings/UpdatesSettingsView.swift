@@ -15,7 +15,7 @@ struct UpdatesSettingsView: View {
         @Bindable var updater = updater
 
         Form {
-            Section {
+            Section("Sparkle") {
                 Toggle("Automatically check for updates", isOn: $updater.automaticallyChecksForUpdates)
 
                 Picker("Check frequency", selection: $updater.updateCheckInterval) {

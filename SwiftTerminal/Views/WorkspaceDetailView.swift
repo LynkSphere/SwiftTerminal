@@ -21,6 +21,7 @@ struct WorkspaceDetailView: View {
                 } label: {
                     Label("Scratch Pad", systemImage: "note.text")
                 }
+                .keyboardShortcut(".")
             }
         }
         .sheet(isPresented: $showingScratchPad) {
