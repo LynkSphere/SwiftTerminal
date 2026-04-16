@@ -209,6 +209,11 @@ struct CodeTextEditor: NSViewRepresentable {
         textView.textColor = .labelColor
         textView.backgroundColor = .clear
         textView.drawsBackground = false
+        // Preserve syntax highlighting under selection: only paint a background,
+        // don't let AppKit override the foreground colors Highlightr applied.
+        textView.selectedTextAttributes = [
+            .backgroundColor: NSColor.selectedTextBackgroundColor
+        ]
         textView.font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
         textView.editorFontSize = fontSize
         textView.lineNumberFontSize = fontSize - 1

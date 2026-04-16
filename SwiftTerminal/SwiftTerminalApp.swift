@@ -1,5 +1,4 @@
 import SwiftUI
-import Aptabase
 
 @main
 struct SwiftTerminalApp: App {
@@ -8,14 +7,6 @@ struct SwiftTerminalApp: App {
     @State private var workspaceStore = WorkspaceStore()
     @State private var appState = AppState()
     @State private var updater = UpdaterManager()
-
-    init() {
-        if let key = Bundle.main.object(forInfoDictionaryKey: "APTABASE_APP_KEY") as? String,
-           !key.isEmpty, !key.hasPrefix("A-US-XXXX") {
-            Aptabase.shared.initialize(appKey: key)
-            Aptabase.shared.trackEvent("app_started")
-        }
-    }
 
     var body: some Scene {
         Window("SwiftTerminal", id: "swiftterminal") {

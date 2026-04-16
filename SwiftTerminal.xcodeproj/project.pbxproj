@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		08BEFC282F74722D009C370D /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 08BEFC272F74722D009C370D /* SwiftTerm */; };
 		08BEFC2A2F74722D009C370E /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 08BEFC292F74722D009C370E /* Sparkle */; };
-		08BEFC2D2F74722D009C370F /* Aptabase in Frameworks */ = {isa = PBXBuildFile; productRef = 08BEFC2C2F74722D009C370F /* Aptabase */; };
 		08BEFC322F74722D009C3710 /* Highlightr in Frameworks */ = {isa = PBXBuildFile; productRef = 08BEFC312F74722D009C3710 /* Highlightr */; };
 /* End PBXBuildFile section */
 
@@ -32,7 +31,6 @@
 			files = (
 				08BEFC282F74722D009C370D /* SwiftTerm in Frameworks */,
 				08BEFC2A2F74722D009C370E /* Sparkle in Frameworks */,
-				08BEFC2D2F74722D009C370F /* Aptabase in Frameworks */,
 				08BEFC322F74722D009C3710 /* Highlightr in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -78,7 +76,6 @@
 			packageProductDependencies = (
 				08BEFC272F74722D009C370D /* SwiftTerm */,
 				08BEFC292F74722D009C370E /* Sparkle */,
-				08BEFC2C2F74722D009C370F /* Aptabase */,
 				08BEFC312F74722D009C3710 /* Highlightr */,
 			);
 			productName = SwiftTerminal;
@@ -112,7 +109,6 @@
 			packageReferences = (
 				08BEFC262F74722D009C370D /* XCRemoteSwiftPackageReference "SwiftTerm" */,
 				08BEFC2B2F74722D009C370E /* XCRemoteSwiftPackageReference "Sparkle" */,
-				08BEFC2E2F74722D009C370F /* XCRemoteSwiftPackageReference "aptabase-swift" */,
 				08BEFC302F74722D009C3710 /* XCRemoteSwiftPackageReference "Highlightr" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -422,14 +418,6 @@
 				minimumVersion = 2.6.0;
 			};
 		};
-		08BEFC2E2F74722D009C370F /* XCRemoteSwiftPackageReference "aptabase-swift" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/aptabase/aptabase-swift";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.3.11;
-			};
-		};
 		08BEFC302F74722D009C3710 /* XCRemoteSwiftPackageReference "Highlightr" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/raspu/Highlightr";
@@ -450,11 +438,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 08BEFC2B2F74722D009C370E /* XCRemoteSwiftPackageReference "Sparkle" */;
 			productName = Sparkle;
-		};
-		08BEFC2C2F74722D009C370F /* Aptabase */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 08BEFC2E2F74722D009C370F /* XCRemoteSwiftPackageReference "aptabase-swift" */;
-			productName = Aptabase;
 		};
 		08BEFC312F74722D009C3710 /* Highlightr */ = {
 			isa = XCSwiftPackageProductDependency;

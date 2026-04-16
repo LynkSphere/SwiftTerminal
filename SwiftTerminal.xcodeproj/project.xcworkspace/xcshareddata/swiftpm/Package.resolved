@@ -2,15 +2,6 @@
   "originHash" : "8c79c3106ecdde5424126d3c620115771195a17cb40da040f3960acfa223dd8e",
   "pins" : [
     {
-      "identity" : "aptabase-swift",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/aptabase/aptabase-swift",
-      "state" : {
-        "revision" : "cfd67fac2a228d448d9d2ac92ffc71589cc3ef00",
-        "version" : "0.3.11"
-      }
-    },
-    {
       "identity" : "highlightr",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/raspu/Highlightr",
