@@ -18,7 +18,10 @@ struct CodeTextEditor: NSViewRepresentable {
     private let repositoryRootURL: URL?
     private let onReloadFromDisk: (() async -> Void)?
     @Environment(\.editorFontSize) private var fontSize
+    @Environment(\.colorScheme) private var colorScheme
     @AppStorage("editorWrapLines") private var wrapLines: Bool = true
+
+    private var isDark: Bool { colorScheme == .dark }
 
     init(
         text: Binding<String>,
@@ -258,11 +261,13 @@ struct CodeTextEditor: NSViewRepresentable {
                 let highlighted = SyntaxHighlighter.highlight(
                     text.wrappedValue,
                     fileExtension: fileExtension,
-                    fontSize: fontSize
+                    fontSize: fontSize,
+                    isDark: isDark
                 )
                 textView.textStorage?.setAttributedString(highlighted)
                 textView.recomputeFolding()
             }
+            coordinator.lastIsDark = isDark
 
             coordinator.updateMinimapMarkers(gutterDiff: gutterDiff, text: textView.string)
 
@@ -298,10 +303,12 @@ struct CodeTextEditor: NSViewRepresentable {
             let highlighted = SyntaxHighlighter.highlight(
                 presentation.string,
                 fileExtension: fileExtension,
-                fontSize: fontSize
+                fontSize: fontSize,
+                isDark: isDark
             )
             textView.textStorage?.setAttributedString(highlighted)
             Self.applyInlineHighlights(to: textView.textStorage, lineKinds: presentation.lineKinds)
+            coordinator.lastIsDark = isDark
 
             coordinator.updateMinimapMarkers(lineKinds: presentation.lineKinds, text: presentation.string)
 
@@ -316,6 +323,8 @@ struct CodeTextEditor: NSViewRepresentable {
     }
 
     private func updateMode(textView: EditorTextView, coordinator: Coordinator) {
+        let colorSchemeChanged = coordinator.lastIsDark != isDark
+
         switch mode {
         case .editable(let gutterDiff, let highlightRequest):
             textView.isEditable = true
@@ -329,13 +338,17 @@ struct CodeTextEditor: NSViewRepresentable {
 
             coordinator.updateMinimapMarkers(gutterDiff: gutterDiff, text: textView.string)
 
-            if let text, !coordinator.isEditing, textView.string != text.wrappedValue {
+            if let text, !coordinator.isEditing,
+               textView.string != text.wrappedValue || colorSchemeChanged {
+                let ranges = textView.selectedRanges
                 let highlighted = SyntaxHighlighter.highlight(
                     text.wrappedValue,
                     fileExtension: fileExtension,
-                    fontSize: fontSize
+                    fontSize: fontSize,
+                    isDark: isDark
                 )
                 textView.textStorage?.setAttributedString(highlighted)
+                textView.setSelectedRanges(ranges, affinity: .downstream, stillSelecting: false)
                 textView.recomputeFolding()
                 textView.applyFoldAttributes()
             }
@@ -363,11 +376,12 @@ struct CodeTextEditor: NSViewRepresentable {
             coordinator.onReload = onReload
             coordinator.buildHunkLookup()
 
-            if textView.string != presentation.string {
+            if textView.string != presentation.string || colorSchemeChanged {
                 let highlighted = SyntaxHighlighter.highlight(
                     presentation.string,
                     fileExtension: fileExtension,
-                    fontSize: fontSize
+                    fontSize: fontSize,
+                    isDark: isDark
                 )
                 textView.textStorage?.setAttributedString(highlighted)
                 Self.applyInlineHighlights(to: textView.textStorage, lineKinds: presentation.lineKinds)
@@ -375,6 +389,8 @@ struct CodeTextEditor: NSViewRepresentable {
 
             coordinator.updateMinimapMarkers(lineKinds: presentation.lineKinds, text: presentation.string)
         }
+
+        coordinator.lastIsDark = isDark
     }
 
     private static func applyInlineHighlights(to textStorage: NSTextStorage?, lineKinds: [Int: GitDiffLineKind]) {
@@ -507,6 +523,7 @@ struct CodeTextEditor: NSViewRepresentable {
         var lastAppliedHighlight: HighlightRequest?
         var lastWrapLines: Bool?
         var lastWrapContentWidth: CGFloat?
+        var lastIsDark: Bool?
         private var rehighlightTask: Task<Void, Never>?
 
         var presentation: GitDiffPresentation?
@@ -562,7 +579,8 @@ struct CodeTextEditor: NSViewRepresentable {
                 let highlighted = SyntaxHighlighter.highlight(
                     source,
                     fileExtension: fileExtension,
-                    fontSize: editorTextView.editorFontSize
+                    fontSize: editorTextView.editorFontSize,
+                    isDark: editorTextView.isDarkAppearance
                 )
 
                 await MainActor.run {

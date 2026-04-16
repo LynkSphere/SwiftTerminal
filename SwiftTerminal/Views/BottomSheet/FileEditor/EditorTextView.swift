@@ -29,6 +29,13 @@ final class EditorTextView: NSTextView {
 
     var editorFontSize: CGFloat = 12
     var lineNumberFontSize: CGFloat = 11
+
+    /// Whether the view is currently rendering with a dark appearance. Used by
+    /// `toggleFold` and the post-edit re-highlight so syntax colors stay in sync
+    /// with the system appearance without routing through SwiftUI.
+    var isDarkAppearance: Bool {
+        effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+    }
     private var lineNumberFont: NSFont { NSFont.monospacedDigitSystemFont(ofSize: lineNumberFontSize, weight: .medium) }
     private let indentUnit = "    " // 4 spaces
 
@@ -40,6 +47,31 @@ final class EditorTextView: NSTextView {
 
     override func setSelectedRange(_ charRange: NSRange, affinity: NSSelectionAffinity, stillSelecting stillSelectingFlag: Bool) {
         super.setSelectedRange(charRange, affinity: affinity, stillSelecting: stillSelectingFlag)
+        needsDisplay = true
+    }
+
+    /// Re-apply syntax highlighting with the new appearance's palette whenever
+    /// the system toggles light/dark mode. Diff mode re-applies inline
+    /// add/remove highlights from its SwiftUI owner, so we skip diff here and
+    /// let `CodeTextEditor.updateNSView` (driven by `@Environment(\.colorScheme)`)
+    /// handle that path.
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        guard !isDiffMode, let textStorage, textStorage.length > 0 else {
+            needsDisplay = true
+            return
+        }
+        let source = string
+        let ranges = selectedRanges
+        let highlighted = SyntaxHighlighter.highlight(
+            source,
+            fileExtension: fileExtension,
+            fontSize: editorFontSize,
+            isDark: isDarkAppearance
+        )
+        textStorage.setAttributedString(highlighted)
+        setSelectedRanges(ranges, affinity: .downstream, stillSelecting: false)
+        applyFoldAttributes()
         needsDisplay = true
     }
 
@@ -141,7 +173,12 @@ final class EditorTextView: NSTextView {
         // Re-highlight to reset attributes, then re-apply fold hiding
         let source = string
         let ranges = selectedRanges
-        let highlighted = SyntaxHighlighter.highlight(source, fileExtension: fileExtension, fontSize: editorFontSize)
+        let highlighted = SyntaxHighlighter.highlight(
+            source,
+            fileExtension: fileExtension,
+            fontSize: editorFontSize,
+            isDark: isDarkAppearance
+        )
         textStorage?.setAttributedString(highlighted)
         setSelectedRanges(ranges, affinity: .downstream, stillSelecting: false)
         applyFoldAttributes()

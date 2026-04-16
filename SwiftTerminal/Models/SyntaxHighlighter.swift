@@ -2,11 +2,22 @@ import AppKit
 import Highlightr
 
 /// Syntax highlighter backed by Highlightr (highlight.js).
+///
+/// Uses separate instances for light and dark themes so callers can switch
+/// without mutating shared state mid-highlight. Callers pass `isDark` based on
+/// the current appearance; views should re-invoke `highlight` when the
+/// color scheme changes so existing buffers pick up the new palette.
 enum SyntaxHighlighter {
 
-    nonisolated(unsafe) private static let highlightr: Highlightr? = {
+    nonisolated(unsafe) private static let darkHighlighter: Highlightr? = {
         let h = Highlightr()
-        h?.setTheme(to: "xcode-dark")
+        h?.setTheme(to: "atom-one-dark")
+        return h
+    }()
+
+    nonisolated(unsafe) private static let lightHighlighter: Highlightr? = {
+        let h = Highlightr()
+        h?.setTheme(to: "atom-one-light")
         return h
     }()
 
@@ -24,14 +35,28 @@ enum SyntaxHighlighter {
 
     static let defaultTheme = Theme()
 
+    /// Resolved from the running app's effective appearance. Views that know
+    /// their own appearance (SwiftUI `colorScheme`, NSView `effectiveAppearance`)
+    /// should pass `isDark` explicitly rather than relying on this fallback.
+    static var isSystemDark: Bool {
+        NSApplication.shared.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+    }
+
     // MARK: - Public
 
-    static func highlight(_ source: String, fileExtension: String, fontSize: CGFloat = 12, theme: Theme = defaultTheme) -> NSAttributedString {
+    static func highlight(
+        _ source: String,
+        fileExtension: String,
+        fontSize: CGFloat = 12,
+        isDark: Bool = isSystemDark,
+        theme: Theme = defaultTheme
+    ) -> NSAttributedString {
         let font = fontSize == 12 ? theme.font : NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
         let language = languageName(for: fileExtension)
+        let highlighter = isDark ? darkHighlighter : lightHighlighter
 
-        if let highlightr,
-           let highlighted = highlightr.highlight(source, as: language, fastRender: true) {
+        if let highlighter,
+           let highlighted = highlighter.highlight(source, as: language, fastRender: true) {
             let result = NSMutableAttributedString(attributedString: highlighted)
             let fullRange = NSRange(location: 0, length: result.length)
             result.addAttribute(.font, value: font, range: fullRange)

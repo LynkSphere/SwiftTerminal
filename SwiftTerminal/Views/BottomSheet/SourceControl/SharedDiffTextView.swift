@@ -67,11 +67,13 @@ final class SharedDiffTextView: NSTextView {
         }
 
         let source = lines.map(\.content).joined(separator: "\n")
+        let isDark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
         let attributed = NSMutableAttributedString(
             attributedString: SyntaxHighlighter.highlight(
                 source,
                 fileExtension: fileExtension,
-                fontSize: layout.fontSize
+                fontSize: layout.fontSize,
+                isDark: isDark
             )
         )
         textStorage?.setAttributedString(attributed)

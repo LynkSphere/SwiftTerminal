@@ -4,6 +4,9 @@ struct HunkTextView: NSViewRepresentable {
     let hunk: DiffHunk
     let fileExtension: String
     @Environment(\.editorFontSize) private var fontSize
+    // Observed so `updateNSView` re-fires — and therefore `configure` re-highlights
+    // with the correct Xcode light/dark theme — whenever the appearance flips.
+    @Environment(\.colorScheme) private var colorScheme
 
     func makeNSView(context: Context) -> SharedDiffTextView {
         let textView = SharedDiffTextView()
