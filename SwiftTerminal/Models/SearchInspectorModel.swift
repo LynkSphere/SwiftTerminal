@@ -1,15 +1,19 @@
 import Foundation
 import SwiftUI
 
-struct SearchFileResult: Identifiable {
+struct SearchFileResult: Identifiable, Equatable, Sendable {
     var id: String { relativePath }
     let fileURL: URL
     let fileName: String
     let relativePath: String
     let matches: [SearchMatch]
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.relativePath == rhs.relativePath && lhs.matches.count == rhs.matches.count
+    }
 }
 
-struct SearchMatch: Identifiable {
+struct SearchMatch: Identifiable, Sendable {
     var id: String { "\(relativePath):\(lineNumber):\(columnRange.lowerBound)" }
     let fileURL: URL
     let relativePath: String
@@ -19,74 +23,91 @@ struct SearchMatch: Identifiable {
 }
 
 @Observable
+@MainActor
 final class SearchInspectorModel {
     var query = ""
     private(set) var results: [SearchFileResult] = []
     private(set) var isSearching = false
 
-    private static let maxFiles = 100
-    private static let maxMatches = 1000
+    private var searchTask: Task<Void, Never>?
 
-    func search(in directoryURL: URL) async {
+    func search(in directoryURL: URL) {
+        searchTask?.cancel()
+
         guard !query.isEmpty else {
             results = []
+            isSearching = false
             return
         }
 
         let query = query
-
         isSearching = true
-        defer { isSearching = false }
 
-        var fileResults: [SearchFileResult] = []
-        var matchCount = 0
-        let basePath = directoryURL.path
+        searchTask = Task {
+            let fileResults = await SearchEngine.performSearch(query: query, directoryURL: directoryURL)
 
-        let fileURLs = Self.collectFiles(in: directoryURL)
-
-        for fileURL in fileURLs {
             guard !Task.isCancelled else { return }
-            guard fileResults.count < Self.maxFiles, matchCount < Self.maxMatches else { break }
+            results = fileResults
+            isSearching = false
+        }
+    }
+}
 
-            guard let data = try? Data(contentsOf: fileURL),
-                  let content = String(data: data, encoding: .utf8)
-            else { continue }
+private enum SearchEngine {
+    static let maxFiles = 100
+    static let maxMatches = 1000
 
-            let relativePath = String(fileURL.path.dropFirst(basePath.count + 1))
-            var matches: [SearchMatch] = []
-            let lines = content.components(separatedBy: .newlines)
+    static func performSearch(query: String, directoryURL: URL) async -> [SearchFileResult] {
+        await Task.detached(priority: .userInitiated) {
+            var fileResults: [SearchFileResult] = []
+            var matchCount = 0
+            let basePath = directoryURL.path
 
-            for (index, line) in lines.enumerated() {
-                guard !Task.isCancelled else { return }
-                guard matchCount + matches.count < Self.maxMatches else { break }
+            let fileURLs = collectFiles(in: directoryURL)
 
-                let trimmedLine = String(line.prefix(500))
-                if let matchRange = trimmedLine.range(of: query, options: .caseInsensitive) {
-                    let colStart = trimmedLine.distance(from: trimmedLine.startIndex, to: matchRange.lowerBound)
-                    let colEnd = trimmedLine.distance(from: trimmedLine.startIndex, to: matchRange.upperBound)
-                    matches.append(SearchMatch(
+            for fileURL in fileURLs {
+                guard !Task.isCancelled else { return [] }
+                guard fileResults.count < maxFiles, matchCount < maxMatches else { break }
+
+                guard let data = try? Data(contentsOf: fileURL),
+                      let content = String(data: data, encoding: .utf8)
+                else { continue }
+
+                let relativePath = String(fileURL.path.dropFirst(basePath.count + 1))
+                var matches: [SearchMatch] = []
+                let lines = content.components(separatedBy: .newlines)
+
+                for (index, line) in lines.enumerated() {
+                    guard !Task.isCancelled else { return [] }
+                    guard matchCount + matches.count < maxMatches else { break }
+
+                    let trimmedLine = String(line.prefix(500))
+                    if let matchRange = trimmedLine.range(of: query, options: .caseInsensitive) {
+                        let colStart = trimmedLine.distance(from: trimmedLine.startIndex, to: matchRange.lowerBound)
+                        let colEnd = trimmedLine.distance(from: trimmedLine.startIndex, to: matchRange.upperBound)
+                        matches.append(SearchMatch(
+                            fileURL: fileURL,
+                            relativePath: relativePath,
+                            lineNumber: index + 1,
+                            columnRange: colStart..<colEnd,
+                            highlightedContent: highlight(line: trimmedLine, match: matchRange)
+                        ))
+                    }
+                }
+
+                if !matches.isEmpty {
+                    fileResults.append(SearchFileResult(
                         fileURL: fileURL,
+                        fileName: fileURL.lastPathComponent,
                         relativePath: relativePath,
-                        lineNumber: index + 1,
-                        columnRange: colStart..<colEnd,
-                        highlightedContent: Self.highlight(line: trimmedLine, match: matchRange)
+                        matches: matches
                     ))
+                    matchCount += matches.count
                 }
             }
 
-            if !matches.isEmpty {
-                fileResults.append(SearchFileResult(
-                    fileURL: fileURL,
-                    fileName: fileURL.lastPathComponent,
-                    relativePath: relativePath,
-                    matches: matches
-                ))
-                matchCount += matches.count
-            }
-        }
-
-        guard !Task.isCancelled else { return }
-        results = fileResults
+            return fileResults
+        }.value
     }
 
     private static func highlight(line: String, match: Range<String.Index>) -> AttributedString {

@@ -28,16 +28,17 @@ struct SearchInspectorView: View {
                 text: $state.model.query,
                 placeholder: "Search Within Files",
                 focusTrigger: state.searchFocusTrigger,
+                isLoading: state.model.isSearching,
                 onSubmit: {
-                    Task {
-                        await state.model.search(in: directoryURL)
-                        state.expandedIDs = Set(state.model.results.map(\.id))
-                    }
+                    state.model.search(in: directoryURL)
                 }
             )
             .padding(.horizontal, 10)
             .padding(.vertical, 3)
             .padding(.top, 6)
+        }
+        .onChange(of: state.model.results) {
+            state.expandedIDs = Set(state.model.results.map(\.id))
         }
         .onChange(of: state.selectedID) { _, newID in
             guard let id = newID else { return }

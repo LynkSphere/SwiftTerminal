@@ -33,6 +33,7 @@ struct FileTreeView: View {
                 text: $state.model.searchText,
                 placeholder: "Search for Files",
                 focusTrigger: state.searchFocusTrigger,
+                isLoading: state.model.isSearching,
                 onSubmit: submitSearch
             ) {
                 Button(action: toggleChangedFilter) {
@@ -70,19 +71,26 @@ struct FileTreeView: View {
         } message: { url in
             Text("Are you sure you want to move \u{201C}\(url.lastPathComponent)\u{201D} to the Trash?")
         }
+        .onChange(of: state.model.searchText) {
+            if state.model.searchText.isEmpty && !state.model.submittedSearchText.isEmpty {
+                state.model.clearSearch()
+            }
+        }
         .onChange(of: state.model.submittedSearchText) { oldValue, newValue in
             if !newValue.isEmpty && oldValue.isEmpty {
                 if state.savedExpandedIDs == nil {
                     state.savedExpandedIDs = state.expandedIDs
                 }
-                expandAllFolders(in: state.model.displayItems)
-            } else if !newValue.isEmpty {
-                expandAllFolders(in: state.model.displayItems)
             } else if newValue.isEmpty && !oldValue.isEmpty && !state.model.showChangedOnly {
                 if let saved = state.savedExpandedIDs {
                     state.expandedIDs = saved
                     state.savedExpandedIDs = nil
                 }
+            }
+        }
+        .onChange(of: state.model.filteredItems) {
+            if state.model.hasActiveFilter {
+                expandAllFolders(in: state.model.displayItems)
             }
         }
         .onChange(of: showHiddenFiles) {
@@ -108,10 +116,11 @@ struct FileTreeView: View {
             state.expandedIDs = saved
             state.savedExpandedIDs = nil
         }
-        state.model.showChangedOnly.toggle()
+        state.model.toggleChangedOnly()
     }
 
     private func submitSearch() {
+        guard !state.model.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         state.model.submitSearch()
     }
 

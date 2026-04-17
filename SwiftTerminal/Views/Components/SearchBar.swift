@@ -4,6 +4,7 @@ struct SearchBar<Trailing: View>: View {
     @Binding var text: String
     var placeholder: String = "Search"
     var focusTrigger: Int = 0
+    var isLoading: Bool = false
     var onSubmit: (() -> Void)?
     @ViewBuilder var trailing: Trailing
 
@@ -20,7 +21,10 @@ struct SearchBar<Trailing: View>: View {
                 .focused($isFocused)
                 .onSubmit { onSubmit?() }
 
-            if !text.isEmpty {
+            if isLoading {
+                ProgressView()
+                    .controlSize(.mini)
+            } else if !text.isEmpty {
                 Button {
                     text = ""
                     onSubmit?()
@@ -50,11 +54,13 @@ extension SearchBar where Trailing == EmptyView {
         text: Binding<String>,
         placeholder: String = "Search",
         focusTrigger: Int = 0,
+        isLoading: Bool = false,
         onSubmit: (() -> Void)? = nil
     ) {
         self._text = text
         self.placeholder = placeholder
         self.focusTrigger = focusTrigger
+        self.isLoading = isLoading
         self.onSubmit = onSubmit
         self.trailing = EmptyView()
     }
