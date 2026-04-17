@@ -18,6 +18,18 @@ struct FileTreeView: View {
         .environment(state)
         .environment(\.fileTreeAction, handleAction)
         .scrollContentBackground(.hidden)
+        .contextMenu(forSelectionType: String.self) { selectedIDs in
+            if let id = selectedIDs.first,
+               let item = state.model.findItem(id: id) {
+                FileTreeContextMenu(item: item)
+            }
+        } primaryAction: { selectedIDs in
+            for id in selectedIDs {
+                if let item = state.model.findItem(id: id), !item.isDirectory {
+                    editorPanel.openFile(item.url)
+                }
+            }
+        }
         .contextMenu {
             Button { handleAction(.newFile(directoryURL)) } label: {
                 Label("New File", systemImage: "doc.badge.plus")

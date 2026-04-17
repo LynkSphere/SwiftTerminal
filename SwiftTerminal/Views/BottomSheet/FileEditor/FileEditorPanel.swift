@@ -16,6 +16,7 @@ struct FileEditorPanel: View {
     @State private var errorMessage: String?
     @State private var unsupported: UnsupportedReason?
     @State private var preview: PreviewContent?
+    @State private var lastModificationDate: Date?
     @State private var gutterDiff: GutterDiffResult = .empty
     @State private var gitState = FileGitState()
     @Environment(\.showInFileTree) private var showInFileTree
@@ -123,6 +124,9 @@ struct FileEditorPanel: View {
         .task(id: fileURL) {
             loadFile()
         }
+        .watchFileSystem(at: fileURL.deletingLastPathComponent()) {
+            reloadIfChanged()
+        }
         .onChange(of: hasUnsavedChanges) { _, dirty in
             panel.isDirty = dirty
         }
@@ -151,6 +155,21 @@ struct FileEditorPanel: View {
         }
     }
 
+    private func reloadIfChanged() {
+        guard !hasUnsavedChanges, isLoaded else { return }
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: fileURL.path),
+              let modDate = attrs[.modificationDate] as? Date,
+              modDate != lastModificationDate else { return }
+        lastModificationDate = modDate
+        do {
+            let data = try Data(contentsOf: fileURL)
+            guard let string = String(data: data, encoding: .utf8) else { return }
+            content = string
+            savedContent = string
+            refreshGitState()
+        } catch {}
+    }
+
     private func loadFile() {
         content = ""
         savedContent = ""
@@ -161,6 +180,7 @@ struct FileEditorPanel: View {
         gutterDiff = .empty
         gitState = FileGitState()
         panel.isDirty = false
+        lastModificationDate = nil
 
         let ext = fileURL.pathExtension.lowercased()
 
@@ -209,6 +229,7 @@ struct FileEditorPanel: View {
             content = string
             savedContent = string
             isLoaded = true
+            lastModificationDate = (try? FileManager.default.attributesOfItem(atPath: fileURL.path))?[.modificationDate] as? Date
             refreshGitState()
         } catch {
             errorMessage = error.localizedDescription
