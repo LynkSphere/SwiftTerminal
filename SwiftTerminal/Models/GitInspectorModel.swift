@@ -1,10 +1,13 @@
 import Foundation
 
-@Observable
+@Observable @MainActor
 final class GitInspectorModel {
     private(set) var snapshots: [GitRepositoryStatusSnapshot] = []
     private(set) var isLoading = false
+    private(set) var activeTaskCount = 0
     var errorMessage: String?
+
+    var isBusy: Bool { activeTaskCount > 0 }
 
     var hasChanges: Bool {
         snapshots.contains { !$0.stagedFiles.isEmpty || !$0.unstagedFiles.isEmpty }
@@ -134,6 +137,8 @@ final class GitInspectorModel {
 
     @discardableResult
     private func perform(_ operation: () async throws -> Void) async -> Bool {
+        activeTaskCount += 1
+        defer { activeTaskCount -= 1 }
         errorMessage = nil
         do {
             try await operation()

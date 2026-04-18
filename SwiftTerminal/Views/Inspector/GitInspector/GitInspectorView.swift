@@ -51,8 +51,8 @@ struct GitInspectorView: View {
             await state.model.fetch(snapshot: snapshot)
             await state.refresh(directoryURL: directoryURL)
         }
-        .gitPolling(id: directoryURL) {
-            await state.refresh(directoryURL: directoryURL)
+        .watchFileSystem(at: directoryURL) {
+            Task { await state.refresh(directoryURL: directoryURL) }
         }
         .alert("Discard Changes?", isPresented: discardAlertBinding) {
             Button("Discard", role: .destructive) {

@@ -10,6 +10,10 @@ struct GitInspectorBranchBar: View {
         HStack(spacing: 4) {
             branchPicker
             Spacer()
+            if state.model.isBusy {
+                ProgressView()
+                    .controlSize(.mini)
+            }
             menuButton
         }
     }

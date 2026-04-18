@@ -6,12 +6,18 @@ struct WorkspaceDetailView: View {
     @State private var showingScratchPad = false
 
     var body: some View {
-        VStack {
+        VStack(spacing: 0) {
+           DocumentTabBar(workspace: workspace)
+                   
             if let terminal = appState.selectedTerminal {
-                TerminalContainerRepresentable(tab: terminal, appState: appState)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(.bottom, 30)
+                TerminalContainerRepresentable(
+                    tab: terminal, 
+                    appState: appState
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            
+            BottomSheetView(directoryURL: workspace.url)
         }
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .toolbar {
@@ -29,12 +35,6 @@ struct WorkspaceDetailView: View {
         }
         .navigationTitle(workspace.name)
         .navigationSubtitle(workspace.directory.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
-        .safeAreaBar(edge: .top, spacing: 0) {
-            DocumentTabBar(workspace: workspace)
-        }
-        .overlay(alignment: .bottom) {
-            BottomSheetView(directoryURL: workspace.url)
-        }
         .environment(workspace.editorPanel)
         .environment(\.showInFileTree) { url in
             workspace.inspectorState.revealInFileTree(url, relativeTo: workspace.url)
