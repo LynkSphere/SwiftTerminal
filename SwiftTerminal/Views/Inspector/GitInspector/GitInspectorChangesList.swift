@@ -22,7 +22,6 @@ struct GitInspectorChangesList: View {
                                 Image(systemName: "circle.fill")
                                     .foregroundStyle(.accent)
                             }
-                            .padding(.leading, -10)
                             .font(.subheadline)
                             .contextMenu {
                                 GitCommitContextMenu(commit: commit, snapshot: snapshot, onAction: handleAction)

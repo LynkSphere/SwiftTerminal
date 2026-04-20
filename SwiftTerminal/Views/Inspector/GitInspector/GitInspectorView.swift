@@ -20,13 +20,20 @@ struct GitInspectorView: View {
                     .padding(.horizontal, 5)
             }
             .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .padding(.top, 7)
+            .padding(.top, 13)
         }
         .safeAreaBar(edge: .bottom) {
-            if state.model.snapshots.count > 1 {
-                repoPicker.padding()
+            VStack {
+                if let banner = activeBanner {
+                    bannerView(banner)
+                        .transition(.move(edge: .bottom))
+                }
+                if state.model.snapshots.count > 1 {
+                    repoPicker
+                }
             }
+            .padding()
+            .animation(.easeInOut(duration: 0.2), value: activeBanner)
         }
         .overlay {
             if state.model.isLoading && state.model.snapshots.isEmpty {
@@ -34,12 +41,6 @@ struct GitInspectorView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .overlay(alignment: .bottom) {
-            if let error = state.model.errorMessage {
-                errorBanner(error)
-            }
-        }
-        .animation(.easeInOut(duration: 0.2), value: state.model.errorMessage)
         .task(id: directoryURL) {
             await state.refresh(directoryURL: directoryURL)
             if state.selectedRepoURL == nil {
@@ -114,18 +115,33 @@ struct GitInspectorView: View {
         .buttonSizing(.flexible)
     }
 
-    // MARK: - Error Banner
+    // MARK: - Banner
+
+    private enum BannerKind: Equatable {
+        case success(String)
+        case error(String)
+    }
+
+    private var activeBanner: BannerKind? {
+        if let error = state.model.errorMessage { return .error(error) }
+        if let success = state.model.successMessage { return .success(success) }
+        return nil
+    }
 
     @ViewBuilder
-    private func errorBanner(_ error: String) -> some View {
+    private func bannerView(_ banner: BannerKind) -> some View {
+        let (icon, iconColor, message): (String, Color, String) = switch banner {
+        case .error(let msg): ("exclamationmark.triangle.fill", .yellow, msg)
+        case .success(let msg): ("checkmark.circle.fill", .green, msg)
+        }
         HStack(spacing: 6) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.yellow)
-            Text(error)
+            Image(systemName: icon)
+                .foregroundStyle(iconColor)
+            Text(message)
                 .lineLimit(3)
             Spacer()
             Button {
-                state.model.errorMessage = nil
+                dismissBanner(banner)
             } label: {
                 Image(systemName: "xmark")
             }
@@ -133,14 +149,21 @@ struct GitInspectorView: View {
         }
         .font(.caption)
         .padding(8)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
-        .padding(8)
-        .transition(.move(edge: .bottom).combined(with: .opacity))
-        .task {
-            try? await Task.sleep(for: .seconds(5))
-            if state.model.errorMessage == error {
-                state.model.errorMessage = nil
-            }
+        .padding(.horizontal, 2)
+        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 14))
+        .task(id: banner) {
+            let seconds: Int = if case .success = banner { 3 } else { 5 }
+            try? await Task.sleep(for: .seconds(seconds))
+            dismissBanner(banner)
+        }
+    }
+
+    private func dismissBanner(_ banner: BannerKind) {
+        switch banner {
+        case .error(let msg):
+            if state.model.errorMessage == msg { state.model.errorMessage = nil }
+        case .success(let msg):
+            if state.model.successMessage == msg { state.model.successMessage = nil }
         }
     }
 

@@ -6,6 +6,7 @@ final class GitInspectorModel {
     private(set) var isLoading = false
     private(set) var activeTaskCount = 0
     var errorMessage: String?
+    var successMessage: String?
 
     var isBusy: Bool { activeTaskCount > 0 }
 
@@ -76,19 +77,19 @@ final class GitInspectorModel {
     }
 
     func commit(message: String, snapshot: GitRepositoryStatusSnapshot) async {
-        await perform {
+        await perform(successLabel: "Committed successfully") {
             try await GitRepository.shared.commit(message: message, at: snapshot.repositoryRootURL)
         }
     }
 
     func push(snapshot: GitRepositoryStatusSnapshot) async {
-        await perform {
+        await perform(successLabel: "Pushed successfully") {
             try await GitRepository.shared.push(at: snapshot.repositoryRootURL)
         }
     }
 
     func pushSetUpstream(branch: String, snapshot: GitRepositoryStatusSnapshot) async {
-        await perform {
+        await perform(successLabel: "Branch published successfully") {
             try await GitRepository.shared.pushSetUpstream(branch: branch, at: snapshot.repositoryRootURL)
         }
     }
@@ -103,25 +104,25 @@ final class GitInspectorModel {
     }
 
     func pull(snapshot: GitRepositoryStatusSnapshot) async {
-        await perform {
+        await perform(successLabel: "Pulled successfully") {
             try await GitRepository.shared.pull(at: snapshot.repositoryRootURL)
         }
     }
 
     func fetch(snapshot: GitRepositoryStatusSnapshot) async {
-        await perform {
+        await perform(successLabel: "Fetched latest changes") {
             try await GitRepository.shared.fetch(at: snapshot.repositoryRootURL)
         }
     }
 
     func switchBranch(to branch: String, snapshot: GitRepositoryStatusSnapshot) async {
-        await perform {
+        await perform(successLabel: "Switched to \(branch)") {
             try await GitRepository.shared.switchBranch(to: branch, at: snapshot.repositoryRootURL)
         }
     }
 
     func createBranch(named name: String, snapshot: GitRepositoryStatusSnapshot) async {
-        await perform {
+        await perform(successLabel: "Created branch \(name)") {
             try await GitRepository.shared.createBranch(named: name, at: snapshot.repositoryRootURL)
         }
     }
@@ -137,13 +138,13 @@ final class GitInspectorModel {
     }
 
     func stashAll(message: String, snapshot: GitRepositoryStatusSnapshot) async {
-        await perform {
+        await perform(successLabel: "Changes stashed") {
             try await GitRepository.shared.stashAll(message: message, at: snapshot.repositoryRootURL)
         }
     }
 
     func applyLatestStash(snapshot: GitRepositoryStatusSnapshot) async {
-        await perform {
+        await perform(successLabel: "Stash applied") {
             try await GitRepository.shared.stashPop(at: snapshot.repositoryRootURL)
         }
     }
@@ -151,12 +152,16 @@ final class GitInspectorModel {
     // MARK: - Private
 
     @discardableResult
-    private func perform(_ operation: () async throws -> Void) async -> Bool {
+    private func perform(successLabel: String? = nil, _ operation: () async throws -> Void) async -> Bool {
         activeTaskCount += 1
         defer { activeTaskCount -= 1 }
         errorMessage = nil
+        successMessage = nil
         do {
             try await operation()
+            if let successLabel {
+                successMessage = successLabel
+            }
             return true
         } catch {
             errorMessage = error.localizedDescription
