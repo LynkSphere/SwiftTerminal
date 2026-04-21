@@ -251,6 +251,14 @@ actor GitRepository {
         try await self.executor.execute(GitCreateBranchCommand(name: name), at: repositoryRootURL)
     }
 
+    func undoLastCommit(at repositoryRootURL: URL) async throws {
+        try await self.executor.execute(GitResetSoftCommand(), at: repositoryRootURL)
+    }
+
+    func amendCommitMessage(_ message: String, at repositoryRootURL: URL) async throws {
+        try await self.executor.execute(GitAmendMessageCommand(message: message), at: repositoryRootURL)
+    }
+
     func stashAll(at repositoryRootURL: URL) async throws {
         try await self.executor.execute(GitStashCommand(), at: repositoryRootURL)
     }
@@ -691,6 +699,17 @@ private struct GitSwitchCommand: GitCommand {
 private struct GitCreateBranchCommand: GitCommand {
     let name: String
     var arguments: [String] { ["switch", "-c", name, "--no-track"] }
+    func parse(output: String) throws { }
+}
+
+private struct GitResetSoftCommand: GitCommand {
+    var arguments: [String] { ["reset", "--soft", "HEAD~1"] }
+    func parse(output: String) throws { }
+}
+
+private struct GitAmendMessageCommand: GitCommand {
+    let message: String
+    var arguments: [String] { ["commit", "--amend", "-m", message] }
     func parse(output: String) throws { }
 }
 

@@ -14,7 +14,7 @@ struct GitInspectorChangesList: View {
             if let snapshot {
                 if !snapshot.unpushedCommits.isEmpty {
                     DisclosureGroup(isExpanded: $state.unpushedExpanded) {
-                        ForEach(snapshot.unpushedCommits) { commit in
+                        ForEach(Array(snapshot.unpushedCommits.enumerated()), id: \.element.id) { index, commit in
                             Label {
                                 Text(commit.message)
                                     .lineLimit(1)
@@ -24,7 +24,13 @@ struct GitInspectorChangesList: View {
                             }
                             .font(.subheadline)
                             .contextMenu {
-                                GitCommitContextMenu(commit: commit, snapshot: snapshot, onAction: handleAction)
+                                GitCommitContextMenu(
+                                    commit: commit,
+                                    isLatest: index == 0
+                                ) {
+                                    state.renameCommitMessage = commit.message
+                                    state.showRenameCommitAlert = true
+                                }
                             }
                             .listRowSeparator(.hidden)
                         }

@@ -83,13 +83,28 @@ struct GitInspectorView: View {
         } message: {
             Text("The branch \"\(snapshot?.branchName ?? "")\" does not exist on the remote. This will create a new branch on the remote and push your commits.")
         }
+        .alert("Rename Commit", isPresented: $state.showRenameCommitAlert) {
+            TextField("Commit message", text: $state.renameCommitMessage)
+            Button("Rename") {
+                state.renameLastCommit(directoryURL: directoryURL)
+            }
+            Button("Cancel", role: .cancel) { state.renameCommitMessage = "" }
+        } message: {
+            Text("Enter a new message for the latest commit.")
+        }
         .alert("Cannot Apply Stash", isPresented: $state.showStashConflictAlert) {
             Button("OK", role: .cancel) {}
         } message: {
             Text("The stash cannot be applied cleanly because it conflicts with your current changes. Commit or discard your changes first, then try again.")
         }
-        .sheet(isPresented: $state.showNewBranchSheet) {
-            NewBranchSheet(directoryURL: directoryURL, state: state)
+        .alert("New Branch", isPresented: $state.showNewBranchSheet) {
+            TextField("Branch name", text: $state.newBranchName)
+            Button("Create") {
+                state.createBranch(named: state.newBranchName, directoryURL: directoryURL)
+            }
+            Button("Cancel", role: .cancel) { state.newBranchName = "" }
+        } message: {
+            Text("Create a new branch from \"\(snapshot?.branchName ?? "HEAD")\"")
         }
     }
 

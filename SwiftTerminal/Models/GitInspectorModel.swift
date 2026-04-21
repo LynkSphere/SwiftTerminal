@@ -143,6 +143,18 @@ final class GitInspectorModel {
         }
     }
 
+    func undoLastCommit(snapshot: GitRepositoryStatusSnapshot) async {
+        await perform(successLabel: "Last commit undone") {
+            try await GitRepository.shared.undoLastCommit(at: snapshot.repositoryRootURL)
+        }
+    }
+
+    func amendCommitMessage(_ message: String, snapshot: GitRepositoryStatusSnapshot) async {
+        await perform(successLabel: "Commit renamed") {
+            try await GitRepository.shared.amendCommitMessage(message, at: snapshot.repositoryRootURL)
+        }
+    }
+
     func canApplyStashCleanly(snapshot: GitRepositoryStatusSnapshot) async -> Bool {
         await GitRepository.shared.canStashApplyCleanly(at: snapshot.repositoryRootURL)
     }

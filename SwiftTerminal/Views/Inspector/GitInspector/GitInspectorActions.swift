@@ -88,6 +88,25 @@ extension GitInspectorState {
         }
     }
 
+    func undoLastCommit(directoryURL: URL) {
+        guard let snapshot = currentSnapshot else { return }
+        Task {
+            await model.undoLastCommit(snapshot: snapshot)
+            await refresh(directoryURL: directoryURL)
+        }
+    }
+
+    func renameLastCommit(directoryURL: URL) {
+        guard let snapshot = currentSnapshot else { return }
+        let message = renameCommitMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !message.isEmpty else { return }
+        Task {
+            await model.amendCommitMessage(message, snapshot: snapshot)
+            renameCommitMessage = ""
+            await refresh(directoryURL: directoryURL)
+        }
+    }
+
     func pushSetUpstream(directoryURL: URL) {
         guard let snapshot = currentSnapshot,
               let branch = snapshot.branchName else { return }

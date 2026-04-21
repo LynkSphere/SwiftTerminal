@@ -48,8 +48,8 @@ struct GitRepoContextMenu: View {
 
 struct GitCommitContextMenu: View {
     let commit: GitUnpushedCommit
-    let snapshot: GitRepositoryStatusSnapshot
-    let onAction: (GitAction) -> Void
+    let isLatest: Bool
+    var onRename: (() -> Void)?
 
     var body: some View {
         Button {
@@ -59,10 +59,10 @@ struct GitCommitContextMenu: View {
             Label("Copy Commit Hash", systemImage: "doc.on.doc")
         }
 
-        Divider()
-
-        Button { onAction(.push(snapshot)) } label: {
-            Label("Push to Remote", systemImage: "arrow.up")
+        if isLatest, let onRename {
+            Button { onRename() } label: {
+                Label("Rename Commit", systemImage: "pencil")
+            }
         }
     }
 }

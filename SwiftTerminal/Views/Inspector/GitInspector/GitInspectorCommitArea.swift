@@ -20,7 +20,7 @@ struct GitInspectorCommitArea: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 6) {
+        HStack(alignment: .top, spacing: 8) {
             TextField("Commit message", text: $state.commitMessage, axis: .vertical)
                 .lineLimit(1...4)
 
@@ -30,6 +30,7 @@ struct GitInspectorCommitArea: View {
                 Image(systemName: currentAction.systemImage)
                     .contentTransition(.symbolEffect(.replace))
             }
+            .frame(width: 16)
             .offset(y: 1)
             .buttonStyle(.borderedProminent)
             .help(currentAction.label)

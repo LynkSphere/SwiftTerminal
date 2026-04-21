@@ -72,8 +72,17 @@ struct GitInspectorBranchBar: View {
             Button {
                 state.applyLatestStash(directoryURL: directoryURL)
             } label: {
-                Label("Apply Lates Stash", systemImage: "tray.and.arrow.up")
+                Label("Apply Latest Stash", systemImage: "tray.and.arrow.up")
             }
+
+            Divider()
+
+            Button {
+                state.undoLastCommit(directoryURL: directoryURL)
+            } label: {
+                Label("Undo Last Commit", systemImage: "arrow.uturn.backward")
+            }
+            .disabled(snapshot?.unpushedCommits.isEmpty != false)
 
             Divider()
 
@@ -147,37 +156,3 @@ private func pullRequestWebURL(remoteURL: String, branch: String) -> URL? {
     return nil
 }
 
-struct NewBranchSheet: View {
-    let directoryURL: URL
-    @Bindable var state: GitInspectorState
-
-    var body: some View {
-        VStack(spacing: 12) {
-            Text("New Branch")
-                .font(.headline)
-
-            Text("Create a new branch from \"\(state.currentSnapshot?.branchName ?? "HEAD")\"")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            TextField("Branch name", text: $state.newBranchName)
-                .textFieldStyle(.roundedBorder)
-
-            HStack {
-                Button("Cancel") {
-                    state.showNewBranchSheet = false
-                }
-                .keyboardShortcut(.cancelAction)
-
-                Button("Create") {
-                    state.showNewBranchSheet = false
-                    state.createBranch(named: state.newBranchName, directoryURL: directoryURL)
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(state.newBranchName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-        }
-        .padding()
-        .frame(width: 300)
-    }
-}
