@@ -4,6 +4,7 @@ import Foundation
 final class GitInspectorModel {
     private(set) var snapshots: [GitRepositoryStatusSnapshot] = []
     private(set) var isLoading = false
+    private(set) var hasCompletedInitialScan = false
     private(set) var activeTaskCount = 0
     var errorMessage: String?
     var successMessage: String?
@@ -28,6 +29,7 @@ final class GitInspectorModel {
         }
 
         isLoading = false
+        hasCompletedInitialScan = true
     }
 
     func stage(files: [GitChangedFile], snapshot: GitRepositoryStatusSnapshot) async {

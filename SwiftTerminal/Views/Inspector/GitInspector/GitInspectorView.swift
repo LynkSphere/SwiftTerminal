@@ -14,6 +14,12 @@ struct GitInspectorView: View {
     var body: some View {
         if hasRepository {
             repositoryView
+        } else if !state.model.hasCompletedInitialScan {
+            ProgressView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .task(id: directoryURL) {
+                    await state.refresh(directoryURL: directoryURL)
+                }
         } else {
             initializeView
         }

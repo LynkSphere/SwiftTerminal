@@ -267,7 +267,6 @@ struct CodeTextEditor: NSViewRepresentable {
                 textView.textStorage?.setAttributedString(highlighted)
                 textView.recomputeFolding()
             }
-            coordinator.lastIsDark = isDark
 
             coordinator.updateMinimapMarkers(gutterDiff: gutterDiff, text: textView.string)
 
