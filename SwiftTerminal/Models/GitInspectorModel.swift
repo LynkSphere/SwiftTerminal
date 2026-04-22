@@ -1,5 +1,10 @@
 import Foundation
 
+enum SyncStrategy {
+    case merge
+    case rebase
+}
+
 @Observable @MainActor
 final class GitInspectorModel {
     private(set) var snapshots: [GitRepositoryStatusSnapshot] = []
@@ -106,6 +111,47 @@ final class GitInspectorModel {
     func pull(snapshot: GitRepositoryStatusSnapshot) async {
         await perform(successLabel: "Pulled successfully") {
             try await GitRepository.shared.pull(at: snapshot.repositoryRootURL)
+        }
+    }
+
+    func pullRebase(snapshot: GitRepositoryStatusSnapshot) async {
+        await perform(successLabel: "Rebased with remote") {
+            try await GitRepository.shared.pullRebase(at: snapshot.repositoryRootURL)
+        }
+    }
+
+    func syncWithBaseBranch(using strategy: SyncStrategy, snapshot: GitRepositoryStatusSnapshot) async {
+        guard let baseBranch = await GitRepository.shared.defaultBranch(at: snapshot.repositoryRootURL) else {
+            errorMessage = "Could not determine the default branch."
+            return
+        }
+        // Fetch first to ensure we have latest remote state
+        try? await GitRepository.shared.fetch(at: snapshot.repositoryRootURL)
+        let remoteBranch = "origin/\(baseBranch)"
+        switch strategy {
+        case .merge:
+            await perform(successLabel: "Merged with \(baseBranch)") {
+                try await GitRepository.shared.mergeBranch(remoteBranch, at: snapshot.repositoryRootURL)
+            }
+        case .rebase:
+            await perform(successLabel: "Rebased onto \(baseBranch)") {
+                try await GitRepository.shared.rebaseBranch(remoteBranch, at: snapshot.repositoryRootURL)
+            }
+        }
+    }
+
+    func syncWithRemote(using strategy: SyncStrategy, snapshot: GitRepositoryStatusSnapshot) async {
+        // Fetch first to ensure we have latest remote state
+        try? await GitRepository.shared.fetch(at: snapshot.repositoryRootURL)
+        switch strategy {
+        case .merge:
+            await perform(successLabel: "Pulled from remote") {
+                try await GitRepository.shared.pull(at: snapshot.repositoryRootURL)
+            }
+        case .rebase:
+            await perform(successLabel: "Rebased with remote") {
+                try await GitRepository.shared.pullRebase(at: snapshot.repositoryRootURL)
+            }
         }
     }
 

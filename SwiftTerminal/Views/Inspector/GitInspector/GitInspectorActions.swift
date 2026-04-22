@@ -107,6 +107,22 @@ extension GitInspectorState {
         }
     }
 
+    func syncWithBaseBranch(using strategy: SyncStrategy, directoryURL: URL) {
+        guard let snapshot = currentSnapshot else { return }
+        Task {
+            await model.syncWithBaseBranch(using: strategy, snapshot: snapshot)
+            await refresh(directoryURL: directoryURL)
+        }
+    }
+
+    func syncWithRemote(using strategy: SyncStrategy, directoryURL: URL) {
+        guard let snapshot = currentSnapshot else { return }
+        Task {
+            await model.syncWithRemote(using: strategy, snapshot: snapshot)
+            await refresh(directoryURL: directoryURL)
+        }
+    }
+
     func pushSetUpstream(directoryURL: URL) {
         guard let snapshot = currentSnapshot,
               let branch = snapshot.branchName else { return }

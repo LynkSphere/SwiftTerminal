@@ -87,6 +87,22 @@ struct GitInspectorBranchBar: View {
 //            Divider()
 
             Button {
+                state.showSyncWithBaseDialog = true
+            } label: {
+                Label("Sync with Base Branch", systemImage: "arrow.triangle.merge")
+            }
+            .disabled(snapshot?.hasTrackingBranch != true)
+
+            Button {
+                state.showSyncWithRemoteDialog = true
+            } label: {
+                Label("Sync with Remote", systemImage: "arrow.2.squarepath")
+            }
+            .disabled(snapshot?.hasTrackingBranch != true)
+
+            Divider()
+
+            Button {
                 openPullRequestPage()
             } label: {
                 Label("Create Pull Request", systemImage: "arrow.triangle.pull")

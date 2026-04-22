@@ -83,6 +83,28 @@ struct GitInspectorView: View {
         } message: {
             Text("The branch \"\(snapshot?.branchName ?? "")\" does not exist on the remote. This will create a new branch on the remote and push your commits.")
         }
+        .confirmationDialog("Sync Base Branch", isPresented: $state.showSyncWithBaseDialog) {
+            Button("Rebase") {
+                state.syncWithBaseBranch(using: .rebase, directoryURL: directoryURL)
+            }
+            Button("Merge") {
+                state.syncWithBaseBranch(using: .merge, directoryURL: directoryURL)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Update your branch with the latest changes from the base branch. Rebase replays your commits on top for cleaner history. Merge creates a merge commit.")
+        }
+        .confirmationDialog("Sync Remote", isPresented: $state.showSyncWithRemoteDialog) {
+            Button("Rebase") {
+                state.syncWithRemote(using: .rebase, directoryURL: directoryURL)
+            }
+            Button("Merge") {
+                state.syncWithRemote(using: .merge, directoryURL: directoryURL)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Pull the latest changes from the remote branch. Rebase replays your commits on top. Merge creates a merge commit.")
+        }
         .alert("Undo Last Commit?", isPresented: $state.showUndoLastCommitAlert) {
             Button("Undo", role: .destructive) {
                 state.undoLastCommit(directoryURL: directoryURL)
