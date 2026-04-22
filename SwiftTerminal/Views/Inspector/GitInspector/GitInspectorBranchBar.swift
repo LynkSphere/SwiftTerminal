@@ -77,14 +77,14 @@ struct GitInspectorBranchBar: View {
 
             Divider()
 
-            Button {
-                state.undoLastCommit(directoryURL: directoryURL)
-            } label: {
-                Label("Undo Last Commit", systemImage: "arrow.uturn.backward")
-            }
-            .disabled(snapshot?.unpushedCommits.isEmpty != false)
-
-            Divider()
+//            Button {
+//                state.undoLastCommit(directoryURL: directoryURL)
+//            } label: {
+//                Label("Undo Last Commit", systemImage: "arrow.uturn.backward")
+//            }
+//            .disabled(snapshot?.unpushedCommits.isEmpty != false)
+//
+//            Divider()
 
             Button {
                 openPullRequestPage()

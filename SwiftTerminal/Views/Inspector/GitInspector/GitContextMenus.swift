@@ -49,7 +49,9 @@ struct GitRepoContextMenu: View {
 struct GitCommitContextMenu: View {
     let commit: GitUnpushedCommit
     let isLatest: Bool
+    let isDirty: Bool
     var onRename: (() -> Void)?
+    var onUndo: (() -> Void)?
 
     var body: some View {
         Button {
@@ -63,6 +65,14 @@ struct GitCommitContextMenu: View {
             Button { onRename() } label: {
                 Label("Rename Commit", systemImage: "pencil")
             }
+        }
+
+        if isLatest, let onUndo {
+            Divider()
+            Button { onUndo() } label: {
+                Label("Undo Last Commit", systemImage: "arrow.uturn.backward")
+            }
+            .disabled(isDirty)
         }
     }
 }

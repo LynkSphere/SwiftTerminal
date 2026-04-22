@@ -26,11 +26,16 @@ struct GitInspectorChangesList: View {
                             .contextMenu {
                                 GitCommitContextMenu(
                                     commit: commit,
-                                    isLatest: index == 0
-                                ) {
-                                    state.renameCommitMessage = commit.message
-                                    state.showRenameCommitAlert = true
-                                }
+                                    isLatest: index == 0,
+                                    isDirty: snapshot.isDirty,
+                                    onRename: {
+                                        state.renameCommitMessage = commit.message
+                                        state.showRenameCommitAlert = true
+                                    },
+                                    onUndo: {
+                                        state.showUndoLastCommitAlert = true
+                                    }
+                                )
                             }
                             .listRowSeparator(.hidden)
                         }
@@ -43,6 +48,13 @@ struct GitInspectorChangesList: View {
                             Button { handleAction(.push(snapshot)) } label: {
                                 Label("Push to Remote", systemImage: "arrow.up")
                             }
+                            Divider()
+                            Button {
+                                state.showUndoLastCommitAlert = true
+                            } label: {
+                                Label("Undo Last Commit", systemImage: "arrow.uturn.backward")
+                            }
+                            .disabled(snapshot.isDirty)
                         }
                     }
                     .listRowSeparator(.hidden)

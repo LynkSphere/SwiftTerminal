@@ -30,7 +30,7 @@ struct GitInspectorCommitArea: View {
                 Image(systemName: currentAction.systemImage)
                     .contentTransition(.symbolEffect(.replace))
             }
-            .frame(width: 16)
+            .frame(width: 20)
             .offset(y: 1)
             .buttonStyle(.borderedProminent)
             .help(currentAction.label)

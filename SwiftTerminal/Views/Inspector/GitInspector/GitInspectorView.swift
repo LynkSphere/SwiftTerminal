@@ -83,6 +83,14 @@ struct GitInspectorView: View {
         } message: {
             Text("The branch \"\(snapshot?.branchName ?? "")\" does not exist on the remote. This will create a new branch on the remote and push your commits.")
         }
+        .alert("Undo Last Commit?", isPresented: $state.showUndoLastCommitAlert) {
+            Button("Undo", role: .destructive) {
+                state.undoLastCommit(directoryURL: directoryURL)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will undo the last commit and return its changes to your working directory.")
+        }
         .alert("Rename Commit", isPresented: $state.showRenameCommitAlert) {
             TextField("Commit message", text: $state.renameCommitMessage)
             Button("Rename") {

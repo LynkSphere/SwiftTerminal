@@ -64,4 +64,5 @@ final class GitInspectorState {
     var showStashConflictAlert = false
     var showRenameCommitAlert = false
     var renameCommitMessage = ""
+    var showUndoLastCommitAlert = false
 }
