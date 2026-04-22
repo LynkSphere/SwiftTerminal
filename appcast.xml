@@ -20,7 +20,20 @@
         
         
         
+        
         <item>
+            <title>Version 1.0.15</title>
+            <pubDate>Wed, 22 Apr 2026 03:39:10 +0000</pubDate>
+            <sparkle:version>17</sparkle:version>
+            <sparkle:shortVersionString>1.0.15</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.2</sparkle:minimumSystemVersion>
+            <enclosure
+                url="https://github.com/LynkSphere/SwiftTerminal/releases/download/v1.0.15/SwiftTerminal.dmg"
+                length="6671062"
+                type="application/x-apple-diskimage"
+                sparkle:edSignature="CcEQ97UAA9z3+9i6pZhkmOp/VOv/Vu5jtaTI8z6nwoNboOxIS9M13wm+CuMzMYpPLLeiT8kIyMrcbhJSCNMnDg==" />
+        </item>
+<item>
             <title>Version 1.0.14</title>
             <pubDate>Mon, 20 Apr 2026 11:44:57 +0000</pubDate>
             <sparkle:version>16</sparkle:version>
