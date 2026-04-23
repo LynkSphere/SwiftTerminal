@@ -116,6 +116,7 @@ final class AssistantBlocksContainerView: NSView {
 
     var onHeightChange: ((CGFloat) -> Void)?
     var onThemeChange: ((String) -> Void)?
+    var onOpenFile: ((String) -> Void)?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -364,6 +365,9 @@ final class AssistantBlocksContainerView: NSView {
             } else {
                 let view = DiffOverlayView()
                 view.translatesAutoresizingMaskIntoConstraints = true
+                view.onOpenFile = { [weak self] path in
+                    self?.onOpenFile?(path)
+                }
                 view.configure(spec: spec)
                 addSubview(view)
                 diffOverlayViews[spec.id] = view
@@ -428,13 +432,18 @@ final class AssistantBlocksContainerView: NSView {
 // MARK: - Popover content
 
 private final class ToolCallGroupPopoverView: NSView {
+    private static let maxHeight: CGFloat = 260
+    private static let width: CGFloat = 320
+
     init(items: [ToolCallItem]) {
         super.init(frame: .zero)
+
         let stack = NSStackView()
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 4
         stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.edgeInsets = NSEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
 
         for item in items {
             let row = NSStackView()
@@ -476,13 +485,47 @@ private final class ToolCallGroupPopoverView: NSView {
             stack.addArrangedSubview(row)
         }
 
-        addSubview(stack)
+        let documentView = NSView()
+        documentView.translatesAutoresizingMaskIntoConstraints = false
+        documentView.addSubview(stack)
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: topAnchor, constant: 12),
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
-            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
-            stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -12),
-            widthAnchor.constraint(lessThanOrEqualToConstant: 320),
+            stack.topAnchor.constraint(equalTo: documentView.topAnchor),
+            stack.leadingAnchor.constraint(equalTo: documentView.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: documentView.trailingAnchor),
+            stack.bottomAnchor.constraint(equalTo: documentView.bottomAnchor),
+        ])
+
+        let scrollView = NSScrollView()
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = true
+        scrollView.drawsBackground = false
+        scrollView.borderType = .noBorder
+        scrollView.documentView = documentView
+        scrollView.contentView.postsBoundsChangedNotifications = false
+
+        NSLayoutConstraint.activate([
+            documentView.widthAnchor.constraint(equalTo: scrollView.contentView.widthAnchor),
+        ])
+
+        addSubview(scrollView)
+
+        let rowHeight: CGFloat = 18
+        let rowSpacing: CGFloat = 4
+        let vPadding: CGFloat = 24
+        let contentHeight = CGFloat(items.count) * rowHeight
+            + CGFloat(max(0, items.count - 1)) * rowSpacing
+            + vPadding
+        let resolvedHeight = min(contentHeight, Self.maxHeight)
+
+        NSLayoutConstraint.activate([
+            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            scrollView.topAnchor.constraint(equalTo: topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            widthAnchor.constraint(equalToConstant: Self.width),
+            heightAnchor.constraint(equalToConstant: resolvedHeight),
         ])
     }
 
@@ -510,7 +553,7 @@ final class DiffOverlayView: NSView {
     private let pathIcon = NSImageView()
     private let pathLabel = NSTextField(labelWithString: "")
     private let statsLabel = NSTextField(labelWithString: "")
-    private let statusIcon = NSImageView()
+    private let openButton = NSButton()
 
     private let borderView = NSView()
 
@@ -518,6 +561,8 @@ final class DiffOverlayView: NSView {
     private let diffTextView = SharedDiffTextView()
 
     private var currentSpec: DiffOverlaySpec?
+
+    var onOpenFile: ((String) -> Void)?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -547,7 +592,7 @@ final class DiffOverlayView: NSView {
         pathIcon.translatesAutoresizingMaskIntoConstraints = false
         pathLabel.translatesAutoresizingMaskIntoConstraints = false
         statsLabel.translatesAutoresizingMaskIntoConstraints = false
-        statusIcon.translatesAutoresizingMaskIntoConstraints = false
+        openButton.translatesAutoresizingMaskIntoConstraints = false
         borderView.translatesAutoresizingMaskIntoConstraints = false
 
         pathIcon.image = NSImage(systemSymbolName: "pencil.line", accessibilityDescription: nil)
@@ -563,13 +608,23 @@ final class DiffOverlayView: NSView {
         statsLabel.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
         statsLabel.textColor = .secondaryLabelColor
 
+        openButton.bezelStyle = .accessoryBarAction
+        openButton.isBordered = false
+        openButton.image = NSImage(systemSymbolName: "arrow.up.forward.square", accessibilityDescription: "Open file")
+        openButton.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 12, weight: .regular)
+        openButton.contentTintColor = .secondaryLabelColor
+        openButton.toolTip = "Open file"
+        openButton.target = self
+        openButton.action = #selector(openButtonClicked(_:))
+        openButton.setButtonType(.momentaryChange)
+
         borderView.wantsLayer = true
         borderView.layer?.backgroundColor = NSColor.separatorColor.cgColor
 
         headerContainer.addSubview(pathIcon)
         headerContainer.addSubview(pathLabel)
         headerContainer.addSubview(statsLabel)
-        headerContainer.addSubview(statusIcon)
+        headerContainer.addSubview(openButton)
 
         addSubview(headerContainer)
         addSubview(borderView)
@@ -589,16 +644,21 @@ final class DiffOverlayView: NSView {
             statsLabel.leadingAnchor.constraint(equalTo: pathLabel.trailingAnchor, constant: 8),
             statsLabel.centerYAnchor.constraint(equalTo: headerContainer.centerYAnchor),
 
-            statusIcon.trailingAnchor.constraint(equalTo: headerContainer.trailingAnchor, constant: -10),
-            statusIcon.centerYAnchor.constraint(equalTo: headerContainer.centerYAnchor),
-            statusIcon.widthAnchor.constraint(equalToConstant: 14),
-            statusIcon.heightAnchor.constraint(equalToConstant: 14),
+            openButton.trailingAnchor.constraint(equalTo: headerContainer.trailingAnchor, constant: -8),
+            openButton.centerYAnchor.constraint(equalTo: headerContainer.centerYAnchor),
+            openButton.widthAnchor.constraint(equalToConstant: 18),
+            openButton.heightAnchor.constraint(equalToConstant: 18),
 
             borderView.leadingAnchor.constraint(equalTo: leadingAnchor),
             borderView.trailingAnchor.constraint(equalTo: trailingAnchor),
             borderView.topAnchor.constraint(equalTo: headerContainer.bottomAnchor),
             borderView.heightAnchor.constraint(equalToConstant: 0.5),
         ])
+    }
+
+    @objc private func openButtonClicked(_ sender: Any?) {
+        guard let spec = currentSpec else { return }
+        onOpenFile?(spec.path)
     }
 
     private func setupDiffArea() {
@@ -626,8 +686,11 @@ final class DiffOverlayView: NSView {
 
         pathLabel.stringValue = (spec.path as NSString).lastPathComponent
 
-        let added = spec.newText.isEmpty ? 0 : spec.newText.components(separatedBy: "\n").count
-        let removed = (spec.oldText?.isEmpty ?? true) ? 0 : (spec.oldText?.components(separatedBy: "\n").count ?? 0)
+        // Build unified diff lines
+        let lines = Self.unifiedDiffLines(oldText: spec.oldText, newText: spec.newText)
+
+        let added = lines.filter { $0.kind == .added }.count
+        let removed = lines.filter { $0.kind == .removed }.count
         let statsText = NSMutableAttributedString()
         if added > 0 {
             statsText.append(NSAttributedString(
@@ -652,34 +715,6 @@ final class DiffOverlayView: NSView {
         }
         statsLabel.attributedStringValue = statsText
 
-        switch spec.status {
-        case .pending:
-            statusIcon.image = NSImage(systemSymbolName: "clock", accessibilityDescription: nil)
-            statusIcon.contentTintColor = .secondaryLabelColor
-        case .inProgress:
-            statusIcon.image = NSImage(systemSymbolName: "ellipsis.circle", accessibilityDescription: nil)
-            statusIcon.contentTintColor = .secondaryLabelColor
-        case .completed:
-            statusIcon.image = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: nil)
-            statusIcon.contentTintColor = .systemGreen
-        case .failed:
-            statusIcon.image = NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: nil)
-            statusIcon.contentTintColor = .systemRed
-        }
-
-        // Build diff lines
-        var lines: [SharedDiffLine] = []
-        if let old = spec.oldText, !old.isEmpty {
-            for (i, line) in old.components(separatedBy: "\n").enumerated() {
-                lines.append(SharedDiffLine(content: line, kind: .removed, oldLineNumber: i + 1, newLineNumber: nil))
-            }
-        }
-        if !spec.newText.isEmpty {
-            for (i, line) in spec.newText.components(separatedBy: "\n").enumerated() {
-                lines.append(SharedDiffLine(content: line, kind: .added, oldLineNumber: nil, newLineNumber: i + 1))
-            }
-        }
-
         let ext = (spec.path as NSString).pathExtension
         diffTextView.configure(
             lines: lines,
@@ -694,4 +729,51 @@ final class DiffOverlayView: NSView {
         configure(spec: spec)
     }
 
+    // MARK: - Unified diff computation
+
+    static func unifiedDiffLines(oldText: String?, newText: String) -> [SharedDiffLine] {
+        let newLines = newText.components(separatedBy: "\n")
+
+        guard let old = oldText, !old.isEmpty else {
+            return newLines.enumerated().map { i, line in
+                SharedDiffLine(content: line, kind: .added, oldLineNumber: nil, newLineNumber: i + 1)
+            }
+        }
+
+        let oldLines = old.components(separatedBy: "\n")
+        let diff = newLines.difference(from: oldLines)
+
+        var removals = Set<Int>()
+        var insertions = Set<Int>()
+
+        for change in diff {
+            switch change {
+            case .remove(let offset, _, _):
+                removals.insert(offset)
+            case .insert(let offset, _, _):
+                insertions.insert(offset)
+            }
+        }
+
+        var result: [SharedDiffLine] = []
+        var oi = 0, ni = 0
+
+        while oi < oldLines.count || ni < newLines.count {
+            if oi < oldLines.count && removals.contains(oi) {
+                result.append(SharedDiffLine(content: oldLines[oi], kind: .removed, oldLineNumber: oi + 1, newLineNumber: nil))
+                oi += 1
+            } else if ni < newLines.count && insertions.contains(ni) {
+                result.append(SharedDiffLine(content: newLines[ni], kind: .added, oldLineNumber: nil, newLineNumber: ni + 1))
+                ni += 1
+            } else if oi < oldLines.count && ni < newLines.count {
+                result.append(SharedDiffLine(content: oldLines[oi], kind: nil, oldLineNumber: oi + 1, newLineNumber: ni + 1))
+                oi += 1
+                ni += 1
+            } else {
+                break
+            }
+        }
+
+        return result
+    }
 }

@@ -17,7 +17,6 @@ struct WorkspaceDetailView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             BottomSheetView(directoryURL: workspace.url)
         }
-        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 Button {

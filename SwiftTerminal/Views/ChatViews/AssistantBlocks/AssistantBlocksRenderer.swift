@@ -151,9 +151,8 @@ struct AssistantBlocksRenderer: Sendable {
                 let headerHeight: CGFloat = 24
                 let diffFont = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
                 let lineHeight = ceil(diffFont.ascender - diffFont.descender + diffFont.leading)
-                let oldLineCount = block.diffOldText.map { $0.isEmpty ? 0 : $0.components(separatedBy: "\n").count } ?? 0
-                let newLineCount = block.diffNewText.map { $0.isEmpty ? 0 : $0.components(separatedBy: "\n").count } ?? 0
-                let totalLines = max(1, oldLineCount + newLineCount)
+                let unifiedLines = DiffOverlayView.unifiedDiffLines(oldText: block.diffOldText, newText: block.diffNewText ?? "")
+                let totalLines = max(1, unifiedLines.count)
                 let diffHeight = headerHeight + 12 + CGFloat(totalLines) * lineHeight
 
                 let placeholder = Self.diffPlaceholderAttributedString(height: diffHeight, diffID: diffID)
@@ -238,6 +237,7 @@ struct AssistantBlocksRenderer: Sendable {
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.paragraphSpacing = 0
         paragraphStyle.lineSpacing = 2
+        paragraphStyle.lineBreakMode = .byTruncatingTail
 
         let baseAttrs: [NSAttributedString.Key: Any] = [
             .font: font,

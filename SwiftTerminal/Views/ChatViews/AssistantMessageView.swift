@@ -3,6 +3,7 @@ import ACP
 
 struct AssistantMessageView: View {
     @AppStorage("fontSize") private var fontSize: Double = 13
+    @Environment(EditorPanel.self) private var editorPanel
 
     let message: Message
 
@@ -11,6 +12,14 @@ struct AssistantMessageView: View {
     private var chat: Chat { message.chat! }
     private var session: ACPSession { chat.session }
     private var isLastMessage: Bool { message.id == chat.messages.last?.id }
+
+    private func resolveFileURL(_ path: String) -> URL? {
+        if path.hasPrefix("/") {
+            return URL(fileURLWithPath: path)
+        }
+        guard let workspaceURL = chat.workspace?.url else { return nil }
+        return workspaceURL.appendingPathComponent(path)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -21,7 +30,11 @@ struct AssistantMessageView: View {
                     blocks: message.blocks,
                     fontSize: fontSize,
                     cachedHeight: message.height,
-                    calculatedHeight: $measuredHeight
+                    calculatedHeight: $measuredHeight,
+                    onOpenFile: { path in
+                        guard let url = resolveFileURL(path) else { return }
+                        editorPanel.openFile(url)
+                    }
                 )
                 .frame(height: message.height > 0 ? message.height : nil, alignment: .top)
                 .onChange(of: measuredHeight) { _, newHeight in

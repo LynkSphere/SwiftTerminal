@@ -6,6 +6,7 @@ struct AssistantBlocksRepresentable: NSViewRepresentable {
     let fontSize: CGFloat
     var cachedHeight: CGFloat = 0
     var calculatedHeight: Binding<CGFloat>? = nil
+    var onOpenFile: ((String) -> Void)? = nil
 
     @MainActor
     final class Coordinator {
@@ -81,6 +82,7 @@ struct AssistantBlocksRepresentable: NSViewRepresentable {
             guard let calculatedHeight, calculatedHeight.wrappedValue != newHeight else { return }
             calculatedHeight.wrappedValue = newHeight
         }
+        nsView.onOpenFile = onOpenFile
         context.coordinator.update(
             nsView: nsView,
             blocks: blocks,
