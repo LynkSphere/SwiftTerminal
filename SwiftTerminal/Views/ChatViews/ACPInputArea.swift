@@ -1,8 +1,7 @@
 import SwiftUI
 
 struct ACPInputArea: View {
-    let chat: Chat
-    @State private var inputText = ""
+    @Bindable var chat: Chat
     @FocusState private var isFocused: Bool
 
     private var session: ACPSession { chat.session }
@@ -14,13 +13,13 @@ struct ACPInputArea: View {
                     .offset(y: -1)
 
                 ZStack(alignment: .leading) {
-                    if inputText.isEmpty {
+                    if chat.prompt.isEmpty {
                         Text("Message \(chat.provider.rawValue)...")
                             .padding(.leading, 1)
                             .foregroundStyle(.placeholder)
                     }
 
-                    TextEditor(text: $inputText)
+                    TextEditor(text: $chat.prompt)
                         .padding(.leading, -4)
                         .frame(maxHeight: 350)
                         .fixedSize(horizontal: false, vertical: true)
@@ -44,18 +43,11 @@ struct ACPInputArea: View {
                 .tint(session.isProcessing ? .red : .accent)
                 .buttonStyle(.borderedProminent)
                 .buttonBorderShape(.circle)
-                .disabled(!session.isProcessing && (inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || session.isConnecting))
+                .disabled(!session.isProcessing && (chat.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || session.isConnecting))
                 .offset(y: -2)
                 .keyboardShortcut(session.isProcessing ? "d" : .return, modifiers: [.command])
             }
             .padding(12)
-        }
-        .onChange(of: chat.pendingInput) { _, text in
-            if let text, !chat.pendingInputIsSend {
-                inputText = text
-                chat.pendingInput = nil
-                isFocused = true
-            }
         }
         .task {
             isFocused = true
@@ -63,9 +55,9 @@ struct ACPInputArea: View {
     }
 
     private func send() {
-        let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let text = chat.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        inputText = ""
+        chat.prompt = ""
         chat.sendMessage(text)
     }
 }

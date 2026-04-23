@@ -1,11 +1,18 @@
 import AppKit
 
+private final class HeaderButton: NSButton {
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let localPoint = convert(point, from: superview)
+        return bounds.contains(localPoint) ? self : nil
+    }
+}
+
 final class DiffOverlayView: NSView {
-    private let headerContainer = NSView()
+    private let headerContainer = HeaderButton()
     private let pathIcon = NSImageView()
     private let pathLabel = NSTextField(labelWithString: "")
     private let statsLabel = NSTextField(labelWithString: "")
-    private let openButton = NSButton()
+    // private let openButton = NSButton()
 
     private let borderView = NSView()
 
@@ -20,7 +27,7 @@ final class DiffOverlayView: NSView {
         super.init(frame: frameRect)
         wantsLayer = true
         layer?.cornerRadius = 12
-        layer?.borderWidth = 1
+        // layer?.borderWidth = 1
 
         setupHeader()
         setupDiffArea()
@@ -41,8 +48,9 @@ final class DiffOverlayView: NSView {
 
     private func applyAppearanceColors() {
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            layer?.backgroundColor = NSColor.quaternarySystemFill.cgColor
-            layer?.borderColor = NSColor.separatorColor.cgColor
+            layer?.backgroundColor = NSColor.clear.cgColor
+            // layer?.backgroundColor = NSColor.quinarySystemFill.cgColor
+            // layer?.borderColor = NSColor.separatorColor.cgColor
             borderView.layer?.backgroundColor = NSColor.separatorColor.cgColor
         }
     }
@@ -52,7 +60,7 @@ final class DiffOverlayView: NSView {
         pathIcon.translatesAutoresizingMaskIntoConstraints = false
         pathLabel.translatesAutoresizingMaskIntoConstraints = false
         statsLabel.translatesAutoresizingMaskIntoConstraints = false
-        openButton.translatesAutoresizingMaskIntoConstraints = false
+        // openButton.translatesAutoresizingMaskIntoConstraints = false
         borderView.translatesAutoresizingMaskIntoConstraints = false
 
         pathIcon.image = NSImage(systemSymbolName: "pencil.line", accessibilityDescription: nil)
@@ -65,25 +73,34 @@ final class DiffOverlayView: NSView {
         pathLabel.maximumNumberOfLines = 1
         pathLabel.cell?.wraps = false
 
+        headerContainer.title = ""
+        headerContainer.isBordered = false
+        headerContainer.bezelStyle = .regularSquare
+        headerContainer.setButtonType(.momentaryChange)
+        headerContainer.focusRingType = .none
+        headerContainer.toolTip = "Open file"
+        headerContainer.target = self
+        headerContainer.action = #selector(pathLabelClicked(_:))
+
         statsLabel.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
         statsLabel.textColor = .secondaryLabelColor
 
-        openButton.bezelStyle = .accessoryBarAction
-        openButton.isBordered = false
-        openButton.image = NSImage(systemSymbolName: "arrow.up.forward.square", accessibilityDescription: "Open file")
-        openButton.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 12, weight: .regular)
-        openButton.contentTintColor = .secondaryLabelColor
-        openButton.toolTip = "Open file"
-        openButton.target = self
-        openButton.action = #selector(openButtonClicked(_:))
-        openButton.setButtonType(.momentaryChange)
+        // openButton.bezelStyle = .accessoryBarAction
+        // openButton.isBordered = false
+        // openButton.image = NSImage(systemSymbolName: "arrow.up.forward.square", accessibilityDescription: "Open file")
+        // openButton.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 12, weight: .regular)
+        // openButton.contentTintColor = .secondaryLabelColor
+        // openButton.toolTip = "Open file"
+        // openButton.target = self
+        // openButton.action = #selector(pathLabelClicked(_:))
+        // openButton.setButtonType(.momentaryChange)
 
         borderView.wantsLayer = true
 
         headerContainer.addSubview(pathIcon)
         headerContainer.addSubview(pathLabel)
         headerContainer.addSubview(statsLabel)
-        headerContainer.addSubview(openButton)
+        // headerContainer.addSubview(openButton)
 
         addSubview(headerContainer)
         addSubview(borderView)
@@ -94,7 +111,7 @@ final class DiffOverlayView: NSView {
             headerContainer.topAnchor.constraint(equalTo: topAnchor),
             headerContainer.heightAnchor.constraint(equalToConstant: 24),
 
-            pathIcon.leadingAnchor.constraint(equalTo: headerContainer.leadingAnchor, constant: 10),
+            pathIcon.leadingAnchor.constraint(equalTo: headerContainer.leadingAnchor, constant: 4),
             pathIcon.centerYAnchor.constraint(equalTo: headerContainer.centerYAnchor),
 
             pathLabel.leadingAnchor.constraint(equalTo: pathIcon.trailingAnchor, constant: 6),
@@ -103,10 +120,10 @@ final class DiffOverlayView: NSView {
             statsLabel.leadingAnchor.constraint(equalTo: pathLabel.trailingAnchor, constant: 8),
             statsLabel.centerYAnchor.constraint(equalTo: headerContainer.centerYAnchor),
 
-            openButton.trailingAnchor.constraint(equalTo: headerContainer.trailingAnchor, constant: -8),
-            openButton.centerYAnchor.constraint(equalTo: headerContainer.centerYAnchor),
-            openButton.widthAnchor.constraint(equalToConstant: 18),
-            openButton.heightAnchor.constraint(equalToConstant: 18),
+            // openButton.trailingAnchor.constraint(equalTo: headerContainer.trailingAnchor, constant: -8),
+            // openButton.centerYAnchor.constraint(equalTo: headerContainer.centerYAnchor),
+            // openButton.widthAnchor.constraint(equalToConstant: 18),
+            // openButton.heightAnchor.constraint(equalToConstant: 18),
 
             borderView.leadingAnchor.constraint(equalTo: leadingAnchor),
             borderView.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -115,7 +132,7 @@ final class DiffOverlayView: NSView {
         ])
     }
 
-    @objc private func openButtonClicked(_ sender: Any?) {
+    @objc private func pathLabelClicked(_ sender: Any?) {
         guard let spec = currentSpec else { return }
         onOpenFile?(spec.path)
     }
@@ -135,8 +152,8 @@ final class DiffOverlayView: NSView {
         NSLayoutConstraint.activate([
             diffScrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
             diffScrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            diffScrollView.topAnchor.constraint(equalTo: borderView.bottomAnchor, constant: 4),
-            diffScrollView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -4),
+            diffScrollView.topAnchor.constraint(equalTo: borderView.bottomAnchor, constant: 6),
+            diffScrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
         ])
     }
 
@@ -145,7 +162,8 @@ final class DiffOverlayView: NSView {
 
         pathLabel.stringValue = (spec.path as NSString).lastPathComponent
 
-        let lines = UnifiedDiff.lines(oldText: spec.oldText, newText: spec.newText)
+        let rawLines = UnifiedDiff.lines(oldText: spec.oldText, newText: spec.newText)
+        let lines = Self.trimCommonLeadingWhitespace(rawLines)
 
         let added = lines.filter { $0.kind == .added }.count
         let removed = lines.filter { $0.kind == .removed }.count
@@ -177,13 +195,74 @@ final class DiffOverlayView: NSView {
         diffTextView.configure(
             lines: lines,
             fileExtension: ext,
-            layout: .popover(wrapsLines: false),
+            layout: Self.inlineLayout(for: lines),
             width: bounds.width
+        )
+    }
+
+    private static func inlineLayout(for lines: [SharedDiffLine]) -> SharedDiffTextLayout {
+        let lineNumberFontSize: CGFloat = 11
+        let maxLineNumber = lines.reduce(0) { partial, line in
+            Swift.max(partial, line.newLineNumber ?? 0, line.oldLineNumber ?? 0)
+        }
+        let digits = maxLineNumber > 0 ? String(maxLineNumber) : "0"
+        let font = NSFont.monospacedDigitSystemFont(ofSize: lineNumberFontSize, weight: .regular)
+        let digitsWidth = (digits as NSString).size(withAttributes: [.font: font]).width
+        let gutterWidth = ceil(digitsWidth) + 12
+
+        return SharedDiffTextLayout(
+            gutterWidth: gutterWidth,
+            verticalPadding: 0,
+            wrapsLines: false,
+            fontSize: 12,
+            lineNumberFontSize: lineNumberFontSize
         )
     }
 
     func refreshAppearance() {
         guard let spec = currentSpec else { return }
         configure(spec: spec)
+    }
+
+    private static func trimCommonLeadingWhitespace(_ lines: [SharedDiffLine]) -> [SharedDiffLine] {
+        var minLeading = Int.max
+        for line in lines {
+            let content = line.content
+            if content.isEmpty { continue }
+            var count = 0
+            var sawNonWhitespace = false
+            for char in content {
+                if char == " " || char == "\t" {
+                    count += 1
+                } else {
+                    sawNonWhitespace = true
+                    break
+                }
+            }
+            guard sawNonWhitespace else { continue }
+            if count < minLeading { minLeading = count }
+            if minLeading == 0 { return lines }
+        }
+        guard minLeading != Int.max, minLeading > 0 else { return lines }
+
+        return lines.map { line in
+            let content = line.content
+            var leading = 0
+            for char in content {
+                if char == " " || char == "\t" {
+                    leading += 1
+                } else {
+                    break
+                }
+            }
+            let dropCount = Swift.min(minLeading, leading)
+            let trimmed = String(content.dropFirst(dropCount))
+            return SharedDiffLine(
+                content: trimmed,
+                kind: line.kind,
+                oldLineNumber: line.oldLineNumber,
+                newLineNumber: line.newLineNumber
+            )
+        }
     }
 }

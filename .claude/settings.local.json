@@ -5,7 +5,12 @@
       "Bash(find ~/Library/Developer/Xcode/DerivedData/SwiftTerminal-*/SourcePackages -name \"*.swift\")",
       "Bash(npm view *)",
       "Bash(tar xzf *)",
-      "Bash(npm pack *)"
+      "Bash(npm pack *)",
+      "Bash(asc --version)",
+      "Bash(asc --help)",
+      "Bash(asc analytics *)",
+      "Bash(gh release *)",
+      "Bash(gh api *)"
     ]
   }
 }

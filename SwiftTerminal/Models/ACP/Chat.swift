@@ -27,8 +27,7 @@ final class Chat: Identifiable, Hashable, Codable {
     @ObservationIgnored
     var pendingInput: String?
 
-    @ObservationIgnored
-    var pendingInputIsSend = false
+    var prompt: String = ""
 
     // Replay state
     @ObservationIgnored
@@ -110,9 +109,8 @@ final class Chat: Identifiable, Hashable, Codable {
                 try? await Task.sleep(for: .seconds(1))
                 self.isReplaying = false
                 self.wireLiveCallbacks()
-                if self.pendingInputIsSend, let text = self.pendingInput {
+                if let text = self.pendingInput {
                     self.pendingInput = nil
-                    self.pendingInputIsSend = false
                     self.session.send(text)
                 }
             }
@@ -149,7 +147,6 @@ final class Chat: Identifiable, Hashable, Codable {
             session.send(text)
         } else {
             pendingInput = text
-            pendingInputIsSend = true
             connectIfNeeded()
         }
         scheduleSave()
@@ -316,9 +313,8 @@ final class Chat: Identifiable, Hashable, Codable {
         wireLiveCallbacks()
 
         // Handle pending input after replay
-        if pendingInputIsSend, let text = pendingInput {
+        if let text = pendingInput {
             pendingInput = nil
-            pendingInputIsSend = false
             session.send(text)
         }
     }
@@ -362,9 +358,8 @@ final class Chat: Identifiable, Hashable, Codable {
                 self.scheduleSave()
             }
 
-            if self.pendingInputIsSend, let text = self.pendingInput {
+            if let text = self.pendingInput {
                 self.pendingInput = nil
-                self.pendingInputIsSend = false
                 self.session.send(text)
             }
 
@@ -446,8 +441,7 @@ final class Chat: Identifiable, Hashable, Codable {
         guard turn >= 1, turn <= turnCount else { return }
 
         let revertedMsg = messages.first { $0.turnIndex == turn && $0.role == .user }
-        pendingInput = revertedMsg?.text
-        pendingInputIsSend = false
+        prompt = revertedMsg?.text ?? ""
 
         messages.removeAll { $0.turnIndex >= turn }
 
