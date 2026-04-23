@@ -8,7 +8,9 @@ struct SidebarItem: Identifiable, Hashable {
     let children: [SidebarItem]?
 
     static func forWorkspace(_ workspace: Workspace) -> SidebarItem {
-        let sessionChildren = workspace.chats.map { forSession($0) }
+        let sessionChildren = workspace.chats
+            .filter { !$0.isArchived }
+            .map { forSession($0) }
         return SidebarItem(
             id: "w:\(workspace.id.uuidString)",
             workspace: workspace,

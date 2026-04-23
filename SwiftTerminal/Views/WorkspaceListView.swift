@@ -65,7 +65,7 @@ struct WorkspaceListView: View {
                 SessionSidebarRow(session: session)
             }
         }
-        .safeAreaInset(edge: .bottom) {
+        .safeAreaBar(edge: .bottom) {
             HStack(spacing: 0) {
                 Button {
                     chooseDirectoryForNewWorkspace()

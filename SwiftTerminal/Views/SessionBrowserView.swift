@@ -7,11 +7,27 @@ struct SessionBrowserView: View {
     @Environment(AppState.self) private var appState
     @AppStorage("defaultChatMode") private var defaultChatMode: AgentProvider = .claude
 
+    private var regularChats: [Chat] {
+        workspace.chats.filter { !$0.isArchived }
+    }
+
+    private var archivedChats: [Chat] {
+        workspace.chats.filter { $0.isArchived }
+    }
+
     var body: some View {
         List {
-            if !workspace.chats.isEmpty {
-                Section("Sessions") {
-                    ForEach(workspace.chats) { chat in
+            if !regularChats.isEmpty {
+                // Section("Sessions") {
+                    ForEach(regularChats) { chat in
+                        storedSessionRow(chat)
+                    }
+                // }
+            }
+
+            if !archivedChats.isEmpty {
+                Section("Archived") {
+                    ForEach(archivedChats) { chat in
                         storedSessionRow(chat)
                     }
                 }
@@ -47,11 +63,7 @@ struct SessionBrowserView: View {
                 }
             }
         } label: {
-            Label {
-                Text("New Chat")
-            } icon: {
-                Image(defaultChatMode.imageName)
-            }
+            Label("New Chat", systemImage: "plus")
         } primaryAction: {
             let chat = workspace.addSession(provider: defaultChatMode)
             appState.selectedSession = chat
@@ -105,6 +117,16 @@ struct SessionBrowserView: View {
                     chat.disconnect()
                 } label: {
                     Label("Disconnect", systemImage: "bolt.slash")
+                }
+            }
+
+            Button {
+                chat.isArchived.toggle()
+            } label: {
+                if chat.isArchived {
+                    Label("Unarchive", systemImage: "tray.and.arrow.up")
+                } else {
+                    Label("Archive", systemImage: "archivebox")
                 }
             }
 

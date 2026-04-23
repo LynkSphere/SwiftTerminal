@@ -115,6 +115,7 @@ final class WorkspaceStore {
                     _ = chat.turnCount
                     _ = chat.provider
                     _ = chat.acpSessionId
+                    _ = chat.isArchived
                 }
             }
         } onChange: { [weak self] in

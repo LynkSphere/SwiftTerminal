@@ -11,6 +11,7 @@ final class Chat: Identifiable, Hashable, Codable {
     var date: Date = Date()
     var sortOrder: Int = 0
     var turnCount: Int = 0
+    var isArchived: Bool = false
 
     private(set) var messages: [Message] = []
     private(set) var checkpoints: [Checkpoint] = []
@@ -42,7 +43,7 @@ final class Chat: Identifiable, Hashable, Codable {
     // MARK: - Codable
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, acpSessionId, provider, date, sortOrder, turnCount
+        case id, title, acpSessionId, provider, date, sortOrder, turnCount, isArchived
         case messages, checkpoints
     }
 
@@ -55,6 +56,7 @@ final class Chat: Identifiable, Hashable, Codable {
         self.date = try c.decodeIfPresent(Date.self, forKey: .date) ?? Date()
         self.sortOrder = try c.decodeIfPresent(Int.self, forKey: .sortOrder) ?? 0
         self.turnCount = try c.decodeIfPresent(Int.self, forKey: .turnCount) ?? 0
+        self.isArchived = try c.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
         self.messages = try c.decodeIfPresent([Message].self, forKey: .messages) ?? []
         self.checkpoints = try c.decodeIfPresent([Checkpoint].self, forKey: .checkpoints) ?? []
         for msg in messages { msg.chat = self }
@@ -69,6 +71,7 @@ final class Chat: Identifiable, Hashable, Codable {
         try c.encode(date, forKey: .date)
         try c.encode(sortOrder, forKey: .sortOrder)
         try c.encode(turnCount, forKey: .turnCount)
+        try c.encode(isArchived, forKey: .isArchived)
         try c.encode(messages, forKey: .messages)
         try c.encode(checkpoints, forKey: .checkpoints)
     }

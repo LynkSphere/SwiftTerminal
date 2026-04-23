@@ -46,7 +46,19 @@ struct WorkspaceRow: View {
             }
         }
         .contextMenu {
-            Button("New Chat") {
+            Menu {
+                ForEach(AgentProvider.allCases, id: \.self) { provider in
+                    Button {
+                        let tracked = workspace.addSession(provider: provider)
+                        appState.selectedWorkspace = workspace
+                        appState.selectedSession = tracked
+                    } label: {
+                        Label(provider.rawValue, image: provider.imageName)
+                    }
+                }
+            } label: {
+                Label("New Chat", systemImage: "plus")
+            } primaryAction: {
                 let tracked = workspace.addSession(provider: defaultChatMode)
                 appState.selectedWorkspace = workspace
                 appState.selectedSession = tracked

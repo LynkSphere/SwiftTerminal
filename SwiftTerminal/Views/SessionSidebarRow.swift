@@ -39,6 +39,15 @@ struct SessionSidebarRow: View {
                 }
             }
 
+            Button {
+                if appState.selectedSession?.id == session.id {
+                    appState.selectedSession = nil
+                }
+                session.isArchived = true
+            } label: {
+                Label("Archive", systemImage: "archivebox")
+            }
+
             Divider()
 
             Button(role: .destructive) {
