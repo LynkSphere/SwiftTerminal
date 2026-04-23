@@ -6,6 +6,7 @@ import ACP
 final class Chat: Identifiable, Hashable, Codable {
     var id = UUID()
     var title: String = "New Chat"
+    var acpSessionId: String?
     var provider: AgentProvider = .codex
     var date: Date = Date()
     var sortOrder: Int = 0
@@ -41,7 +42,7 @@ final class Chat: Identifiable, Hashable, Codable {
     // MARK: - Codable
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, provider, date, sortOrder, turnCount
+        case id, title, acpSessionId, provider, date, sortOrder, turnCount
         case messages, checkpoints
     }
 
@@ -49,6 +50,7 @@ final class Chat: Identifiable, Hashable, Codable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try c.decode(UUID.self, forKey: .id)
         self.title = try c.decode(String.self, forKey: .title)
+        self.acpSessionId = try c.decodeIfPresent(String.self, forKey: .acpSessionId)
         self.provider = try c.decodeIfPresent(AgentProvider.self, forKey: .provider) ?? .codex
         self.date = try c.decodeIfPresent(Date.self, forKey: .date) ?? Date()
         self.sortOrder = try c.decodeIfPresent(Int.self, forKey: .sortOrder) ?? 0
@@ -62,6 +64,7 @@ final class Chat: Identifiable, Hashable, Codable {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(id, forKey: .id)
         try c.encode(title, forKey: .title)
+        try c.encodeIfPresent(acpSessionId, forKey: .acpSessionId)
         try c.encode(provider, forKey: .provider)
         try c.encode(date, forKey: .date)
         try c.encode(sortOrder, forKey: .sortOrder)
@@ -82,8 +85,14 @@ final class Chat: Identifiable, Hashable, Codable {
         guard let directory = workspace?.directory else { return }
 
         session.provider = provider
+        session.setWorkingDirectory(directory)
         wireLiveCallbacks()
-        session.connect(workingDirectory: directory)
+
+        if let acpId = acpSessionId {
+            Task { await session.relaunchAndLoadSession(SessionId(acpId)) }
+        } else {
+            session.connect(workingDirectory: directory)
+        }
     }
 
     func sendMessage(_ text: String) {
@@ -140,6 +149,9 @@ final class Chat: Identifiable, Hashable, Codable {
 
         session.onConnected = { [weak self] in
             guard let self else { return }
+            if let id = self.session.sessionId?.value, self.acpSessionId != id {
+                self.acpSessionId = id
+            }
             self.date = Date()
             self.scheduleSave()
 
@@ -250,6 +262,7 @@ final class Chat: Identifiable, Hashable, Codable {
         date = Date()
         session.disconnect()
         session = ACPSession()
+        acpSessionId = nil
         currentTurnMessage = nil
 
         scheduleSave()

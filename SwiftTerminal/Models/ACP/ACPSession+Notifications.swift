@@ -27,6 +27,9 @@ extension ACPSession {
 
     @MainActor
     private func handleUpdate(_ update: SessionUpdate) {
+        // Drop updates streamed back by the agent while replaying a resumed
+        // session — our persisted messages are the source of truth.
+        if isReplaying { return }
         onSessionUpdate?(update)
     }
 }

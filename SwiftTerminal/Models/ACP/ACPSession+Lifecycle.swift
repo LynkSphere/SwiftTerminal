@@ -15,6 +15,48 @@ extension ACPSession {
         }
     }
 
+    func relaunchAndLoadSession(_ sessionId: SessionId) async {
+        notificationTask?.cancel()
+        notificationTask = nil
+        let oldClient = client
+        setClient(nil)
+        setSessionId(nil)
+        isConnected = false
+        isConnecting = true
+        error = nil
+
+        if let oldClient {
+            await oldClient.terminate()
+            try? await Task.sleep(for: .milliseconds(500))
+        }
+
+        do {
+            isReplaying = true
+            let newClient = try await launchAndInitialize()
+            listenForNotifications(client: newClient)
+
+            let response = try await newClient.loadSession(
+                sessionId: sessionId,
+                cwd: workingDirectory,
+                mcpServers: []
+            )
+            setSessionId(response.sessionId ?? sessionId)
+
+            // Let queued replay notifications drain before re-opening the
+            // update handler.
+            try? await Task.sleep(for: .seconds(1))
+            isReplaying = false
+
+            isConnected = true
+            isConnecting = false
+            onConnected?()
+        } catch {
+            isReplaying = false
+            isConnecting = false
+            self.error = error.localizedDescription
+        }
+    }
+
     func launchAndInitialize() async throws -> Client {
         let newClient = Client()
         await newClient.setDelegate(autoApproveDelegate)

@@ -18,6 +18,7 @@ final class ACPSession {
     @ObservationIgnored var notificationTask: Task<Void, Never>?
     @ObservationIgnored private(set) var workingDirectory: String = ""
     @ObservationIgnored let autoApproveDelegate = AutoApproveDelegate()
+    @ObservationIgnored var isReplaying = false
 
     func connect(workingDirectory: String) {
         self.workingDirectory = workingDirectory

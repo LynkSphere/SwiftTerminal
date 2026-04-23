@@ -114,6 +114,7 @@ final class WorkspaceStore {
                     _ = chat.title
                     _ = chat.turnCount
                     _ = chat.provider
+                    _ = chat.acpSessionId
                 }
             }
         } onChange: { [weak self] in
