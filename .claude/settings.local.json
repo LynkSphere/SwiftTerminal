@@ -10,7 +10,9 @@
       "Bash(asc --help)",
       "Bash(asc analytics *)",
       "Bash(gh release *)",
-      "Bash(gh api *)"
+      "Bash(gh api *)",
+      "Bash(grep \"\\\\.swift$\")",
+      "Bash(xcodebuild -project SwiftTerminal.xcodeproj -scheme SwiftTerminal -configuration Debug -destination 'platform=macOS' build)"
     ]
   }
 }

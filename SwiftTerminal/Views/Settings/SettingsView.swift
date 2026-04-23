@@ -13,6 +13,11 @@ struct SettingsView: View {
                     Label("Updates", systemImage: "arrow.down.circle")
                 }
 
+            ChatSettingsView()
+                .tabItem {
+                    Label("Chat", systemImage: "bubble.left.and.bubble.right")
+                }
+
             ShortcutsSettingsView()
                 .tabItem {
                     Label("Shortcuts", systemImage: "keyboard")

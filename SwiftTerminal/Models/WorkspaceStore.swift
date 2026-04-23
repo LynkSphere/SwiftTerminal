@@ -113,7 +113,7 @@ final class WorkspaceStore {
                 for chat in ws.chats {
                     _ = chat.title
                     _ = chat.turnCount
-                    _ = chat.acpSessionId
+                    _ = chat.provider
                 }
             }
         } onChange: { [weak self] in

@@ -4,15 +4,33 @@ struct SessionSidebarRow: View {
     let session: Chat
     @Environment(AppState.self) private var appState
 
+    @State private var isRenaming = false
+    @FocusState private var isNameFieldFocused: Bool
+
     var body: some View {
         Label {
-            Text(session.title)
-                .lineLimit(1)
+            if isRenaming {
+                TextField("Chat Name", text: Bindable(session).title)
+                    .textFieldStyle(.plain)
+                    .focused($isNameFieldFocused)
+                    .onSubmit { isRenaming = false }
+                    .onExitCommand { isRenaming = false }
+                    .onAppear { isNameFieldFocused = true }
+            } else {
+                Text(session.title)
+                    .lineLimit(1)
+            }
         } icon: {
             Image(session.provider.imageName)
                 .foregroundStyle(session.isActive ? session.provider.color : .primary)
         }
         .contextMenu {
+            Button {
+                isRenaming = true
+            } label: {
+                Label("Rename", systemImage: "pencil")
+            }
+
             if session.isActive {
                 Button {
                     session.disconnect()
@@ -20,6 +38,8 @@ struct SessionSidebarRow: View {
                     Label("Disconnect", systemImage: "bolt.slash")
                 }
             }
+
+            Divider()
 
             Button(role: .destructive) {
                 if appState.selectedSession?.id == session.id {
@@ -29,6 +49,9 @@ struct SessionSidebarRow: View {
             } label: {
                 Label("Delete", systemImage: "trash")
             }
+        }
+        .renameAction {
+            isRenaming = true
         }
     }
 }

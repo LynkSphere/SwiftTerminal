@@ -8,11 +8,9 @@ final class ACPSession {
     var isProcessing = false
     var error: String?
     var provider: AgentProvider = .codex
-    var sessionTitle: String?
 
     var onTurnComplete: (() async -> Void)?
-    var onSessionIdChanged: ((String) -> Void)?
-    var onTitleChanged: ((String) -> Void)?
+    var onConnected: (() -> Void)?
     var onSessionUpdate: ((SessionUpdate) -> Void)?
 
     @ObservationIgnored private(set) var client: Client?
@@ -28,18 +26,23 @@ final class ACPSession {
         }
     }
 
+    func newSession() {
+        isConnecting = true
+        Task {
+            await terminateAndRelaunch()
+        }
+    }
+
     func disconnect() {
         notificationTask?.cancel()
         notificationTask = nil
         onTurnComplete = nil
-        onSessionIdChanged = nil
-        onTitleChanged = nil
+        onConnected = nil
         onSessionUpdate = nil
         let clientToTerminate = client
         client = nil
         sessionId = nil
         isConnected = false
-        sessionTitle = nil
         Task {
             await clientToTerminate?.terminate()
         }
@@ -75,19 +78,6 @@ final class ACPSession {
         }
     }
 
-    // MARK: - Session Discovery
-
-    /// Lists existing sessions for the given working directory.
-    /// Requires a running, initialized client.
-    func listExistingSessions(workingDirectory: String) async throws -> [SessionInfo] {
-        let tempClient = try await launchAndInitialize()
-        defer {
-            Task { await tempClient.terminate() }
-        }
-        let response = try await tempClient.listSessions(cwd: workingDirectory, timeout: 30)
-        return response.sessions
-    }
-
     // MARK: - Internal Setters
 
     func setClient(_ client: Client?) {
@@ -96,9 +86,6 @@ final class ACPSession {
 
     func setSessionId(_ id: SessionId?) {
         self.sessionId = id
-        if let value = id?.value {
-            onSessionIdChanged?(value)
-        }
     }
 
     func setWorkingDirectory(_ dir: String) {

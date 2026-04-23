@@ -28,15 +28,5 @@ extension ACPSession {
     @MainActor
     private func handleUpdate(_ update: SessionUpdate) {
         onSessionUpdate?(update)
-
-        switch update {
-        case .sessionInfoUpdate(let info):
-            if let title = info.title {
-                sessionTitle = title
-                onTitleChanged?(title)
-            }
-        default:
-            break
-        }
     }
 }

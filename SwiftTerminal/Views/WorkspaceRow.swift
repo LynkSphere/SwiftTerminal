@@ -3,6 +3,7 @@ import SwiftUI
 struct WorkspaceRow: View {
     @Environment(AppState.self) private var appState
     @Environment(WorkspaceStore.self) private var store
+    @AppStorage("defaultChatMode") private var defaultChatMode: AgentProvider = .claude
 
     let workspace: Workspace
 
@@ -46,7 +47,7 @@ struct WorkspaceRow: View {
         }
         .contextMenu {
             Button("New Chat") {
-                let tracked = workspace.addSession(provider: .claude)
+                let tracked = workspace.addSession(provider: defaultChatMode)
                 appState.selectedWorkspace = workspace
                 appState.selectedSession = tracked
             }
