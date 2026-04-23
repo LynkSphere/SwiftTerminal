@@ -170,8 +170,6 @@ struct AssistantBlocksRenderer: Sendable {
                     reservedHeight: diffHeight
                 ))
 
-            case .thought:
-                continue
             }
         }
 
@@ -189,7 +187,7 @@ struct AssistantBlocksRenderer: Sendable {
     // MARK: - Grouping
 
     private struct Group {
-        enum Kind { case text, toolCalls, editDiff, thought }
+        enum Kind { case text, toolCalls, editDiff }
         let kind: Kind
         var blocks: [MessageBlock]
     }
@@ -197,6 +195,10 @@ struct AssistantBlocksRenderer: Sendable {
     private static func groupBlocks(_ blocks: [MessageBlock]) -> [Group] {
         var groups: [Group] = []
         for block in blocks {
+            // Blocks that render nothing shouldn't split runs of tool calls.
+            if block.isThought { continue }
+            if block.isText && block.text.isEmpty { continue }
+
             if block.isEditWithDiff {
                 groups.append(Group(kind: .editDiff, blocks: [block]))
             } else if block.isToolCall {
@@ -205,8 +207,6 @@ struct AssistantBlocksRenderer: Sendable {
                 } else {
                     groups.append(Group(kind: .toolCalls, blocks: [block]))
                 }
-            } else if block.isThought {
-                groups.append(Group(kind: .thought, blocks: [block]))
             } else {
                 groups.append(Group(kind: .text, blocks: [block]))
             }
@@ -266,9 +266,9 @@ struct AssistantBlocksRenderer: Sendable {
         }
         result.append(NSAttributedString(string: label, attributes: baseAttrs))
 
-        // Overall status
-        result.append(NSAttributedString(string: "  ", attributes: baseAttrs))
+        // Overall status — only render on failure or in-progress; success is implicit.
         if let statusAttachment = overallStatusAttachment(for: items, fontSize: font.pointSize) {
+            result.append(NSAttributedString(string: "  ", attributes: baseAttrs))
             let suffix = NSMutableAttributedString(attachment: statusAttachment.image)
             suffix.addAttributes(baseAttrs, range: NSRange(location: 0, length: suffix.length))
             suffix.addAttribute(.foregroundColor, value: statusAttachment.color, range: NSRange(location: 0, length: suffix.length))
@@ -290,8 +290,7 @@ struct AssistantBlocksRenderer: Sendable {
             name = "ellipsis"
             color = .secondaryLabelColor
         } else {
-            name = "checkmark"
-            color = .systemGreen
+            return nil
         }
         guard let att = symbolAttachment(name: name, fontSize: fontSize, tint: color) else { return nil }
         return (att, color)

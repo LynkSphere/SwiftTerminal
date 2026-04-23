@@ -38,6 +38,7 @@ struct ACPView: View {
                             Label("Disconnected", systemImage: "bolt.slash")
                         } else if session.isConnecting {
                             ProgressView()
+                            .controlSize(.small)
                         } else if session.isConnected {
                             Label("Connected", systemImage: "bolt.fill")
                         }

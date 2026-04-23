@@ -1,5 +1,4 @@
 import SwiftUI
-import ACP
 
 struct WorkspaceRow: View {
     @Environment(AppState.self) private var appState
@@ -12,7 +11,6 @@ struct WorkspaceRow: View {
 
     @State private var busyCount = 0
     @State private var hasBell = false
-    @State private var showingImportSessions = false
 
     var body: some View {
         HStack(spacing: 8) {
@@ -51,10 +49,6 @@ struct WorkspaceRow: View {
                 let tracked = workspace.addSession(provider: .claude)
                 appState.selectedWorkspace = workspace
                 appState.selectedSession = tracked
-            }
-
-            Button("Import Existing Session...") {
-                showingImportSessions = true
             }
 
             Divider()
@@ -100,130 +94,5 @@ struct WorkspaceRow: View {
         .renameAction {
             isRenaming = true
         }
-        .sheet(isPresented: $showingImportSessions) {
-            ImportSessionSheet(workspace: workspace)
-        }
-    }
-}
-
-// MARK: - Import Session Sheet
-
-struct ImportSessionSheet: View {
-    let workspace: Workspace
-    @Environment(AppState.self) private var appState
-    @Environment(\.dismiss) private var dismiss
-
-    @State private var sessions: [SessionInfo] = []
-    @State private var isLoading = true
-    @State private var error: String?
-    @State private var importingId: String?
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("Import Session")
-                    .font(.headline)
-                Spacer()
-                Button("Done") { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-            }
-            .padding()
-
-            Divider()
-
-            if isLoading {
-                ProgressView("Discovering sessions...")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let error {
-                ContentUnavailableView {
-                    Label("Error", systemImage: "exclamationmark.triangle")
-                } description: {
-                    Text(error)
-                }
-            } else if sessions.isEmpty {
-                ContentUnavailableView {
-                    Label("No Sessions Found", systemImage: "bubble.left.and.bubble.right")
-                } description: {
-                    Text("No existing Claude sessions found for this workspace directory.")
-                }
-            } else {
-                List(sessions, id: \.sessionId) { session in
-                    sessionRow(session)
-                }
-            }
-        }
-        .frame(width: 450, height: 400)
-        .task {
-            await discoverSessions()
-        }
-    }
-
-    private func sessionRow(_ session: SessionInfo) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(session.title ?? session.sessionId.value.prefix(12) + "...")
-                    .lineLimit(1)
-
-                HStack(spacing: 8) {
-                    if let updatedAt = session.updatedAt {
-                        Text(updatedAt)
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                    }
-
-                    Text(session.sessionId.value.prefix(8) + "...")
-                        .font(.caption2)
-                        .foregroundStyle(.quaternary)
-                        .monospaced()
-                }
-            }
-
-            Spacer()
-
-            if importingId == session.sessionId.value {
-                ProgressView()
-                    .controlSize(.small)
-            } else {
-                let alreadyImported = workspace.chats.contains { $0.acpSessionId == session.sessionId.value }
-                Button(alreadyImported ? "Imported" : "Import") {
-                    Task { await importSession(session) }
-                }
-                .disabled(alreadyImported || importingId != nil)
-            }
-        }
-    }
-
-    private func discoverSessions() async {
-        isLoading = true
-        do {
-            let tempSession = ACPSession()
-            tempSession.provider = .claude
-            sessions = try await tempSession.listExistingSessions(workingDirectory: workspace.directory)
-            // Filter out sessions already in our workspace
-            let existingIds = Set(workspace.chats.compactMap(\.acpSessionId))
-            // Sort by updatedAt descending
-            sessions.sort { ($0.updatedAt ?? "") > ($1.updatedAt ?? "") }
-        } catch {
-            self.error = error.localizedDescription
-        }
-        isLoading = false
-    }
-
-    private func importSession(_ sessionInfo: SessionInfo) async {
-        importingId = sessionInfo.sessionId.value
-        do {
-            let chat = try await Chat.importSession(
-                sessionInfo: sessionInfo,
-                provider: .claude,
-                workspace: workspace
-            )
-            workspace.appendChat(chat)
-            appState.selectedWorkspace = workspace
-            appState.selectedSession = chat
-            dismiss()
-        } catch {
-            self.error = "Import failed: \(error.localizedDescription)"
-        }
-        importingId = nil
     }
 }

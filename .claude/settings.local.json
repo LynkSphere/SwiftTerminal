@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xcodebuild -scheme SwiftTerminal -configuration Debug -destination 'platform=macOS' build)",
+      "Bash(find ~/Library/Developer/Xcode/DerivedData/SwiftTerminal-*/SourcePackages -name \"*.swift\")",
+      "Bash(npm view *)",
+      "Bash(tar xzf *)",
+      "Bash(npm pack *)"
+    ]
+  }
+}

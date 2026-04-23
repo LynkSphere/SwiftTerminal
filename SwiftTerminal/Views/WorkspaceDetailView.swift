@@ -11,7 +11,8 @@ struct WorkspaceDetailView: View {
                 ACPView(chat: chat)
                     .id(chat.id)
             } else {
-                terminalContent
+                SessionBrowserView(workspace: workspace)
+                    .id(workspace.id)
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -35,52 +36,6 @@ struct WorkspaceDetailView: View {
         .environment(workspace.editorPanel)
         .environment(\.showInFileTree) { url in
             workspace.inspectorState.revealInFileTree(url, relativeTo: workspace.url)
-        }
-        .task(id: workspace) {
-            appState.selectedTerminal = workspace.terminals.first ?? workspace.addTerminal()
-        }
-        .onChange(of: appState.selectedTerminal) {
-            appState.selectedTerminal?.hasBellNotification = false
-        }
-        .alert(
-            "Close Tab?",
-            isPresented: Binding(
-                get: { appState.terminalPendingClose != nil },
-                set: { if !$0 { appState.terminalPendingClose = nil } }
-            )
-        ) {
-            Button("Close", role: .destructive) {
-                guard let terminal = appState.terminalPendingClose else { return }
-                let next = workspace.terminalAfter(terminal) ?? workspace.terminalBefore(terminal)
-                workspace.closeTerminal(terminal)
-                if appState.selectedTerminal === terminal {
-                    appState.selectedTerminal = next
-                }
-                appState.terminalPendingClose = nil
-            }
-            Button("Cancel", role: .cancel) {
-                appState.terminalPendingClose = nil
-            }
-        } message: {
-            if let terminal = appState.terminalPendingClose, let name = terminal.foregroundProcessName {
-                Text("\"\(name)\" is still running in this tab. Are you sure you want to close it?")
-            } else {
-                Text("A process is still running in this tab. Are you sure you want to close it?")
-            }
-        }
-    }
-
-    private var terminalContent: some View {
-        VStack(spacing: 0) {
-            DocumentTabBar(workspace: workspace)
-
-            if let terminal = appState.selectedTerminal {
-                TerminalContainerRepresentable(
-                    tab: terminal,
-                    appState: appState
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
         }
     }
 }
