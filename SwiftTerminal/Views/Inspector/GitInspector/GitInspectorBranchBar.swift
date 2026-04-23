@@ -91,7 +91,7 @@ struct GitInspectorBranchBar: View {
             } label: {
                 Label("Sync with Branch", systemImage: "arrow.triangle.merge")
             }
-            .disabled(snapshot?.hasTrackingBranch != true)
+            .disabled((snapshot?.localBranches.count ?? 0) < 2)
 
             Button {
                 state.syncWithRemote(directoryURL: directoryURL)

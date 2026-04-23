@@ -51,6 +51,7 @@ extension GitInspectorState {
             Task {
                 await model.switchBranch(to: branch, snapshot: snapshot)
                 await refresh(directoryURL: directoryURL)
+                await fetchAndRefreshQuietly(directoryURL: directoryURL, snapshot: snapshot)
             }
         }
     }
@@ -61,7 +62,15 @@ extension GitInspectorState {
         Task {
             await model.stashAndSwitch(to: branch, snapshot: snapshot)
             await refresh(directoryURL: directoryURL)
+            await fetchAndRefreshQuietly(directoryURL: directoryURL, snapshot: snapshot)
         }
+    }
+
+    /// Best-effort fetch so the new branch's upstream state reflects reality.
+    /// Errors (offline, no remote) are silent — branch switching shouldn't surface them.
+    private func fetchAndRefreshQuietly(directoryURL: URL, snapshot: GitRepositoryStatusSnapshot) async {
+        try? await GitRepository.shared.fetch(at: snapshot.repositoryRootURL)
+        await refresh(directoryURL: directoryURL)
     }
 
     func confirmStashAll(directoryURL: URL) {
