@@ -10,7 +10,7 @@ struct CommandTerminalOutputView: View {
         VStack(spacing: 0) {
             HStack {
                 Text(terminal.foregroundProcessName ?? terminal.title)
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
 
@@ -47,7 +47,8 @@ struct CommandTerminalOutputView: View {
                 .buttonStyle(.borderless)
             }
             .padding(.horizontal, 10)
-            .frame(height: 36)
+            .padding(.top, 5)
+            // .frame(height: 36)
 
             TerminalContainerRepresentable(tab: terminal, appState: appState)
         }
