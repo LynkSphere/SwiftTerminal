@@ -278,6 +278,33 @@ final class Chat: Identifiable, Hashable, Codable {
             session.plan = updatedPlan.entries
         case .availableCommandsUpdate(let commands):
             session.availableCommands = commands
+        case .currentModeUpdate(let modeId):
+            if let mode = PermissionMode.allCases.first(where: { $0.configValue(for: provider) == modeId }) {
+                permissionMode = mode
+                session.permissionMode = mode
+            }
+        case .sessionInfoUpdate(let info):
+            if let newTitle = info.title {
+                title = newTitle
+            }
+        case .configOptionUpdate(let configOptions):
+            for option in configOptions {
+                guard case .select(let select) = option.kind else { continue }
+                switch option.id.value {
+                case "model":
+                    if let agentModel = AgentModel(rawValue: select.currentValue.value) {
+                        model = agentModel
+                        session.model = agentModel
+                    }
+                case "mode":
+                    if let mode = PermissionMode.allCases.first(where: { $0.configValue(for: provider) == select.currentValue.value }) {
+                        permissionMode = mode
+                        session.permissionMode = mode
+                    }
+                default:
+                    break
+                }
+            }
         default:
             break
         }
@@ -335,6 +362,13 @@ final class Chat: Identifiable, Hashable, Codable {
     }
 
     // MARK: - Helpers
+    
+    var displayTitle: String {
+        if let lastUserMessage = messages.last(where: { $0.role == .user }), !lastUserMessage.text.isEmpty {
+            return String(lastUserMessage.text.prefix(30))
+        }
+        return title
+    }
 
     private static func firstDiff(in content: [ToolCallContent]) -> ToolCallDiff? {
         for item in content {

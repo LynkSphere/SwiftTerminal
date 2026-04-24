@@ -15,7 +15,7 @@ struct SessionBrowserRow: View {
             HStack {
                 Label {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(chat.title)
+                        Text(chat.displayTitle)
                             .lineLimit(1)
 
                         HStack(spacing: 8) {

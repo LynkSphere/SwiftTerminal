@@ -17,7 +17,7 @@ extension ACPSession {
                 do {
                     let data = try encoder.encode(params)
                     let update = try decoder.decode(SessionUpdateNotification.self, from: data)
-                    await handleUpdate(update.update)
+                    handleUpdate(update.update)
                 } catch {
                     // Skip unparseable notifications
                 }
@@ -32,7 +32,7 @@ extension ACPSession {
             // message content and plan state are already persisted locally.
             switch update {
             case .availableCommandsUpdate, .configOptionUpdate, .usageUpdate,
-                 .sessionInfoUpdate, .currentModeUpdate:
+                 .sessionInfoUpdate, .currentModeUpdate, .plan:
                 break
             default:
                 return

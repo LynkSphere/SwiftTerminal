@@ -17,7 +17,7 @@ struct SessionSidebarRow: View {
                     .onExitCommand { isRenaming = false }
                     .onAppear { isNameFieldFocused = true }
             } else {
-                Text(session.title)
+                Text(session.displayTitle)
                     .lineLimit(1)
             }
         } icon: {
@@ -38,7 +38,7 @@ struct SessionSidebarRow: View {
                     Label("Disconnect", systemImage: "bolt.slash")
                 }
             }
-            
+
             Divider()
             
             Button {

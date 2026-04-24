@@ -27,6 +27,15 @@ struct UserMessageView: View {
         .transaction { $0.animation = nil }
         .frame(maxWidth: .infinity, alignment: .trailing)
         .contextMenu {
+            if !message.text.isEmpty {
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(message.text, forType: .string)
+                } label: {
+                    Label("Copy Message", systemImage: "doc.on.doc")
+                }
+            }
+
             revertButton
         }
         .padding(.leading, 160)
