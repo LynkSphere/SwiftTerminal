@@ -24,6 +24,14 @@ enum PermissionMode: String, Codable, CaseIterable, Identifiable {
         }
     }
 
+    var systemImage: String {
+        switch self {
+        case .standard: return "lock.shield"
+        case .acceptEdits: return "pencil.and.outline"
+        case .bypassPermissions: return "bolt.shield"
+        }
+    }
+
     var description: String {
         switch self {
         case .standard: return "Prompts for dangerous operations"

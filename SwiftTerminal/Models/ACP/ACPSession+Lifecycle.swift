@@ -44,7 +44,7 @@ extension ACPSession {
             let resolvedId = response.sessionId ?? sessionId
             setSessionId(resolvedId)
 
-            try? await applyPermissionConfig(client: newClient, sessionId: resolvedId)
+            try? await applySessionConfig(client: newClient, sessionId: resolvedId)
 
             // Let queued replay notifications drain before re-opening the
             // update handler.
@@ -95,7 +95,7 @@ extension ACPSession {
         )
         setSessionId(session.sessionId)
 
-        try? await applyPermissionConfig(client: client, sessionId: session.sessionId)
+        try? await applySessionConfig(client: client, sessionId: session.sessionId)
 
         isConnected = true
         isConnecting = false
@@ -125,12 +125,16 @@ extension ACPSession {
         }
     }
 
-    private func applyPermissionConfig(client: Client, sessionId: SessionId) async throws {
-        let value = permissionMode.configValue(for: provider)
+    private func applySessionConfig(client: Client, sessionId: SessionId) async throws {
         _ = try await client.setConfigOption(
             sessionId: sessionId,
             configId: SessionConfigId("mode"),
-            value: SessionConfigValueId(value)
+            value: SessionConfigValueId(permissionMode.configValue(for: provider))
+        )
+        _ = try await client.setConfigOption(
+            sessionId: sessionId,
+            configId: SessionConfigId("model"),
+            value: SessionConfigValueId(model.rawValue)
         )
     }
 }

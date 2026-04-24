@@ -8,6 +8,16 @@ struct ACPView: View {
     private var session: ACPSession { chat.session }
     private var messages: [Message] { chat.messages }
 
+    private var modelBinding: Binding<AgentModel> {
+        Binding(
+            get: { chat.model },
+            set: { newModel in
+                chat.model = newModel
+                session.applyModel(newModel)
+            }
+        )
+    }
+
     private var permissionModeBinding: Binding<PermissionMode> {
         Binding(
             get: { chat.permissionMode },
@@ -60,13 +70,30 @@ struct ACPView: View {
                 ToolbarItem(placement: .automatic) {
                     Picker(selection: permissionModeBinding) {
                         ForEach(PermissionMode.allCases) { mode in
-                            Text(mode.label).tag(mode)
+                            Label(mode.label, systemImage: mode.systemImage)
+                                .tag(mode)
                         }
                     } label: {
-                        Label(chat.permissionMode.label, systemImage: "lock.shield")
+                        Label("Permission Mode", systemImage: "lock.shield")
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .help(chat.permissionMode.description)
+                }
+
+                ToolbarItem(placement: .automatic) {
+                    Picker(selection: modelBinding) {
+                        ForEach(AgentModel.models(for: chat.provider)) { model in
+                            Label(model.name, image: model.imageName)
+                                .labelStyle(.titleAndIcon)
+                                .tag(model)
+                        }
+                    } label: {
+                        Label(chat.model.name, image: chat.model.imageName)
+                            .labelStyle(.titleAndIcon)
                     }
                     .pickerStyle(.menu)
-                    .help(chat.permissionMode.description)
+                    .menuOrder(.fixed)
                 }
             }
             .overlay {

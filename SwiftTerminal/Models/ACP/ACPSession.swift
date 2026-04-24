@@ -10,6 +10,7 @@ final class ACPSession {
     var error: String?
     var provider: AgentProvider = .codex
     var permissionMode: PermissionMode = .bypassPermissions
+    var model: AgentModel = .claudeSonnet
 
     var onTurnComplete: (() async -> Void)?
     var onConnected: (() -> Void)?
@@ -77,6 +78,18 @@ final class ACPSession {
                 isProcessing = false
                 self.error = error.localizedDescription
             }
+        }
+    }
+
+    func applyModel(_ newModel: AgentModel) {
+        model = newModel
+        guard let client, let sessionId else { return }
+        Task {
+            try? await client.setConfigOption(
+                sessionId: sessionId,
+                configId: SessionConfigId("model"),
+                value: SessionConfigValueId(newModel.rawValue)
+            )
         }
     }
 

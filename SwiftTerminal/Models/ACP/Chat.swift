@@ -9,6 +9,7 @@ final class Chat: Identifiable, Hashable, Codable {
     var acpSessionId: String?
     var provider: AgentProvider = .codex
     var permissionMode: PermissionMode = .bypassPermissions
+    var model: AgentModel = .claudeSonnet
     var date: Date = Date()
     var sortOrder: Int = 0
     var turnCount: Int = 0
@@ -36,17 +37,18 @@ final class Chat: Identifiable, Hashable, Codable {
 
     private var checkpointNamespace: String { id.uuidString }
 
-    init(title: String = "New Chat", provider: AgentProvider = .codex, permissionMode: PermissionMode = .bypassPermissions, sortOrder: Int = 0) {
+    init(title: String = "New Chat", provider: AgentProvider = .codex, permissionMode: PermissionMode = .bypassPermissions, model: AgentModel? = nil, sortOrder: Int = 0) {
         self.title = title
         self.provider = provider
         self.permissionMode = permissionMode
+        self.model = model ?? AgentModel.defaultModel(for: provider)
         self.sortOrder = sortOrder
     }
 
     // MARK: - Codable
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, acpSessionId, provider, permissionMode, date, sortOrder, turnCount, isArchived
+        case id, title, acpSessionId, provider, permissionMode, model, date, sortOrder, turnCount, isArchived
         case messages, checkpoints
     }
 
@@ -57,6 +59,7 @@ final class Chat: Identifiable, Hashable, Codable {
         self.acpSessionId = try c.decodeIfPresent(String.self, forKey: .acpSessionId)
         self.provider = try c.decodeIfPresent(AgentProvider.self, forKey: .provider) ?? .codex
         self.permissionMode = try c.decodeIfPresent(PermissionMode.self, forKey: .permissionMode) ?? .bypassPermissions
+        self.model = try c.decodeIfPresent(AgentModel.self, forKey: .model) ?? AgentModel.defaultModel(for: self.provider)
         self.date = try c.decodeIfPresent(Date.self, forKey: .date) ?? Date()
         self.sortOrder = try c.decodeIfPresent(Int.self, forKey: .sortOrder) ?? 0
         self.turnCount = try c.decodeIfPresent(Int.self, forKey: .turnCount) ?? 0
@@ -73,6 +76,7 @@ final class Chat: Identifiable, Hashable, Codable {
         try c.encodeIfPresent(acpSessionId, forKey: .acpSessionId)
         try c.encode(provider, forKey: .provider)
         try c.encode(permissionMode, forKey: .permissionMode)
+        try c.encode(model, forKey: .model)
         try c.encode(date, forKey: .date)
         try c.encode(sortOrder, forKey: .sortOrder)
         try c.encode(turnCount, forKey: .turnCount)
@@ -94,6 +98,7 @@ final class Chat: Identifiable, Hashable, Codable {
 
         session.provider = provider
         session.permissionMode = permissionMode
+        session.model = model
         session.setWorkingDirectory(directory)
         wireLiveCallbacks()
 
