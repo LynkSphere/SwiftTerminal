@@ -15,7 +15,7 @@ struct PlanView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading) {
             // Collapsed header — always visible
             Button {
                 withAnimation(.snappy(duration: 0.2)) {
@@ -59,7 +59,7 @@ struct PlanView: View {
                 Divider()
                     .padding(.horizontal, 12)
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 4) {
                     ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
                         HStack(spacing: 6) {
                             Image(systemName: entry.status.systemImage)
@@ -75,7 +75,6 @@ struct PlanView: View {
 
                             Spacer()
                         }
-                        .padding(.vertical, 2)
                     }
                 }
             }
