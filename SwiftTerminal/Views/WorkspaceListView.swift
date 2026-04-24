@@ -65,6 +65,7 @@ struct WorkspaceListView: View {
                 SessionSidebarRow(session: session)
             }
         }
+        .environment(\.sidebarRowSize, .medium)
         .safeAreaBar(edge: .bottom) {
             HStack(spacing: 0) {
                 Button {
