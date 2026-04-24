@@ -8,6 +8,7 @@ final class Chat: Identifiable, Hashable, Codable {
     var title: String = "New Chat"
     var acpSessionId: String?
     var provider: AgentProvider = .codex
+    var permissionMode: PermissionMode = .bypassPermissions
     var date: Date = Date()
     var sortOrder: Int = 0
     var turnCount: Int = 0
@@ -35,16 +36,17 @@ final class Chat: Identifiable, Hashable, Codable {
 
     private var checkpointNamespace: String { id.uuidString }
 
-    init(title: String = "New Chat", provider: AgentProvider = .codex, sortOrder: Int = 0) {
+    init(title: String = "New Chat", provider: AgentProvider = .codex, permissionMode: PermissionMode = .bypassPermissions, sortOrder: Int = 0) {
         self.title = title
         self.provider = provider
+        self.permissionMode = permissionMode
         self.sortOrder = sortOrder
     }
 
     // MARK: - Codable
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, acpSessionId, provider, date, sortOrder, turnCount, isArchived
+        case id, title, acpSessionId, provider, permissionMode, date, sortOrder, turnCount, isArchived
         case messages, checkpoints
     }
 
@@ -54,6 +56,7 @@ final class Chat: Identifiable, Hashable, Codable {
         self.title = try c.decode(String.self, forKey: .title)
         self.acpSessionId = try c.decodeIfPresent(String.self, forKey: .acpSessionId)
         self.provider = try c.decodeIfPresent(AgentProvider.self, forKey: .provider) ?? .codex
+        self.permissionMode = try c.decodeIfPresent(PermissionMode.self, forKey: .permissionMode) ?? .bypassPermissions
         self.date = try c.decodeIfPresent(Date.self, forKey: .date) ?? Date()
         self.sortOrder = try c.decodeIfPresent(Int.self, forKey: .sortOrder) ?? 0
         self.turnCount = try c.decodeIfPresent(Int.self, forKey: .turnCount) ?? 0
@@ -69,6 +72,7 @@ final class Chat: Identifiable, Hashable, Codable {
         try c.encode(title, forKey: .title)
         try c.encodeIfPresent(acpSessionId, forKey: .acpSessionId)
         try c.encode(provider, forKey: .provider)
+        try c.encode(permissionMode, forKey: .permissionMode)
         try c.encode(date, forKey: .date)
         try c.encode(sortOrder, forKey: .sortOrder)
         try c.encode(turnCount, forKey: .turnCount)
@@ -89,6 +93,7 @@ final class Chat: Identifiable, Hashable, Codable {
         guard let directory = workspace?.directory else { return }
 
         session.provider = provider
+        session.permissionMode = permissionMode
         session.setWorkingDirectory(directory)
         wireLiveCallbacks()
 

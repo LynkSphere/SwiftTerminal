@@ -177,10 +177,11 @@ final class Workspace: Identifiable, Hashable, Codable {
     }
 
     @discardableResult
-    func addSession(title: String = "New Chat", provider: AgentProvider = .codex) -> Chat {
+    func addSession(title: String = "New Chat", provider: AgentProvider = .codex, permissionMode: PermissionMode = .bypassPermissions) -> Chat {
         let tracked = Chat(
             title: title,
             provider: provider,
+            permissionMode: permissionMode,
             sortOrder: chats.count
         )
         tracked.workspace = self

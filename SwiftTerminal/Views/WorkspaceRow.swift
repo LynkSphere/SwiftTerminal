@@ -4,6 +4,7 @@ struct WorkspaceRow: View {
     @Environment(AppState.self) private var appState
     @Environment(WorkspaceStore.self) private var store
     @AppStorage("defaultChatMode") private var defaultChatMode: AgentProvider = .claude
+    @AppStorage("defaultPermissionMode") private var defaultPermissionMode: PermissionMode = .bypassPermissions
 
     let workspace: Workspace
 
@@ -49,7 +50,7 @@ struct WorkspaceRow: View {
             Menu {
                 ForEach(AgentProvider.allCases, id: \.self) { provider in
                     Button {
-                        let tracked = workspace.addSession(provider: provider)
+                        let tracked = workspace.addSession(provider: provider, permissionMode: defaultPermissionMode)
                         appState.expandedWorkspaceIDs.insert("w:\(workspace.id.uuidString)")
                         appState.selectedWorkspace = workspace
                         appState.selectedSession = tracked
@@ -60,7 +61,7 @@ struct WorkspaceRow: View {
             } label: {
                 Label("New Chat", systemImage: "plus")
             } primaryAction: {
-                let tracked = workspace.addSession(provider: defaultChatMode)
+                let tracked = workspace.addSession(provider: defaultChatMode, permissionMode: defaultPermissionMode)
                 appState.expandedWorkspaceIDs.insert("w:\(workspace.id.uuidString)")
                 appState.selectedWorkspace = workspace
                 appState.selectedSession = tracked

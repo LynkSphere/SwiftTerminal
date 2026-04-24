@@ -6,6 +6,7 @@ struct SessionBrowserView: View {
 
     @Environment(AppState.self) private var appState
     @AppStorage("defaultChatMode") private var defaultChatMode: AgentProvider = .claude
+    @AppStorage("defaultPermissionMode") private var defaultPermissionMode: PermissionMode = .bypassPermissions
 
     private var regularChats: [Chat] {
         workspace.chats.filter { !$0.isArchived }.sorted { $0.date > $1.date }
@@ -53,7 +54,7 @@ struct SessionBrowserView: View {
         Menu {
             ForEach(AgentProvider.allCases, id: \.self) { provider in
                 Button {
-                    let chat = workspace.addSession(provider: provider)
+                    let chat = workspace.addSession(provider: provider, permissionMode: defaultPermissionMode)
                     appState.expandedWorkspaceIDs.insert("w:\(workspace.id.uuidString)")
                     appState.selectedSession = chat
                     onSelect?()
@@ -64,7 +65,7 @@ struct SessionBrowserView: View {
         } label: {
             Label("New Chat", systemImage: "plus")
         } primaryAction: {
-            let chat = workspace.addSession(provider: defaultChatMode)
+            let chat = workspace.addSession(provider: defaultChatMode, permissionMode: defaultPermissionMode)
             appState.expandedWorkspaceIDs.insert("w:\(workspace.id.uuidString)")
             appState.selectedSession = chat
             onSelect?()

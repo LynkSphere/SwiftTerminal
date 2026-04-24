@@ -1,5 +1,6 @@
 import Foundation
 import ACP
+import ACPModel
 
 @Observable
 final class ACPSession {
@@ -8,6 +9,7 @@ final class ACPSession {
     var isProcessing = false
     var error: String?
     var provider: AgentProvider = .codex
+    var permissionMode: PermissionMode = .bypassPermissions
 
     var onTurnComplete: (() async -> Void)?
     var onConnected: (() -> Void)?
@@ -17,7 +19,7 @@ final class ACPSession {
     @ObservationIgnored private(set) var sessionId: SessionId?
     @ObservationIgnored var notificationTask: Task<Void, Never>?
     @ObservationIgnored private(set) var workingDirectory: String = ""
-    @ObservationIgnored let autoApproveDelegate = AutoApproveDelegate()
+    @ObservationIgnored let delegate = ACPSessionDelegate()
     @ObservationIgnored var isReplaying = false
 
     func connect(workingDirectory: String) {
@@ -75,6 +77,19 @@ final class ACPSession {
                 isProcessing = false
                 self.error = error.localizedDescription
             }
+        }
+    }
+
+    func applyPermissionMode(_ mode: PermissionMode) {
+        permissionMode = mode
+        guard let client, let sessionId else { return }
+        let value = mode.configValue(for: provider)
+        Task {
+            try? await client.setConfigOption(
+                sessionId: sessionId,
+                configId: SessionConfigId("mode"),
+                value: SessionConfigValueId(value)
+            )
         }
     }
 

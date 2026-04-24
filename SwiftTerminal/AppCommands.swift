@@ -8,6 +8,7 @@ struct AppCommands: Commands {
     @FocusedValue(\.isMainWindow) private var isMainWindow
     @AppStorage("showHiddenFiles") var showHiddenFiles = false
     @AppStorage("defaultChatMode") private var defaultChatMode: AgentProvider = .claude
+    @AppStorage("defaultPermissionMode") private var defaultPermissionMode: PermissionMode = .bypassPermissions
 
     /// Whether the focused window is the main SwiftTerminal window.
     private var mainWindowActive: Bool { isMainWindow == true }
@@ -39,7 +40,7 @@ struct AppCommands: Commands {
             CommandGroup(after: .newItem) {
                 Button {
                     guard let workspace = appState.selectedWorkspace else { return }
-                    let chat = workspace.addSession(provider: defaultChatMode)
+                    let chat = workspace.addSession(provider: defaultChatMode, permissionMode: defaultPermissionMode)
                     appState.expandedWorkspaceIDs.insert("w:\(workspace.id.uuidString)")
                     appState.selectedSession = chat
                 } label: {

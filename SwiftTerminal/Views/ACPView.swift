@@ -8,6 +8,16 @@ struct ACPView: View {
     private var session: ACPSession { chat.session }
     private var messages: [Message] { chat.messages }
 
+    private var permissionModeBinding: Binding<PermissionMode> {
+        Binding(
+            get: { chat.permissionMode },
+            set: { newMode in
+                chat.permissionMode = newMode
+                session.applyPermissionMode(newMode)
+            }
+        )
+    }
+
     var body: some View {
         ScrollViewReader { proxy in
             List {
@@ -45,6 +55,18 @@ struct ACPView: View {
                             Label("Connected", systemImage: "bolt.fill")
                         }
                     }
+                }
+
+                ToolbarItem(placement: .automatic) {
+                    Picker(selection: permissionModeBinding) {
+                        ForEach(PermissionMode.allCases) { mode in
+                            Text(mode.label).tag(mode)
+                        }
+                    } label: {
+                        Label(chat.permissionMode.label, systemImage: "lock.shield")
+                    }
+                    .pickerStyle(.menu)
+                    .help(chat.permissionMode.description)
                 }
             }
             .overlay {

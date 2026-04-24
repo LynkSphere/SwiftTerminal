@@ -2,15 +2,17 @@ import Foundation
 import ACP
 import ACPModel
 
-final class AutoApproveDelegate: ClientDelegate, @unchecked Sendable {
+final class ACPSessionDelegate: ClientDelegate, @unchecked Sendable {
 
+    // MARK: - Permissions
+
+    /// Called when the agent requests permission for a tool call.
+    /// Wire this up to a UI prompt later for non-bypass permission modes.
     func handlePermissionRequest(request: RequestPermissionRequest) async throws -> RequestPermissionResponse {
-        let options = request.options
-        if let allow = options.first(where: { $0.kind == "allow" }) ?? options.first {
-            return RequestPermissionResponse(outcome: PermissionOutcome(optionId: allow.optionId))
-        }
         return RequestPermissionResponse(outcome: PermissionOutcome(cancelled: true))
     }
+
+    // MARK: - File System
 
     func handleFileReadRequest(_ path: String, sessionId: String, line: Int?, limit: Int?) async throws -> ReadTextFileResponse {
         throw ACPDelegateError.notSupported
@@ -19,6 +21,8 @@ final class AutoApproveDelegate: ClientDelegate, @unchecked Sendable {
     func handleFileWriteRequest(_ path: String, content: String, sessionId: String) async throws -> WriteTextFileResponse {
         throw ACPDelegateError.notSupported
     }
+
+    // MARK: - Terminal
 
     func handleTerminalCreate(command: String, sessionId: String, args: [String]?, cwd: String?, env: [EnvVariable]?, outputByteLimit: Int?) async throws -> CreateTerminalResponse {
         throw ACPDelegateError.notSupported
@@ -41,6 +45,6 @@ final class AutoApproveDelegate: ClientDelegate, @unchecked Sendable {
     }
 }
 
-private enum ACPDelegateError: Error {
+enum ACPDelegateError: Error {
     case notSupported
 }

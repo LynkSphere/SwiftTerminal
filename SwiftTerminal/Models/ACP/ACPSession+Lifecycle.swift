@@ -1,5 +1,6 @@
 import Foundation
 import ACP
+import ACPModel
 
 extension ACPSession {
     func launchAndCreateSession() async {
@@ -40,7 +41,10 @@ extension ACPSession {
                 cwd: workingDirectory,
                 mcpServers: []
             )
-            setSessionId(response.sessionId ?? sessionId)
+            let resolvedId = response.sessionId ?? sessionId
+            setSessionId(resolvedId)
+
+            try? await applyPermissionConfig(client: newClient, sessionId: resolvedId)
 
             // Let queued replay notifications drain before re-opening the
             // update handler.
@@ -59,7 +63,7 @@ extension ACPSession {
 
     func launchAndInitialize() async throws -> Client {
         let newClient = Client()
-        await newClient.setDelegate(autoApproveDelegate)
+        await newClient.setDelegate(delegate)
         setClient(newClient)
 
         try await newClient.launch(
@@ -90,6 +94,9 @@ extension ACPSession {
             timeout: 60
         )
         setSessionId(session.sessionId)
+
+        try? await applyPermissionConfig(client: client, sessionId: session.sessionId)
+
         isConnected = true
         isConnecting = false
         listenForNotifications(client: client)
@@ -116,5 +123,14 @@ extension ACPSession {
             isConnecting = false
             self.error = error.localizedDescription
         }
+    }
+
+    private func applyPermissionConfig(client: Client, sessionId: SessionId) async throws {
+        let value = permissionMode.configValue(for: provider)
+        _ = try await client.setConfigOption(
+            sessionId: sessionId,
+            configId: SessionConfigId("mode"),
+            value: SessionConfigValueId(value)
+        )
     }
 }
