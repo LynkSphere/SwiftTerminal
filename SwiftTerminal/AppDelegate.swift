@@ -13,13 +13,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
         // Remove the system "Close" (Cmd+W) from File menu so our custom Close Tab command takes priority.
         // SwiftUI can rebuild the menu after launch, so observe changes and re-strip it.
-        removeCloseMenuItem()
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(menuDidChange),
-            name: NSMenu.didAddItemNotification,
-            object: nil
-        )
+//        removeCloseMenuItem()
+//        NotificationCenter.default.addObserver(
+//            self,
+//            selector: #selector(menuDidChange),
+//            name: NSMenu.didAddItemNotification,
+//            object: nil
+//        )
     }
 
     @objc private func menuDidChange(_ notification: Notification) {

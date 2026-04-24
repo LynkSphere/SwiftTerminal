@@ -47,10 +47,6 @@ struct ACPView: View {
                     }
                 }
             }
-            .safeAreaBar(edge: .bottom) {
-                ACPInputArea(chat: chat)
-            }
-            .imageDropHandler(chat: chat)
             .overlay {
                 if isPreparingInitialScroll {
                     ZStack {
@@ -59,9 +55,12 @@ struct ACPView: View {
                         ProgressView()
                             .controlSize(.large)
                     }
-                    .ignoresSafeArea(edges: .vertical)
                 }
             }
+            .safeAreaBar(edge: .bottom) {
+                ACPInputArea(chat: chat)
+            }
+            .imageDropHandler(chat: chat)
             .onChange(of: messages.count) {
                 guard !isPreparingInitialScroll else { return }
                 withAnimation {
