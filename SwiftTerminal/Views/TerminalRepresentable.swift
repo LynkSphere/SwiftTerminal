@@ -58,6 +58,7 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
         func hostCurrentDirectoryUpdate(source: SwiftTerm.TerminalView, directory: String?) {}
 
         private var viewMap: [ObjectIdentifier: (id: UUID, tab: Terminal)] = [:]
+        private var pollTasks: [UUID: Task<Void, Never>] = [:]
 
         func register(_ view: LocalProcessTerminalView, for tab: Terminal) {
             viewMap[ObjectIdentifier(view)] = (id: tab.id, tab: tab)
@@ -91,7 +92,9 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
             let shellBasename = (shell as NSString).lastPathComponent
             let shellName = "-" + shellBasename
             let home = FileManager.default.homeDirectoryForCurrentUser.path
-            let startingDirectory = resolvedWorkingDirectoryPath(from: tab.currentDirectory) ?? home
+            let startingDirectory = resolvedWorkingDirectoryPath(from: tab.currentDirectory)
+                ?? tab.workspace?.directory
+                ?? home
             var env = ProcessInfo.processInfo.environment
             env["TERM"] = "xterm-256color"
             env["COLORTERM"] = "truecolor"
@@ -108,9 +111,10 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
                 currentDirectory: startingDirectory
             )
 
-            Task { [weak tab] in
+            pollTasks[tab.id]?.cancel()
+            pollTasks[tab.id] = Task { [weak self, weak tab] in
                 while !Task.isCancelled {
-                    try? await Task.sleep(for: .seconds(5))
+                    try? await Task.sleep(for: .seconds(1))
                     guard !Task.isCancelled, let tab else { break }
 
                     guard let pid = tab.localProcessTerminalView?.process.shellPid, pid > 0 else { continue }
@@ -118,17 +122,23 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
                     var pathInfo = proc_vnodepathinfo()
                     let size = MemoryLayout<proc_vnodepathinfo>.size
                     let result = proc_pidinfo(pid, PROC_PIDVNODEPATHINFO, 0, &pathInfo, Int32(size))
-                    guard result == size else { continue }
-
-                    let liveDir = withUnsafePointer(to: pathInfo.pvi_cdir.vip_path) { ptr in
-                        ptr.withMemoryRebound(to: CChar.self, capacity: Int(MAXPATHLEN)) {
-                            String(cString: $0)
+                    if result == size {
+                        let liveDir = withUnsafePointer(to: pathInfo.pvi_cdir.vip_path) { ptr in
+                            ptr.withMemoryRebound(to: CChar.self, capacity: Int(MAXPATHLEN)) {
+                                String(cString: $0)
+                            }
+                        }
+                        if !liveDir.isEmpty, liveDir != tab.currentDirectory {
+                            tab.currentDirectory = liveDir
                         }
                     }
-                    if !liveDir.isEmpty, liveDir != tab.currentDirectory {
-                        tab.currentDirectory = liveDir
+
+                    let fg = tab.childProcesses().first?.name
+                    if tab.foregroundProcessName != fg {
+                        tab.foregroundProcessName = fg
                     }
                 }
+                self?.pollTasks[tab?.id ?? UUID()] = nil
             }
 
             return tv

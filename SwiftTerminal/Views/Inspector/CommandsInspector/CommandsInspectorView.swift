@@ -2,17 +2,32 @@ import SwiftUI
 
 struct CommandsInspectorView: View {
     let workspace: Workspace
-
-    @State private var selection: CommandEntry?
-    @State private var showAddSheet = false
+    @Environment(AppState.self) private var appState
 
     var body: some View {
+        @Bindable var state = workspace.inspectorState
         VSplitView {
-            commandList
-                .layoutPriority(1)
-            outputPanel
-                .frame(minHeight: 300, maxHeight: .infinity)
-                .frame(maxWidth: .infinity)
+            List(workspace.commands, selection: $state.selectedCommand) { terminal in
+                CommandEntryRow(terminal: terminal)
+                    .tag(terminal)
+                    .listRowSeparator(.hidden)
+            }
+            .safeAreaInset(edge: .top) {
+                Color.clear.frame(height: 50)
+            }
+            .scrollContentBackground(.hidden)
+            .layoutPriority(1)
+
+            Group {
+                if let terminal = state.selectedCommand {
+                    CommandTerminalOutputView(terminal: terminal)
+                        .id(terminal.id)
+                } else {
+                    Color.clear
+                }
+            }
+            .frame(minHeight: 390, maxHeight: .infinity)
+            .frame(maxWidth: .infinity)
         }
         .safeAreaBar(edge: .top) {
             HStack {
@@ -23,7 +38,8 @@ struct CommandsInspectorView: View {
                 Spacer()
 
                 Button {
-                    showAddSheet = true
+                    let terminal = workspace.addCommand()
+                    state.selectedCommand = terminal
                 } label: {
                     Image(systemName: "plus")
                 }
@@ -32,46 +48,6 @@ struct CommandsInspectorView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 6)
             .padding(.top, 7)
-        }
-        .sheet(isPresented: $showAddSheet) {
-            CommandEntrySheet(workspace: workspace)
-        }
-    }
-
-    private var commandList: some View {
-        List(workspace.commands, selection: $selection) { entry in
-            CommandEntryRow(entry: entry, runner: entry.runner, selection: $selection)
-                .tag(entry)
-                .listRowSeparator(.hidden)
-        }
-        .safeAreaInset(edge: .top) {
-            Color.clear.frame(height: 50)
-        }
-        .scrollContentBackground(.hidden)
-    }
-
-    @ViewBuilder
-    private var outputPanel: some View {
-        if let entry = selection {
-            let runner = entry.runner
-            if runner.output.isEmpty && !runner.isRunning {
-                Text("No output")
-                    .foregroundStyle(.tertiary)
-                    .font(.callout)
-            } else {
-                CommandOutputView(text: runner.output)
-                    .overlay(alignment: .topTrailing) {
-                       Button {
-                            runner.clearOutput()
-                        } label: {
-                            Image(systemName: "trash")
-                        }
-                        .buttonStyle(.borderless)
-                        .padding(10)
-                    }
-            }
-        } else {
-            Color.clear
         }
     }
 }

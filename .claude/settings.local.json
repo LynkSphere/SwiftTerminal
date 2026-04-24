@@ -12,7 +12,8 @@
       "Bash(gh release *)",
       "Bash(gh api *)",
       "Bash(grep \"\\\\.swift$\")",
-      "Bash(xcodebuild -project SwiftTerminal.xcodeproj -scheme SwiftTerminal -configuration Debug -destination 'platform=macOS' build)"
+      "Bash(xcodebuild -project SwiftTerminal.xcodeproj -scheme SwiftTerminal -configuration Debug -destination 'platform=macOS' build)",
+      "Bash(xargs cat *)"
     ]
   }
 }

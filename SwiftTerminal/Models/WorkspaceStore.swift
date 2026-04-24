@@ -2,8 +2,9 @@ import Foundation
 import Observation
 import SwiftUI
 
-/// Persists `Workspace` objects (and their `Terminal` / `CommandEntry`
-/// children) to a JSON file in `~/Library/Application Support/SwiftTerminal/`.
+/// Persists `Workspace` objects (and their `Terminal` children — both ad-hoc
+/// tabs and saved commands) to a JSON file in
+/// `~/Library/Application Support/SwiftTerminal/`.
 ///
 /// Mutations through `addWorkspace`/`deleteWorkspace`/`moveWorkspace` save
 /// directly. Property edits made through `Bindable(workspace).name` etc. are
@@ -106,8 +107,9 @@ final class WorkspaceStore {
                     _ = t.currentDirectory
                 }
                 for cmd in ws.commands {
-                    _ = cmd.name
-                    _ = cmd.command
+                    _ = cmd.title
+                    _ = cmd.currentDirectory
+                    _ = cmd.runScript
                     _ = cmd.isDefault
                 }
                 for chat in ws.chats {
@@ -137,7 +139,7 @@ final class WorkspaceStore {
 
     func deleteWorkspace(_ workspace: Workspace) {
         for cmd in workspace.commands {
-            CommandRunner.remove(for: cmd.id)
+            cmd.terminate()
         }
         for terminal in workspace.terminals {
             terminal.terminate()

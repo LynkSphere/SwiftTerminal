@@ -151,22 +151,22 @@ struct AppCommands: Commands {
                 Button {
                     guard let workspace = appState.selectedWorkspace,
                           let command = workspace.defaultCommand else { return }
-                    command.run()
+                    appState.showingInspector = true
+                    workspace.runCommand(command)
                 } label: {
                     Label("Run", systemImage: "play.fill")
                 }
                 .keyboardShortcut("r", modifiers: .command)
-                .disabled(appState.selectedWorkspace?.defaultCommand == nil || appState.selectedWorkspace?.defaultCommand?.runner.isRunning == true)
+                .disabled(appState.selectedWorkspace?.defaultCommand == nil || appState.selectedWorkspace?.defaultCommand?.hasChildProcess == true)
 
                 Button {
-                    guard let workspace = appState.selectedWorkspace,
-                          let command = workspace.defaultCommand else { return }
-                    command.runner.stop()
+                    guard let command = appState.selectedWorkspace?.defaultCommand else { return }
+                    command.interrupt()
                 } label: {
                     Label("Stop", systemImage: "stop.fill")
                 }
                 .keyboardShortcut("d", modifiers: .command)
-                .disabled(appState.selectedWorkspace?.defaultCommand?.runner.isRunning != true)
+                .disabled(appState.selectedWorkspace?.defaultCommand?.hasChildProcess != true)
 
                 Divider()
 

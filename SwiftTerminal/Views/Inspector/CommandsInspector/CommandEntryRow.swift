@@ -2,47 +2,57 @@ import SwiftUI
 import SwiftTerm
 
 struct CommandEntryRow: View {
-    let entry: CommandEntry
-    var runner: CommandRunner
-    @Binding var selection: CommandEntry?
-    @Environment(AppState.self) private var appState
+    let terminal: Terminal
 
     @State private var showEditSheet = false
 
-    private var isRunning: Bool { runner.isRunning }
+    private var isRunning: Bool { terminal.hasChildProcess }
+    private var hasScript: Bool {
+        !(terminal.runScript?.trimmingCharacters(in: .whitespaces).isEmpty ?? true)
+    }
 
     var body: some View {
         HStack(spacing: 6) {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
-                    Text(entry.name)
+                    Text(terminal.title)
                         .font(.callout)
                         .lineLimit(1)
                     statusIndicator
                 }
 
-                Text(entry.command)
-                    .font(.subheadline)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
+                subtitle
             }
 
             Spacer()
 
-            actionButtons
+            actionButton
         }
         .padding(.horizontal, 5)
         .contextMenu {
             contextMenuItems
         }
         .sheet(isPresented: $showEditSheet) {
-            if let workspace = entry.workspace {
-                CommandEntrySheet(workspace: workspace, entry: entry)
+            if let workspace = terminal.workspace {
+                CommandEntrySheet(workspace: workspace, terminal: terminal)
             }
         }
     }
 
-    // MARK: - Status Indicator
+    @ViewBuilder
+    private var subtitle: some View {
+        if let script = terminal.runScript, !script.isEmpty {
+            Text(script)
+                .font(.subheadline)
+                .foregroundStyle(.tertiary)
+                .lineLimit(1)
+        } else if !terminal.displayDirectory.isEmpty {
+            Text(terminal.displayDirectory)
+                .font(.subheadline)
+                .foregroundStyle(.tertiary)
+                .lineLimit(1)
+        }
+    }
 
     @ViewBuilder
     private var statusIndicator: some View {
@@ -50,60 +60,59 @@ struct CommandEntryRow: View {
             ProgressView()
                 .controlSize(.mini)
                 .frame(width: 14, height: 14)
-        } else if let code = runner.exitCode {
-            Image(systemName: code == 0 ? "checkmark.circle.fill" : "xmark.circle.fill")
-                .foregroundStyle(code == 0 ? .green : .red)
-                .font(.caption)
         }
     }
 
-    // MARK: - Action Buttons
-
-    private var actionButtons: some View {
-        Button {
-            if isRunning {
-                runner.stop()
-            } else {
-                entry.run()
-                selection = entry
+    @ViewBuilder
+    private var actionButton: some View {
+        if isRunning {
+            Button {
+                terminal.interrupt()
+            } label: {
+                Image(systemName: "stop.fill")
+                    .contentTransition(.symbolEffect(.replace))
             }
-        } label: {
-            Image(systemName: isRunning ? "stop.fill" : "play.fill")
-                .contentTransition(.symbolEffect(.replace))
+            .buttonStyle(.borderless)
+        } else if hasScript {
+            Button {
+                terminal.workspace?.runCommand(terminal)
+            } label: {
+                Image(systemName: "play.fill")
+                    .contentTransition(.symbolEffect(.replace))
+            }
+            .buttonStyle(.borderless)
         }
-        .buttonStyle(.borderless)
     }
-
-    // MARK: - Context Menu
 
     @ViewBuilder
     private var contextMenuItems: some View {
         if isRunning {
-            Button { runner.stop() } label: {
-                Label("Stop", systemImage: "stop.fill")
+            Button { terminal.interrupt() } label: {
+                Label("Interrupt", systemImage: "stop.fill")
             }
-        } else {
+        } else if hasScript {
             Button {
-                entry.run()
+                terminal.workspace?.runCommand(terminal)
             } label: {
                 Label("Run", systemImage: "play.fill")
             }
-
-            Button {
-                runInNewTerminal()
-            } label: {
-                Label("Run in Terminal", systemImage: "terminal")
-            }
         }
+
+        Button {
+            terminal.clearTerminal()
+        } label: {
+            Label("Clear", systemImage: "clear")
+        }
+        .disabled(terminal.localProcessTerminalView == nil)
 
         Divider()
 
         Button {
-            entry.workspace?.setDefaultCommand(entry)
+            terminal.workspace?.setDefaultCommand(terminal)
         } label: {
-            Label("Set as Run Command", systemImage: entry.isDefault ? "checkmark" : "play.circle")
+            Label("Set as Run Command", systemImage: terminal.isDefault ? "checkmark" : "play.circle")
         }
-        .disabled(entry.isDefault)
+        .disabled(terminal.isDefault || !hasScript)
 
         Button {
             showEditSheet = true
@@ -114,22 +123,9 @@ struct CommandEntryRow: View {
         Divider()
 
         Button(role: .destructive) {
-            runner.stop()
-            entry.workspace?.removeCommand(entry)
+            terminal.workspace?.removeCommand(terminal)
         } label: {
             Label("Delete", systemImage: "trash")
-        }
-    }
-
-    private func runInNewTerminal() {
-        guard let workspace = entry.workspace else { return }
-        let terminal = workspace.addTerminal()
-        appState.selectedTerminal = terminal
-        Task {
-            try? await Task.sleep(for: .milliseconds(300))
-            if let tv = terminal.localProcessTerminalView {
-                tv.send(txt: entry.command + "\n")
-            }
         }
     }
 }

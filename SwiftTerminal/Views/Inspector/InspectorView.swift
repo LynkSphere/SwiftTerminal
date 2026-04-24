@@ -12,13 +12,13 @@ struct InspectorView: View {
                 if let defaultCommand = workspace.defaultCommand {
                     ToolbarItem(placement: .primaryAction) {
                         Button {
-                            if defaultCommand.runner.isRunning {
-                                defaultCommand.runner.stop()
+                            if defaultCommand.hasChildProcess {
+                                defaultCommand.interrupt()
                             } else {
-                                defaultCommand.run()
+                                workspace.runCommand(defaultCommand)
                             }
                         } label: {
-                            Image(systemName: defaultCommand.runner.isRunning ? "stop.fill" : "play.fill")
+                            Image(systemName: defaultCommand.hasChildProcess ? "stop.fill" : "play.fill")
                                 .contentTransition(.symbolEffect(.replace))
                         }
                     }
@@ -51,7 +51,7 @@ struct InspectorView: View {
     }
 
     private func iconName(for tab: InspectorTab) -> String {
-        if tab == .commands && workspace.commands.contains(where: { $0.runner.isRunning }) {
+        if tab == .commands && workspace.commands.contains(where: { $0.hasChildProcess }) {
             return "terminal.fill"
         }
         return tab.icon
