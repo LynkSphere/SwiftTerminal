@@ -129,6 +129,15 @@ final class Chat: Identifiable, Hashable, Codable {
 
         pendingAttachments.removeAll()
 
+        session.isProcessing = true
+
+        // Create the assistant message immediately so it appears in the UI
+        // before the first API response arrives.
+        let assistantMsg = Message(role: .assistant, turnIndex: turnCount + 1)
+        assistantMsg.chat = self
+        messages.append(assistantMsg)
+        currentTurnMessage = assistantMsg
+
         if session.isConnected {
             session.send(content: content)
         } else {
