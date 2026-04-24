@@ -66,12 +66,12 @@ struct WorkspaceRow: View {
                 appState.selectedWorkspace = workspace
                 appState.selectedSession = tracked
             }
-
+            
             Divider()
-
+            
             RenameButton()
-
-            Menu("Project Type") {
+            
+            Menu {
                 ForEach(ProjectType.allCases, id: \.self) { type in
                     Button {
                         workspace.projectType = type
@@ -87,12 +87,14 @@ struct WorkspaceRow: View {
                         }
                     }
                 }
-
+                
                 Divider()
-
+                
                 Button("Auto-Detect") {
                     workspace.detectProjectType()
                 }
+            } label: {
+                Label("Project Type", systemImage: "shippingbox")
             }
 
             Divider()

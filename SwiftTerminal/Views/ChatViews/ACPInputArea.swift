@@ -1,4 +1,5 @@
 import SwiftUI
+import ACPModel
 
 struct ACPInputArea: View {
     @Bindable var chat: Chat
@@ -11,6 +12,37 @@ struct ACPInputArea: View {
             || !chat.pendingAttachments.isEmpty
     }
 
+    private var attributedPrompt: Binding<AttributedString> {
+        Binding(
+            get: {
+                var attributed = AttributedString(chat.prompt)
+                highlightCommand(in: &attributed)
+                return attributed
+            },
+            set: { newValue in
+                chat.prompt = String(newValue.characters)
+            }
+        )
+    }
+
+    private func highlightCommand(in text: inout AttributedString) {
+        let plain = String(text.characters)
+        guard plain.hasPrefix("/") else { return }
+
+        let afterSlash = plain.dropFirst()
+        let token = String(afterSlash.prefix(while: { !$0.isWhitespace })).lowercased()
+        guard !token.isEmpty else { return }
+
+        let matched = session.availableCommands.contains { $0.name.lowercased() == token }
+        guard matched else { return }
+
+        let commandLength = 1 + token.count // "/" + command name
+        let startIndex = text.startIndex
+        let endIndex = text.index(startIndex, offsetByCharacters: commandLength)
+        text[startIndex..<endIndex].foregroundColor = .accentColor
+        text[startIndex..<endIndex].font = .body.bold()
+    }
+
     var body: some View {
         GlassEffectContainer {
             HStack(alignment: .bottom) {
@@ -21,8 +53,8 @@ struct ACPInputArea: View {
                     if !chat.pendingAttachments.isEmpty {
                         AttachmentThumbnails(chat: chat)
                     }
-                    
-                    TextEditor(text: $chat.prompt)
+
+                    TextEditor(text: attributedPrompt)
                         .padding(.leading, -4)
                         .frame(maxHeight: 350)
                         .fixedSize(horizontal: false, vertical: true)
@@ -34,9 +66,9 @@ struct ACPInputArea: View {
                                     .padding(.leading, 1)
                                     .foregroundStyle(.placeholder)
                                     .allowsHitTesting(false)
-                             }  
+                             }
                         }
-                       .font(.body)                 
+                       .font(.body)
                 }
                 .padding(.horizontal, 7)
                 .padding(.vertical, 3)

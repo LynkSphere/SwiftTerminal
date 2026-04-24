@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import ACPModel
 
 struct ACPInputMenu: View {
     @Bindable var chat: Chat
@@ -7,8 +8,26 @@ struct ACPInputMenu: View {
     @State private var showFileImporter = false
     @State private var selectedPhotos: [PhotosPickerItem] = []
 
+    private var commands: [AvailableCommand] { chat.session.availableCommands }
+
     var body: some View {
         Menu {
+            if !commands.isEmpty {
+                Menu {
+                    ForEach(commands, id: \.name) { command in
+                        Button {
+                            chat.prompt += ("/\(command.name)")
+                        } label: {
+                            Text("/\(command.name)")
+                        }
+                    }
+                } label: {
+                    Label("Commands", systemImage: "command")
+                }
+
+                Divider()
+            }
+
             Button {
                 showPhotosPicker = true
             } label: {
