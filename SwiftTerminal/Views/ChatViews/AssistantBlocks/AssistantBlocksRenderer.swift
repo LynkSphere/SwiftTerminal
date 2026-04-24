@@ -160,7 +160,7 @@ struct AssistantBlocksRenderer: Sendable {
                     if let cap = maxLines { return min(cap, max(1, unifiedLines.count)) }
                     return max(1, unifiedLines.count)
                 }()
-                let diffHeight = headerHeight + 12 + CGFloat(renderedLineCount) * lineHeight
+                let diffHeight = headerHeight + 3 + CGFloat(renderedLineCount) * lineHeight
 
                 let placeholder = Self.diffPlaceholderAttributedString(height: diffHeight, diffID: diffID)
                 let start = output.length

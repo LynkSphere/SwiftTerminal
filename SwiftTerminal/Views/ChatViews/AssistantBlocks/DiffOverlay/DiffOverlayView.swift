@@ -152,7 +152,7 @@ final class DiffOverlayView: NSView {
         NSLayoutConstraint.activate([
             diffScrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
             diffScrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            diffScrollView.topAnchor.constraint(equalTo: borderView.bottomAnchor, constant: 6),
+            diffScrollView.topAnchor.constraint(equalTo: borderView.bottomAnchor, constant: 2),
             diffScrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
         ])
     }
