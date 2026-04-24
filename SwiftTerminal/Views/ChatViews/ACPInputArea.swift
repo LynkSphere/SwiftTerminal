@@ -16,6 +16,7 @@ struct ACPInputArea: View {
         Binding(
             get: {
                 var attributed = AttributedString(chat.prompt)
+                attributed.foregroundColor = .primary
                 highlightCommand(in: &attributed)
                 return attributed
             },
