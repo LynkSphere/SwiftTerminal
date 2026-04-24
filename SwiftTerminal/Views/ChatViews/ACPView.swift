@@ -50,23 +50,6 @@ struct ACPView: View {
                     .listRowSeparator(.hidden)
             }
             .toolbar {
-                ToolbarItem(placement: .navigation) {
-                    Button {
-                        if session.isConnected {
-                            session.disconnect()
-                        }
-                    } label: {
-                        if !session.isConnected && !session.isConnecting {
-                            Label("Disconnected", systemImage: "bolt.slash")
-                        } else if session.isConnecting {
-                            ProgressView()
-                            .controlSize(.small)
-                        } else if session.isConnected {
-                            Label("Connected", systemImage: "bolt.fill")
-                        }
-                    }
-                }
-
                 ToolbarItem(placement: .automatic) {
                     Picker(selection: permissionModeBinding) {
                         ForEach(PermissionMode.allCases) { mode in

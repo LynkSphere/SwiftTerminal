@@ -41,7 +41,7 @@ struct WorkspaceDetailView: View {
             BottomSheetView(directoryURL: workspace.url)
         }
         .toolbar {
-            ToolbarItem(placement: .automatic) {
+            ToolbarItem(placement: .navigation) {
                 Button {
                     showingScratchPad = true
                 } label: {

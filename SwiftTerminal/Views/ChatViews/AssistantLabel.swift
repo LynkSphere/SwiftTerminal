@@ -3,6 +3,7 @@ import SwiftUI
 struct AssistantLabel: View {
     @Environment(\.colorScheme) var colorScheme
     let provider: AgentProvider
+    var isConnected: Bool = true
 
     var body: some View {
         Label {
@@ -18,5 +19,6 @@ struct AssistantLabel: View {
                 .foregroundStyle(provider.color.gradient)
         }
         .labelIconToTitleSpacing(5)
+        .opacity(isConnected ? 1 : 0.4)
     }
 }

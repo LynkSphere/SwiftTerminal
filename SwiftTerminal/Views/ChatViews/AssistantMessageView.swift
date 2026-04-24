@@ -21,34 +21,42 @@ struct AssistantMessageView: View {
         return workspaceURL.appendingPathComponent(path)
     }
 
+    private var hasContent: Bool {
+        !message.blocks.isEmpty || (session.isProcessing && isLastMessage)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            AssistantLabel(provider: chat.provider)
+            AssistantLabel(provider: chat.provider, isConnected: session.isConnected || session.isConnecting)
 
-            VStack(alignment: .leading, spacing: 8) {
-                AssistantBlocksRepresentable(
-                    blocks: message.blocks,
-                    fontSize: fontSize,
-                    cachedHeight: message.height,
-                    calculatedHeight: $measuredHeight,
-                    onOpenFile: { path in
-                        guard let url = resolveFileURL(path) else { return }
-                        editorPanel.openFile(url)
+            if hasContent {
+                VStack(alignment: .leading, spacing: 8) {
+                    if !message.blocks.isEmpty {
+                        AssistantBlocksRepresentable(
+                            blocks: message.blocks,
+                            fontSize: fontSize,
+                            cachedHeight: message.height,
+                            calculatedHeight: $measuredHeight,
+                            onOpenFile: { path in
+                                guard let url = resolveFileURL(path) else { return }
+                                editorPanel.openFile(url)
+                            }
+                        )
+                        .frame(height: message.height > 0 ? message.height : nil, alignment: .top)
+                        .onChange(of: measuredHeight) { _, newHeight in
+                            guard newHeight > 0, message.height != newHeight else { return }
+                            message.height = newHeight
+                        }
+                        .transaction { $0.animation = nil }
                     }
-                )
-                .frame(height: message.height > 0 ? message.height : nil, alignment: .top)
-                .onChange(of: measuredHeight) { _, newHeight in
-                    guard newHeight > 0, message.height != newHeight else { return }
-                    message.height = newHeight
-                }
-                .transaction { $0.animation = nil }
 
-                if session.isProcessing && isLastMessage {
-                    ProgressView()
-                        .controlSize(.small)
+                    if session.isProcessing && isLastMessage {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
                 }
+                .padding(.leading, 22)
             }
-            .padding(.leading, 22)
         }
         .contentShape(.rect)
         .transaction { $0.animation = nil }
