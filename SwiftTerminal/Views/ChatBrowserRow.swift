@@ -61,6 +61,9 @@ struct ChatBrowserRow: View {
             }
 
             Button {
+                if !chat.isArchived {
+                    chat.disconnect()
+                }
                 chat.isArchived.toggle()
             } label: {
                 if chat.isArchived {

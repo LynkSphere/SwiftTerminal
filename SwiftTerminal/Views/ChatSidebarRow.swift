@@ -44,6 +44,7 @@ struct ChatSidebarRow: View {
                 if appState.selectedChat?.id == chat.id {
                     appState.selectedChat = nil
                 }
+                chat.disconnect()
                 chat.isArchived = true
             } label: {
                 Label("Archive", systemImage: "archivebox")
@@ -66,6 +67,7 @@ struct ChatSidebarRow: View {
                 if appState.selectedChat?.id == chat.id {
                     appState.selectedChat = nil
                 }
+                chat.disconnect()
                 chat.isArchived = true
             } label: {
                 Label("Archive", systemImage: "archivebox")
