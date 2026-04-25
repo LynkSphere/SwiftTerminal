@@ -87,13 +87,11 @@ struct WorkspaceRow: View {
 
             Divider()
             Button {
-                for chat in workspace.chats where chat.isActive {
-                    chat.disconnect()
-                }
+                workspace.disconnectAllActiveChats()
             } label: {
                 Label("Disconnect All", systemImage: "bolt.slash")
             }
-            .disabled(!workspace.chats.contains(where: { $0.isActive }))
+            .disabled(!workspace.hasActiveChats)
 
             Divider()
             Button(role: .destructive) {

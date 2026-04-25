@@ -161,4 +161,14 @@ final class Workspace: Identifiable, Hashable, Codable {
         chats.removeAll { $0.id == chat.id }
         store?.scheduleSave()
     }
+
+    var hasActiveChats: Bool {
+        chats.contains { $0.isActive }
+    }
+
+    func disconnectAllActiveChats() {
+        for chat in chats where chat.isActive {
+            chat.disconnect()
+        }
+    }
 }
