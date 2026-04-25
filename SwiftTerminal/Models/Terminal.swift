@@ -141,6 +141,7 @@ final class Terminal: Identifiable, Hashable, Codable {
         guard let script = runScript?.trimmingCharacters(in: .whitespacesAndNewlines),
               !script.isEmpty,
               let tv = localProcessTerminalView else { return }
+        clearTerminal()
         tv.send(txt: script + "\n")
     }
 

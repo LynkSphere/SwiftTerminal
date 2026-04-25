@@ -52,6 +52,7 @@ struct AssistantMessageView: View {
 
                     if session.isProcessing && isLastMessage {
                         ProgressView()
+                            .id(UUID())
                             .controlSize(.small)
                     }
                 }

@@ -4,12 +4,10 @@ final class ToolCallGroupPopoverView: NSView {
     private static let popoverWidth: CGFloat = 480
     private static let padding: CGFloat = 10
     private static let rowSpacing: CGFloat = 2
-    private static let maxItems = 10
+    private static let maxHeight: CGFloat = 360
 
     init(items: [ToolCallItem]) {
         super.init(frame: .zero)
-
-        let visibleItems = Array(items.prefix(Self.maxItems))
 
         let stack = NSStackView()
         stack.orientation = .vertical
@@ -17,24 +15,42 @@ final class ToolCallGroupPopoverView: NSView {
         stack.spacing = Self.rowSpacing
         stack.translatesAutoresizingMaskIntoConstraints = false
 
-        for item in visibleItems {
+        for item in items {
             stack.addArrangedSubview(makeRow(for: item))
         }
 
-        if items.count > Self.maxItems {
-            let more = NSTextField(labelWithString: "+\(items.count - Self.maxItems) more")
-            more.font = .systemFont(ofSize: 11, weight: .regular)
-            more.textColor = .secondaryLabelColor
-            stack.addArrangedSubview(more)
-        }
+        let documentView = FlippedView()
+        documentView.translatesAutoresizingMaskIntoConstraints = false
+        documentView.addSubview(stack)
 
-        addSubview(stack)
+        let scrollView = NSScrollView()
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = true
+        scrollView.borderType = .noBorder
+        scrollView.drawsBackground = false
+        scrollView.documentView = documentView
+
+        addSubview(scrollView)
+
+        let heightMatchesContent = scrollView.heightAnchor.constraint(equalTo: documentView.heightAnchor)
+        heightMatchesContent.priority = .defaultHigh
 
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: topAnchor, constant: Self.padding),
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Self.padding),
-            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Self.padding),
-            stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -Self.padding),
+            stack.topAnchor.constraint(equalTo: documentView.topAnchor),
+            stack.leadingAnchor.constraint(equalTo: documentView.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: documentView.trailingAnchor),
+            stack.bottomAnchor.constraint(equalTo: documentView.bottomAnchor),
+            documentView.widthAnchor.constraint(equalTo: scrollView.contentView.widthAnchor),
+
+            scrollView.topAnchor.constraint(equalTo: topAnchor, constant: Self.padding),
+            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Self.padding),
+            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Self.padding),
+            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -Self.padding),
+            scrollView.heightAnchor.constraint(lessThanOrEqualToConstant: Self.maxHeight),
+            heightMatchesContent,
+
             widthAnchor.constraint(equalToConstant: Self.popoverWidth),
         ])
     }
@@ -85,4 +101,8 @@ final class ToolCallGroupPopoverView: NSView {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
+}
+
+private final class FlippedView: NSView {
+    override var isFlipped: Bool { true }
 }
