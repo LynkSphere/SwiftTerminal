@@ -14,6 +14,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .sound])
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
@@ -32,7 +40,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     static func sendChatNotification(workspaceTitle: String, body: String, workspaceID: UUID, chatID: UUID) {
         DispatchQueue.main.async {
-            guard !NSApp.isActive else { return }
             let content = UNMutableNotificationContent()
             content.title = workspaceTitle
             content.body = body

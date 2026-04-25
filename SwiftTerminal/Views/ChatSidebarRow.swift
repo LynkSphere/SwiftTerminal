@@ -7,6 +7,10 @@ struct ChatSidebarRow: View {
     @State private var isRenaming = false
     @FocusState private var isNameFieldFocused: Bool
 
+    private var showNotificationBadge: Bool {
+        chat.hasNotification && appState.selectedChat?.id != chat.id
+    }
+
     var body: some View {
         Label {
             if isRenaming {
@@ -24,6 +28,8 @@ struct ChatSidebarRow: View {
             Image(chat.provider.imageName)
                 .foregroundStyle(chat.isActive ? chat.provider.color : .primary)
         }
+        .badge(showNotificationBadge ? Text("●") : nil)
+        .badgeProminence(.increased)
         .contextMenu {
             Button {
                 isRenaming = true
@@ -82,11 +88,10 @@ struct ChatSidebarRow: View {
                     chat.connectIfNeeded()
                 }
             } label: {
-                if chat.isActive {
-                    Label("Disconnect", systemImage: "bolt.slash")
-                } else {
-                    Label("Connect", systemImage: "bolt")
-                }
+                Label(
+                    chat.isActive ? "Disconnect" : "Connect",
+                    systemImage: chat.isActive ? "bolt.slash" : "bolt"
+                )
             }
             .labelStyle(.iconOnly)
             .tint(chat.isActive ? .gray : .yellow)

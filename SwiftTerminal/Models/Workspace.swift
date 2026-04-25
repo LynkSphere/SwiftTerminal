@@ -185,6 +185,10 @@ final class Workspace: Identifiable, Hashable, Codable {
         chats.contains { $0.isActive }
     }
 
+    var connectedChatCount: Int {
+        chats.lazy.filter { !$0.isArchived && $0.isActive }.count
+    }
+
     func disconnectAllActiveChats() {
         for chat in chats where chat.isActive {
             chat.disconnect()

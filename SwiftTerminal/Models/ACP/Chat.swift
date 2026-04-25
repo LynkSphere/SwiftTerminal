@@ -36,6 +36,8 @@ final class Chat: Identifiable, Hashable, Codable {
     var prompt: String = ""
     var pendingAttachments: [ChatAttachment] = []
 
+    var hasNotification: Bool = false
+
     var isActive: Bool { session.isConnected }
 
     private var checkpointNamespace: String { id.uuidString }
@@ -381,6 +383,7 @@ final class Chat: Identifiable, Hashable, Codable {
     private func notify(_ reason: String) {
         guard !session.isReplaying else { return }
         guard let workspace else { return }
+        hasNotification = true
         AppDelegate.sendChatNotification(
             workspaceTitle: workspace.name,
             body: reason,

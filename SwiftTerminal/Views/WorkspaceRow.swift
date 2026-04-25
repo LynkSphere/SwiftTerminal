@@ -11,6 +11,26 @@ struct WorkspaceRow: View {
     @State private var isRenaming = false
     @FocusState private var isNameFieldFocused: Bool
 
+    private var isExpanded: Bool {
+        appState.expandedWorkspaceIDs.contains("w:\(workspace.id.uuidString)")
+    }
+
+    private var notificationCount: Int {
+        let selectedID = appState.selectedChat?.id
+        return workspace.chats.lazy
+            .filter { !$0.isArchived && $0.hasNotification && $0.id != selectedID }
+            .count
+    }
+
+    private var badgeCount: Int {
+        if isExpanded { return workspace.connectedChatCount }
+        return notificationCount > 0 ? notificationCount : workspace.connectedChatCount
+    }
+
+    private var badgeIsProminent: Bool {
+        !isExpanded && notificationCount > 0
+    }
+
     var body: some View {
         HStack(spacing: 8) {
             if workspace.projectType != .unknown {
@@ -34,6 +54,8 @@ struct WorkspaceRow: View {
                     .lineLimit(1)
             }
         }
+        .badge(badgeCount)
+        .badgeProminence(badgeIsProminent ? .increased : .standard)
         .contextMenu {
             Menu {
                 ForEach(AgentProvider.allCases, id: \.self) { provider in

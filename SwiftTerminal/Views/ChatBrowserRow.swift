@@ -66,11 +66,10 @@ struct ChatBrowserRow: View {
                 }
                 chat.isArchived.toggle()
             } label: {
-                if chat.isArchived {
-                    Label("Unarchive", systemImage: "tray.and.arrow.up")
-                } else {
-                    Label("Archive", systemImage: "archivebox")
-                }
+                Label(
+                    chat.isArchived ? "Unarchive" : "Archive",
+                    systemImage: chat.isArchived ? "tray.and.arrow.up" : "archivebox"
+                )
             }
 
             Button(role: .destructive) {
@@ -92,11 +91,10 @@ struct ChatBrowserRow: View {
                 }
                 chat.isArchived.toggle()
             } label: {
-                if chat.isArchived {
-                    Label("Unarchive", systemImage: "tray.and.arrow.up")
-                } else {
-                    Label("Archive", systemImage: "archivebox")
-                }
+                Label(
+                    chat.isArchived ? "Unarchive" : "Archive",
+                    systemImage: chat.isArchived ? "tray.and.arrow.up" : "archivebox"
+                )
             }
             .labelStyle(.iconOnly)
             .tint(.orange)
@@ -108,11 +106,10 @@ struct ChatBrowserRow: View {
                     chat.connectIfNeeded()
                 }
             } label: {
-                if chat.isActive {
-                    Label("Disconnect", systemImage: "bolt.slash")
-                } else {
-                    Label("Connect", systemImage: "bolt")
-                }
+                Label(
+                    chat.isActive ? "Disconnect" : "Connect",
+                    systemImage: chat.isActive ? "bolt.slash" : "bolt"
+                )
             }
             .labelStyle(.iconOnly)
             .tint(chat.isActive ? .gray : .yellow)
