@@ -624,15 +624,35 @@ final class EditorTextView: NSTextView {
         let containerOrigin = textContainerOrigin
         let text = string as NSString
 
-        guard text.length > 0 else { return }
-
-        let visibleGlyphRange = layoutManager.glyphRange(forBoundingRect: rect, in: textContainer)
-        let visibleCharRange = layoutManager.characterRange(forGlyphRange: visibleGlyphRange, actualGlyphRange: nil)
-
         let lineNumAttrs: [NSAttributedString.Key: Any] = [
             .font: lineNumberFont,
             .foregroundColor: NSColor.secondaryLabelColor,
         ]
+        let lineNumEndX = gutterWidth - foldColWidth - markerBarWidth - 6
+
+        if text.length == 0 {
+            var fragmentRect = layoutManager.extraLineFragmentRect
+            if fragmentRect == .zero {
+                let resolvedFont = font ?? NSFont.monospacedSystemFont(ofSize: editorFontSize, weight: .regular)
+                let lineHeight = layoutManager.defaultLineHeight(for: resolvedFont)
+                fragmentRect = NSRect(x: 0, y: 0, width: 0, height: lineHeight)
+            }
+            let lineY = fragmentRect.minY + containerOrigin.y
+            let lineHeight = fragmentRect.height
+
+            currentLineHighlightColor.setFill()
+            NSRect(x: 0, y: lineY, width: bounds.width, height: lineHeight).fill()
+
+            let numStr = "1" as NSString
+            let size = numStr.size(withAttributes: lineNumAttrs)
+            let x = lineNumEndX - size.width
+            let y = lineY + (lineHeight - size.height) / 2
+            numStr.draw(at: NSPoint(x: x, y: y), withAttributes: lineNumAttrs)
+            return
+        }
+
+        let visibleGlyphRange = layoutManager.glyphRange(forBoundingRect: rect, in: textContainer)
+        let visibleCharRange = layoutManager.characterRange(forGlyphRange: visibleGlyphRange, actualGlyphRange: nil)
 
         let foldBadgeAttrs: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedSystemFont(ofSize: 10, weight: .medium),
@@ -646,7 +666,6 @@ final class EditorTextView: NSTextView {
             startLineNumber = preText.components(separatedBy: "\n").count
         }
 
-        let lineNumEndX = gutterWidth - foldColWidth - markerBarWidth - 6
         let markerBarX = gutterWidth - foldColWidth - markerBarWidth - 1
         let foldCenterX = gutterWidth - foldColWidth / 2
 

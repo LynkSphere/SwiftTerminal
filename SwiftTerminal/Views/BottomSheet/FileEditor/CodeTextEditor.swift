@@ -168,6 +168,7 @@ struct CodeTextEditor: NSViewRepresentable {
     private func applyWrapping(textView: EditorTextView, contentWidth: CGFloat, coordinator: Coordinator) {
         guard let textContainer = textView.textContainer else { return }
         let layoutManager = textContainer.layoutManager
+        let scrollViewHeight = coordinator.scrollView?.contentSize.height ?? 0
 
         let stateChanged = coordinator.lastWrapLines != wrapLines
         let widthChanged = coordinator.lastWrapContentWidth != contentWidth
@@ -177,23 +178,28 @@ struct CodeTextEditor: NSViewRepresentable {
         if wrapLines {
             let inset = textView.textContainerInset.width * 2
             let containerWidth = max(0, contentWidth - inset)
-            textView.minSize = NSSize(width: 0, height: 0)
+            textView.minSize = NSSize(width: 0, height: scrollViewHeight)
             textView.maxSize = NSSize(width: contentWidth, height: .greatestFiniteMagnitude)
             textView.isHorizontallyResizable = false
             textContainer.containerSize = NSSize(width: containerWidth, height: .greatestFiniteMagnitude)
             textContainer.widthTracksTextView = true
-            textView.setFrameSize(NSSize(width: contentWidth, height: textView.frame.height))
+            let newHeight = max(textView.frame.height, scrollViewHeight)
+            textView.setFrameSize(NSSize(width: contentWidth, height: newHeight))
         } else {
             textContainer.widthTracksTextView = false
             textContainer.containerSize = NSSize(
                 width: CGFloat.greatestFiniteMagnitude,
                 height: CGFloat.greatestFiniteMagnitude
             )
+            textView.minSize = NSSize(width: 0, height: scrollViewHeight)
             textView.isHorizontallyResizable = true
             textView.maxSize = NSSize(
                 width: CGFloat.greatestFiniteMagnitude,
                 height: CGFloat.greatestFiniteMagnitude
             )
+            if textView.frame.height < scrollViewHeight {
+                textView.setFrameSize(NSSize(width: textView.frame.width, height: scrollViewHeight))
+            }
         }
 
         if (stateChanged || widthChanged), let layoutManager, let textStorage = textView.textStorage {

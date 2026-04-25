@@ -94,7 +94,7 @@ struct ChatSidebarRow: View {
                 )
             }
             .labelStyle(.iconOnly)
-            .tint(chat.isActive ? .gray : .yellow)
+            .tint(chat.isActive ? .gray : .green)
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(role: .destructive) {
