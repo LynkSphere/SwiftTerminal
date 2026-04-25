@@ -91,9 +91,9 @@ struct ACPView: View {
                     Image(chat.provider.imageName)
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 128, height: 128)
+                        .frame(width: 100, height: 100)
                         .foregroundStyle(chat.provider.color.gradient)
-                        .opacity(0.5)
+                        .saturation(0)
                         .allowsHitTesting(false)
                 }
             }

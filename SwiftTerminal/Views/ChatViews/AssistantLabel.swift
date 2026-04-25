@@ -19,6 +19,7 @@ struct AssistantLabel: View {
                 .foregroundStyle(provider.color.gradient)
         }
         .labelIconToTitleSpacing(5)
-        .opacity(isConnected ? 1 : 0.4)
+        .saturation(isConnected ? 1 : 0)
+        .animation(.default, value: isConnected)
     }
 }

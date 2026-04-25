@@ -3,6 +3,7 @@ import SwiftUI
 struct ChatSettingsView: View {
     @AppStorage("defaultChatMode") private var defaultChatMode: AgentProvider = .claude
     @AppStorage("defaultPermissionMode") private var defaultPermissionMode: PermissionMode = .bypassPermissions
+    @AppStorage("enterToSendChat") private var enterToSendChat: Bool = false
 
     var body: some View {
         Form {
@@ -26,6 +27,12 @@ struct ChatSettingsView: View {
                 }
             } footer: {
                 Text(defaultPermissionMode.description)
+            }
+
+            Section {
+                Toggle("Send message on Return", isOn: $enterToSendChat)
+            } footer: {
+                Text("When enabled, pressing Return sends the message. Hold Shift or Option for a newline. Cmd+Return always sends.")
             }
         }
         .formStyle(.grouped)

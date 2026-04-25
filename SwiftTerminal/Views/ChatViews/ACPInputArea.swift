@@ -1,15 +1,49 @@
 import SwiftUI
+import AppKit
 import ACPModel
 
 struct ACPInputArea: View {
     @Bindable var chat: Chat
     @FocusState private var isFocused: Bool
+    @AppStorage("enterToSendChat") private var enterToSendChat: Bool = false
 
     private var session: ACPSession { chat.session }
 
     private var canSend: Bool {
         !chat.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || !chat.pendingAttachments.isEmpty
+    }
+
+    private var slashQuery: String? {
+        let prompt = chat.prompt
+        guard prompt.hasPrefix("/") else { return nil }
+        let afterSlash = prompt.dropFirst()
+        if let end = afterSlash.firstIndex(where: { $0.isWhitespace || $0.isNewline }) {
+            return String(afterSlash[..<end])
+        }
+        return String(afterSlash)
+    }
+
+    private var filteredCommands: [AvailableCommand] {
+        guard let query = slashQuery else { return [] }
+        guard !query.isEmpty else { return session.availableCommands }
+        let needle = query.lowercased()
+        return session.availableCommands.filter { $0.name.lowercased().hasPrefix(needle) }
+    }
+
+    private var showSlashMenu: Bool {
+        slashQuery != nil && !filteredCommands.isEmpty
+    }
+
+    private var slashMenuBinding: Binding<Bool> {
+        Binding(
+            get: { showSlashMenu },
+            set: { newValue in
+                if !newValue && showSlashMenu {
+                    chat.prompt = ""
+                }
+            }
+        )
     }
 
     var body: some View {
@@ -38,11 +72,21 @@ struct ACPInputArea: View {
                              }
                         }
                        .font(.body)
+                       .onKeyPress(.return) { handleReturnKey() }
                 }
                 .padding(.horizontal, 7)
                 .padding(.vertical, 3)
                 .padding(6)
                 .glassEffect(in: .rect(cornerRadius: 16))
+                .popover(
+                    isPresented: slashMenuBinding,
+                    attachmentAnchor: .point(.topLeading),
+                    arrowEdge: .bottom
+                ) {
+                    SlashCommandMenu(commands: filteredCommands) { cmd in
+                        chat.prompt = "/\(cmd.name) "
+                    }
+                }
 
                 Button {
                     session.isProcessing ? session.stopStreaming() : send()
@@ -73,6 +117,20 @@ struct ACPInputArea: View {
         .task {
                 isFocused = true
         }
+    }
+
+    private func handleReturnKey() -> KeyPress.Result {
+        let mods = NSApp.currentEvent?.modifierFlags ?? []
+        let isPlainReturn = !mods.contains(.shift) && !mods.contains(.option) && !mods.contains(.command)
+
+        if enterToSendChat, isPlainReturn {
+            if canSend, !session.isProcessing, !session.isConnecting {
+                send()
+            }
+            return .handled
+        }
+
+        return .ignored
     }
 
     private func send() {
