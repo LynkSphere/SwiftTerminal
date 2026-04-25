@@ -15,4 +15,7 @@ final class AppState {
 
     // Inspector state
     var showingInspector = true
+
+    // Whether archived workspaces are temporarily revealed in the sidebar.
+    var showArchivedWorkspaces = false
 }

@@ -82,6 +82,15 @@ struct AppCommands: Commands {
                     )
                 }
                 .keyboardShortcut(".", modifiers: [.command, .shift])
+
+                Button {
+                    appState.showArchivedWorkspaces.toggle()
+                } label: {
+                    Label(
+                        appState.showArchivedWorkspaces ? "Hide Archived Workspaces" : "Show Archived Workspaces",
+                        systemImage: appState.showArchivedWorkspaces ? "tray.and.arrow.up" : "archivebox"
+                    )
+                }
             }
 
             CommandMenu("Inspector") {

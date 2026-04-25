@@ -13,8 +13,9 @@ struct WorkspaceListView: View {
     }
 
     private var visibleWorkspaces: [Workspace] {
-        guard !searchText.isEmpty else { return store.workspaces }
-        return store.workspaces.filter { $0.name.localizedStandardContains(searchText) }
+        let base = store.workspaces.filter { appState.showArchivedWorkspaces || !$0.isArchived }
+        guard !searchText.isEmpty else { return base }
+        return base.filter { $0.name.localizedStandardContains(searchText) }
     }
 
     private var sidebarSelection: Binding<String?> {
@@ -72,14 +73,37 @@ struct WorkspaceListView: View {
                 )) {
                     let chats = workspace.chats
                         .filter { !$0.isArchived }
-                        .sorted { $0.date > $1.date }
+                        .sorted { $0.sortOrder < $1.sortOrder }
                     ForEach(chats) { chat in
                         ChatSidebarRow(chat: chat)
                             .tag("c:\(chat.id.uuidString)")
                     }
+                    .onMove { source, destination in
+                        withAnimation {
+                            var newOrder = chats
+                            newOrder.move(fromOffsets: source, toOffset: destination)
+                            workspace.reorderChats(newOrder)
+                        }
+                    }
                 } label: {
                     WorkspaceRow(workspace: workspace)
                         .tag(workspaceID)
+                }
+            }
+            .onMove { source, destination in
+                withAnimation {
+                    let visible = visibleWorkspaces
+                    let visibleIDs = Set(visible.map { $0.id })
+                    let slots = store.workspaces.indices.filter { visibleIDs.contains(store.workspaces[$0].id) }
+
+                    var newVisible = visible
+                    newVisible.move(fromOffsets: source, toOffset: destination)
+
+                    var newAll = store.workspaces
+                    for (slot, ws) in zip(slots, newVisible) {
+                        newAll[slot] = ws
+                    }
+                    store.reorderWorkspaces(newAll)
                 }
             }
         }

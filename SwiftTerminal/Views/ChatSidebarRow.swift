@@ -28,7 +28,7 @@ struct ChatSidebarRow: View {
             Image(chat.provider.imageName)
                 .foregroundStyle(chat.isActive ? chat.provider.color : .primary)
         }
-        .badge(showNotificationBadge ? Text("●") : nil)
+        .badge(showNotificationBadge ? Text("") : nil)
         .badgeProminence(.increased)
         .contextMenu {
             Button {

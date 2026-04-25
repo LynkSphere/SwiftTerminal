@@ -101,6 +101,7 @@ final class WorkspaceStore {
                 _ = ws.directory
                 _ = ws.projectTypeRaw
                 _ = ws.scratchPad
+                _ = ws.isArchived
                 for cmd in ws.commands {
                     _ = cmd.title
                     _ = cmd.currentDirectory
@@ -145,6 +146,11 @@ final class WorkspaceStore {
 
     func moveWorkspaces(from source: IndexSet, to destination: Int) {
         workspaces.move(fromOffsets: source, toOffset: destination)
+        scheduleSave()
+    }
+
+    func reorderWorkspaces(_ newOrder: [Workspace]) {
+        workspaces = newOrder
         scheduleSave()
     }
 }

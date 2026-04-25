@@ -123,6 +123,15 @@ struct WorkspaceRow: View {
             .disabled(!workspace.hasRunningTerminals)
 
             Divider()
+            Button {
+                toggleArchive()
+            } label: {
+                Label(
+                    workspace.isArchived ? "Unarchive" : "Archive",
+                    systemImage: workspace.isArchived ? "tray.and.arrow.up" : "archivebox"
+                )
+            }
+
             Button(role: .destructive) {
                 if appState.selectedWorkspace === workspace {
                     appState.selectedWorkspace = nil
@@ -136,5 +145,29 @@ struct WorkspaceRow: View {
         .renameAction {
             isRenaming = true
         }
+        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            Button {
+                toggleArchive()
+            } label: {
+                Label(
+                    workspace.isArchived ? "Unarchive" : "Archive",
+                    systemImage: workspace.isArchived ? "tray.and.arrow.up" : "archivebox"
+                )
+            }
+            .labelStyle(.iconOnly)
+            .tint(.orange)
+        }
+    }
+
+    private func toggleArchive() {
+        if !workspace.isArchived {
+            if appState.selectedWorkspace === workspace {
+                appState.selectedWorkspace = nil
+                appState.selectedChat = nil
+            }
+            workspace.disconnectAllActiveChats()
+            workspace.killAllRunningTerminals()
+        }
+        workspace.isArchived.toggle()
     }
 }

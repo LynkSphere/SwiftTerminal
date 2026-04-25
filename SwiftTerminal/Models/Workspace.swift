@@ -9,6 +9,7 @@ final class Workspace: Identifiable, Hashable, Codable {
     var directory: String
     var projectTypeRaw: String
     var scratchPad: String
+    var isArchived: Bool = false
 
     private(set) var commands: [Terminal]
     private(set) var chats: [Chat]
@@ -48,7 +49,7 @@ final class Workspace: Identifiable, Hashable, Codable {
     // MARK: - Codable
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, directory, projectTypeRaw, scratchPad
+        case id, name, directory, projectTypeRaw, scratchPad, isArchived
         case commands, chats
     }
 
@@ -59,6 +60,7 @@ final class Workspace: Identifiable, Hashable, Codable {
         self.directory = try c.decode(String.self, forKey: .directory)
         self.projectTypeRaw = try c.decodeIfPresent(String.self, forKey: .projectTypeRaw) ?? ProjectType.unknown.rawValue
         self.scratchPad = try c.decodeIfPresent(String.self, forKey: .scratchPad) ?? ""
+        self.isArchived = try c.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
         self.commands = try c.decodeIfPresent([Terminal].self, forKey: .commands) ?? []
         self.chats = try c.decodeIfPresent([Chat].self, forKey: .chats) ?? []
         for cmd in commands { cmd.workspace = self }
@@ -72,6 +74,7 @@ final class Workspace: Identifiable, Hashable, Codable {
         try c.encode(directory, forKey: .directory)
         try c.encode(projectTypeRaw, forKey: .projectTypeRaw)
         try c.encode(scratchPad, forKey: .scratchPad)
+        try c.encode(isArchived, forKey: .isArchived)
         try c.encode(commands, forKey: .commands)
         try c.encode(chats, forKey: .chats)
     }
@@ -178,6 +181,13 @@ final class Workspace: Identifiable, Hashable, Codable {
     func removeChat(_ chat: Chat) {
         chat.disconnect()
         chats.removeAll { $0.id == chat.id }
+        store?.scheduleSave()
+    }
+
+    func reorderChats(_ sortedChats: [Chat]) {
+        for (i, chat) in sortedChats.enumerated() {
+            chat.sortOrder = i
+        }
         store?.scheduleSave()
     }
 
