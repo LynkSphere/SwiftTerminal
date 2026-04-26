@@ -99,20 +99,15 @@ struct ChatBrowserRow: View {
             .labelStyle(.iconOnly)
             .tint(.orange)
 
-            Button {
-                if chat.isActive {
+            if chat.isActive {
+                Button {
                     chat.disconnect()
-                } else {
-                    chat.connectIfNeeded()
+                } label: {
+                    Label("Disconnect", systemImage: "bolt.slash")
                 }
-            } label: {
-                Label(
-                    chat.isActive ? "Disconnect" : "Connect",
-                    systemImage: chat.isActive ? "bolt.slash" : "bolt"
-                )
+                .labelStyle(.iconOnly)
+                .tint(.gray)
             }
-            .labelStyle(.iconOnly)
-            .tint(chat.isActive ? .gray : .green)
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(role: .destructive) {
