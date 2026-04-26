@@ -5,6 +5,9 @@ struct WorkspaceListView: View {
     @Environment(AppState.self) private var appState
     @Environment(WorkspaceStore.self) private var store
     @AppStorage("hideSettingsButton") private var hideSettingsButton = false
+    @AppStorage("sidebarRowSize") private var sidebarRowSize: SidebarRowSizePreference = .medium
+
+    @State private var browsingWorkspace: Workspace?
 
     let searchText: String
 
@@ -18,47 +21,9 @@ struct WorkspaceListView: View {
         return base.filter { $0.name.localizedStandardContains(searchText) }
     }
 
-    private var sidebarSelection: Binding<String?> {
-        Binding(
-            get: {
-                if let chat = appState.selectedChat,
-                   let workspace = appState.selectedWorkspace,
-                   workspace.chats.contains(where: { $0.id == chat.id }) {
-                    return "c:\(chat.id.uuidString)"
-                } else if let workspace = appState.selectedWorkspace {
-                    return "w:\(workspace.id.uuidString)"
-                }
-                return nil
-            },
-            set: { newValue in
-                guard let id = newValue else {
-                    appState.selectedWorkspace = nil
-                    appState.selectedChat = nil
-                    return
-                }
-                if id.hasPrefix("w:") {
-                    let uuidStr = String(id.dropFirst(2))
-                    appState.selectedWorkspace = store.workspaces.first { $0.id.uuidString == uuidStr }
-                    appState.selectedChat = nil
-                    if !appState.expandedWorkspaceIDs.contains(id) {
-                        appState.expandedWorkspaceIDs.insert(id)
-                    }
-                } else if id.hasPrefix("c:") {
-                    let uuidStr = String(id.dropFirst(2))
-                    for workspace in store.workspaces {
-                        if let chat = workspace.chats.first(where: { $0.id.uuidString == uuidStr }) {
-                            appState.selectedWorkspace = workspace
-                            appState.selectedChat = chat
-                            return
-                        }
-                    }
-                }
-            }
-        )
-    }
-
     var body: some View {
-        List(selection: sidebarSelection) {
+        @Bindable var appState = appState
+        List(selection: $appState.selectedChat) {
             ForEach(visibleWorkspaces) { workspace in
                 let workspaceID = "w:\(workspace.id.uuidString)"
                 DisclosureGroup(isExpanded: Binding(
@@ -76,7 +41,7 @@ struct WorkspaceListView: View {
                         .sorted { $0.sortOrder < $1.sortOrder }
                     ForEach(chats) { chat in
                         ChatSidebarRow(chat: chat)
-                            .tag("c:\(chat.id.uuidString)")
+                            .tag(chat)
                     }
                     .onMove { source, destination in
                         withAnimation {
@@ -86,8 +51,21 @@ struct WorkspaceListView: View {
                         }
                     }
                 } label: {
-                    WorkspaceRow(workspace: workspace)
-                        .tag(workspaceID)
+                    WorkspaceRow(workspace: workspace) {
+                        browsingWorkspace = workspace
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        withAnimation {
+                            if appState.expandedWorkspaceIDs.contains(workspaceID) {
+                                appState.expandedWorkspaceIDs.remove(workspaceID)
+                            } else {
+                                appState.expandedWorkspaceIDs.insert(workspaceID)
+                            }
+                        }
+                    }
+                    .selectionDisabled()
                 }
             }
             .onMove { source, destination in
@@ -107,7 +85,21 @@ struct WorkspaceListView: View {
                 }
             }
         }
-        .environment(\.sidebarRowSize, .medium)
+        .environment(\.sidebarRowSize, sidebarRowSize.sidebarRowSize)
+        .sheet(item: $browsingWorkspace) { workspace in
+            NavigationStack {
+                ChatBrowserView(workspace: workspace, onSelect: {
+                    browsingWorkspace = nil
+                })
+                .navigationTitle(workspace.name)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Done") { browsingWorkspace = nil }
+                    }
+                }
+            }
+            .frame(minWidth: 480, minHeight: 520)
+        }
         .safeAreaBar(edge: .bottom) {
             HStack(spacing: 0) {
                 Button {
@@ -147,6 +139,6 @@ struct WorkspaceListView: View {
         let workspace = Workspace(name: name, directory: url.path)
         workspace.detectProjectType()
         store.addWorkspace(workspace)
-        appState.selectedWorkspace = workspace
+        browsingWorkspace = workspace
     }
 }

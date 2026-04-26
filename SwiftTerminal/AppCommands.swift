@@ -41,7 +41,7 @@ struct AppCommands: Commands {
                 Menu {
                     ForEach(AgentProvider.allCases, id: \.self) { provider in
                         Button {
-                            guard let workspace = appState.selectedWorkspace else { return }
+                            guard let workspace = appState.selectedChat?.workspace else { return }
                             let chat = workspace.addChat(provider: provider, permissionMode: defaultPermissionMode)
                             appState.expandedWorkspaceIDs.insert("w:\(workspace.id.uuidString)")
                             appState.selectedChat = chat
@@ -52,13 +52,13 @@ struct AppCommands: Commands {
                 } label: {
                     Label("New Chat", systemImage: "plus.bubble")
                 } primaryAction: {
-                    guard let workspace = appState.selectedWorkspace else { return }
+                    guard let workspace = appState.selectedChat?.workspace else { return }
                     let chat = workspace.addChat(provider: defaultChatMode, permissionMode: defaultPermissionMode)
                     appState.expandedWorkspaceIDs.insert("w:\(workspace.id.uuidString)")
                     appState.selectedChat = chat
                 }
                 .keyboardShortcut("n", modifiers: .command)
-                .disabled(appState.selectedWorkspace == nil)
+                .disabled(appState.selectedChat?.workspace == nil)
             }
 
             CommandGroup(replacing: .toolbar) {
@@ -96,7 +96,7 @@ struct AppCommands: Commands {
             CommandMenu("Inspector") {
                 Button {
                     appState.showingInspector = true
-                    appState.selectedWorkspace?.inspectorState.selectedTab = .files
+                    appState.selectedChat?.workspace?.inspectorState.selectedTab = .files
                 } label: {
                     Label("Files Navigator", systemImage: "folder")
                 }
@@ -104,7 +104,7 @@ struct AppCommands: Commands {
 
                 Button {
                     appState.showingInspector = true
-                    appState.selectedWorkspace?.inspectorState.selectedTab = .git
+                    appState.selectedChat?.workspace?.inspectorState.selectedTab = .git
                 } label: {
                     Label("Git Navigator", systemImage: "point.topleft.down.curvedto.point.bottomright.up")
                 }
@@ -112,7 +112,7 @@ struct AppCommands: Commands {
 
                 Button {
                     appState.showingInspector = true
-                    appState.selectedWorkspace?.inspectorState.selectedTab = .search
+                    appState.selectedChat?.workspace?.inspectorState.selectedTab = .search
                 } label: {
                     Label("Search Navigator", systemImage: "magnifyingglass")
                 }
@@ -120,7 +120,7 @@ struct AppCommands: Commands {
 
                 Button {
                     appState.showingInspector = true
-                    appState.selectedWorkspace?.inspectorState.selectedTab = .commands
+                    appState.selectedChat?.workspace?.inspectorState.selectedTab = .commands
                 } label: {
                     Label("Command Runner", systemImage: "apple.terminal")
                 }
@@ -129,7 +129,7 @@ struct AppCommands: Commands {
                 Divider()
 
                 Button {
-                    guard let workspace = appState.selectedWorkspace,
+                    guard let workspace = appState.selectedChat?.workspace,
                           let command = workspace.defaultCommand else { return }
                     appState.showingInspector = true
                     workspace.runCommand(command)
@@ -137,23 +137,23 @@ struct AppCommands: Commands {
                     Label("Run", systemImage: "play.fill")
                 }
                 .keyboardShortcut("r", modifiers: .command)
-                .disabled(appState.selectedWorkspace?.defaultCommand == nil || appState.selectedWorkspace?.defaultCommand?.hasChildProcess == true)
+                .disabled(appState.selectedChat?.workspace?.defaultCommand == nil || appState.selectedChat?.workspace?.defaultCommand?.hasChildProcess == true)
 
                 Button {
-                    guard let command = appState.selectedWorkspace?.defaultCommand else { return }
+                    guard let command = appState.selectedChat?.workspace?.defaultCommand else { return }
                     command.interrupt()
                 } label: {
                     Label("Stop", systemImage: "stop.fill")
                 }
                 .keyboardShortcut("d", modifiers: .command)
-                .disabled(appState.selectedWorkspace?.defaultCommand?.hasChildProcess != true)
+                .disabled(appState.selectedChat?.workspace?.defaultCommand?.hasChildProcess != true)
 
                 Divider()
 
                 Button {
                     appState.showingInspector = true
-                    appState.selectedWorkspace?.inspectorState.selectedTab = .search
-                    appState.selectedWorkspace?.inspectorState.search.searchFocusTrigger += 1
+                    appState.selectedChat?.workspace?.inspectorState.selectedTab = .search
+                    appState.selectedChat?.workspace?.inspectorState.search.searchFocusTrigger += 1
                 } label: {
                     Label("Find in Files", systemImage: "doc.text.magnifyingglass")
                 }
@@ -161,8 +161,8 @@ struct AppCommands: Commands {
 
                 Button {
                     appState.showingInspector = true
-                    appState.selectedWorkspace?.inspectorState.selectedTab = .files
-                    appState.selectedWorkspace?.inspectorState.fileTree.searchFocusTrigger += 1
+                    appState.selectedChat?.workspace?.inspectorState.selectedTab = .files
+                    appState.selectedChat?.workspace?.inspectorState.fileTree.searchFocusTrigger += 1
                 } label: {
                     Label("Go to File", systemImage: "doc.text.magnifyingglass")
                 }

@@ -7,6 +7,7 @@ struct WorkspaceRow: View {
     @AppStorage("defaultPermissionMode") private var defaultPermissionMode: PermissionMode = .bypassPermissions
 
     let workspace: Workspace
+    var onBrowseChats: (() -> Void)? = nil
 
     @State private var isRenaming = false
     @FocusState private var isNameFieldFocused: Bool
@@ -62,7 +63,6 @@ struct WorkspaceRow: View {
                     Button {
                         let chat = workspace.addChat(provider: provider, permissionMode: defaultPermissionMode)
                         appState.expandedWorkspaceIDs.insert("w:\(workspace.id.uuidString)")
-                        appState.selectedWorkspace = workspace
                         appState.selectedChat = chat
                     } label: {
                         Label(provider.rawValue, image: provider.imageName)
@@ -73,12 +73,17 @@ struct WorkspaceRow: View {
             } primaryAction: {
                 let chat = workspace.addChat(provider: defaultChatMode, permissionMode: defaultPermissionMode)
                 appState.expandedWorkspaceIDs.insert("w:\(workspace.id.uuidString)")
-                appState.selectedWorkspace = workspace
                 appState.selectedChat = chat
             }
-            
+
+            Button {
+                onBrowseChats?()
+            } label: {
+                Label("Browse Chats", systemImage: "list.bullet")
+            }
+
             Divider()
-            
+
             RenameButton()
             
             Menu {
@@ -133,8 +138,7 @@ struct WorkspaceRow: View {
             }
 
             Button(role: .destructive) {
-                if appState.selectedWorkspace === workspace {
-                    appState.selectedWorkspace = nil
+                if appState.selectedChat?.workspace === workspace {
                     appState.selectedChat = nil
                 }
                 store.deleteWorkspace(workspace)
@@ -161,8 +165,7 @@ struct WorkspaceRow: View {
 
     private func toggleArchive() {
         if !workspace.isArchived {
-            if appState.selectedWorkspace === workspace {
-                appState.selectedWorkspace = nil
+            if appState.selectedChat?.workspace === workspace {
                 appState.selectedChat = nil
             }
             workspace.disconnectAllActiveChats()

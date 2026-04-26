@@ -2,7 +2,6 @@ import SwiftUI
 
 @Observable
 final class AppState {
-    var selectedWorkspace: Workspace?
     var selectedChat: Chat? {
         didSet {
             oldValue?.hasNotification = false

@@ -5,12 +5,18 @@ struct GeneralSettingsView: View {
     @AppStorage("hideSettingsButton") private var hideSettingsButton = false
     @AppStorage("editorWrapLines") private var editorWrapLines = true
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @AppStorage("sidebarRowSize") private var sidebarRowSize: SidebarRowSizePreference = .medium
     @AppStorage(TerminalProcessRegistry.fontSizeKey) private var terminalFontSize: Double = Double(TerminalProcessRegistry.defaultFontSize)
 
     var body: some View {
         Form {
             Section("Appearance") {
                 Toggle("Hide settings button from sidebar", isOn: $hideSettingsButton)
+                Picker("Sidebar row size", selection: $sidebarRowSize) {
+                    ForEach(SidebarRowSizePreference.allCases) { size in
+                        Text(size.displayName).tag(size)
+                    }
+                }
             }
 
             Section {

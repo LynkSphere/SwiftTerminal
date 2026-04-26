@@ -13,22 +13,20 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 160, ideal: 200, max: 300)
                 .searchable(text: $searchText, placement: .sidebar, prompt: "Filter workspaces")
         } detail: {
-            if let workspace = appState.selectedWorkspace {
-                WorkspaceDetailView(workspace: workspace)
-                    // .id(workspace.id)
+            if let chat = appState.selectedChat, let workspace = chat.workspace {
+                WorkspaceDetailView(chat: chat, workspace: workspace)
             } else {
                 ContentUnavailableView(
-                    "No Workspace Selected",
+                    "No Chat Selected",
                     systemImage: "sidebar.left",
-                    description: Text("Select a workspace to get started.")
+                    description: Text("Select a chat to get started.")
                 )
             }
         }
         .inspector(isPresented: Bindable(appState).showingInspector) {
-            if let workspace = appState.selectedWorkspace {
+            if let workspace = appState.selectedChat?.workspace {
                 InspectorView(workspace: workspace)
                     .environment(workspace.editorPanel)
-                    // .id(workspace.url)
                     .inspectorColumnWidth(min: 240, ideal: 240, max: 360)
             } else {
                 ContentUnavailableView(
@@ -37,7 +35,7 @@ struct ContentView: View {
                 )
             }
         }
-        .focusedSceneValue(\.editorPanel, appState.selectedWorkspace?.editorPanel)
+        .focusedSceneValue(\.editorPanel, appState.selectedChat?.workspace?.editorPanel)
         .focusedSceneValue(\.isMainWindow, true)
         .sheet(isPresented: $showingOnboarding) {
             hasCompletedOnboarding = true
@@ -58,7 +56,6 @@ struct ContentView: View {
                   let workspace = store.workspaces.first(where: { $0.id == workspaceID }),
                   let chat = workspace.chats.first(where: { $0.id == chatID })
             else { return }
-            appState.selectedWorkspace = workspace
             appState.selectedChat = chat
             appState.expandedWorkspaceIDs.insert("w:\(workspace.id.uuidString)")
         }

@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct WorkspaceDetailView: View {
+    let chat: Chat
     let workspace: Workspace
-    @Environment(AppState.self) private var appState
     @State private var showingScratchPad = false
 
     private var directorySubtitle: String {
@@ -10,9 +10,7 @@ struct WorkspaceDetailView: View {
     }
 
     private var navigationSubtitle: String {
-        guard let chat = appState.selectedChat, chat.usedTokens > 0 else {
-            return directorySubtitle
-        }
+        guard chat.usedTokens > 0 else { return directorySubtitle }
         return "\(formatTokens(chat.usedTokens)) / \(formatTokens(chat.contextSize))"
     }
 
@@ -28,36 +26,28 @@ struct WorkspaceDetailView: View {
     }
 
     var body: some View {
-        Group {
-            if let chat = appState.selectedChat {
-                ACPView(chat: chat)
-                    // .id(chat.id)
-            } else {
-                ChatBrowserView(workspace: workspace)
-                    // .id(workspace.id)
+        ACPView(chat: chat)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                BottomSheetView(directoryURL: workspace.url)
             }
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            BottomSheetView(directoryURL: workspace.url)
-        }
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Button {
-                    showingScratchPad = true
-                } label: {
-                    Label("Scratch Pad", systemImage: "note.text")
+            .toolbar {
+                ToolbarItem(placement: .navigation) {
+                    Button {
+                        showingScratchPad = true
+                    } label: {
+                        Label("Scratch Pad", systemImage: "note.text")
+                    }
+                    .keyboardShortcut(".")
                 }
-                .keyboardShortcut(".")
             }
-        }
-        .sheet(isPresented: $showingScratchPad) {
-            ScratchPadSheet(workspace: workspace)
-        }
-        .navigationTitle(workspace.name)
-        .navigationSubtitle(navigationSubtitle)
-        .environment(workspace.editorPanel)
-        .environment(\.showInFileTree) { url in
-            workspace.inspectorState.revealInFileTree(url, relativeTo: workspace.url)
-        }
+            .sheet(isPresented: $showingScratchPad) {
+                ScratchPadSheet(workspace: workspace)
+            }
+            .navigationTitle(workspace.name)
+            .navigationSubtitle(navigationSubtitle)
+            .environment(workspace.editorPanel)
+            .environment(\.showInFileTree) { url in
+                workspace.inspectorState.revealInFileTree(url, relativeTo: workspace.url)
+            }
     }
 }
