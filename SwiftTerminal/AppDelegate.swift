@@ -9,7 +9,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     func applicationDidFinishLaunching(_ notification: Notification) {
         let center = UNUserNotificationCenter.current()
         center.delegate = self
-        center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        center.requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        NSApp.dockTile.badgeLabel = nil
     }
 
     func userNotificationCenter(
@@ -54,6 +58,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 trigger: nil
             )
             UNUserNotificationCenter.current().add(request)
+
+            if !NSApp.isActive {
+                NSApp.dockTile.badgeLabel = "●"
+                NSApp.requestUserAttention(.criticalRequest)
+            }
         }
     }
 
