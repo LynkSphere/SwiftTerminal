@@ -106,8 +106,11 @@ struct ACPView: View {
                     }
                     if !chat.plan.isEmpty {
                         Divider()
-                        PlanView(entries: chat.plan)
-                            .padding(.horizontal, 16)
+                        PlanView(entries: chat.plan) {
+                            chat.plan.removeAll()
+                            session.plan.removeAll()
+                        }
+                        .padding(.horizontal, 16)
                     }
                     ACPInputArea(chat: chat)
                 }

@@ -3,6 +3,7 @@ import ACPModel
 
 struct PlanView: View {
     let entries: [PlanEntry]
+    var onClear: (() -> Void)? = nil
     @State private var isExpanded = false
 
     private var currentEntry: PlanEntry? {
@@ -80,6 +81,15 @@ struct PlanView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .contextMenu {
+            if let onClear {
+                Button(role: .destructive) {
+                    onClear()
+                } label: {
+                    Label("Clear Plan", systemImage: "trash")
+                }
+            }
+        }
     }
 }
 

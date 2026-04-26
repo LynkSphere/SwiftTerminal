@@ -41,7 +41,7 @@ struct WorkspaceListView: View {
                         .sorted { $0.sortOrder < $1.sortOrder }
                     ForEach(chats) { chat in
                         ChatSidebarRow(chat: chat)
-                            .padding(.leading, -10)
+                            .padding(.leading, -5)
                             .tag(chat)
                     }
                     .onMove { source, destination in
