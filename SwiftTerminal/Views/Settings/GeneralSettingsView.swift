@@ -4,6 +4,7 @@ import SwiftUI
 struct GeneralSettingsView: View {
     @AppStorage("hideSettingsButton") private var hideSettingsButton = false
     @AppStorage("editorWrapLines") private var editorWrapLines = true
+    @AppStorage(EditorFontSize.key) private var editorFontSize: Double = EditorFontSize.default
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage("sidebarRowSize") private var sidebarRowSize: SidebarRowSizePreference = .medium
     @AppStorage(TerminalProcessRegistry.fontSizeKey) private var terminalFontSize: Double = Double(TerminalProcessRegistry.defaultFontSize)
@@ -45,12 +46,27 @@ struct GeneralSettingsView: View {
             }
 
             Section {
+                LabeledContent {
+                    HStack {
+                        Slider(
+                            value: Binding(
+                                get: { editorFontSize },
+                                set: { editorFontSize = (($0 * 2).rounded()) / 2 }
+                            ),
+                            in: EditorFontSize.min...EditorFontSize.max
+                        )
+                        Text(String(format: "%.1f", editorFontSize))
+                            .font(.subheadline.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .frame(width: 25, alignment: .trailing)
+                    }
+                } label: {
+                    Text("Font size")
+                }
                 Toggle("Wrap long lines", isOn: $editorWrapLines)
             } header: {
                 Text("Editor")
-            } footer: {
-                Text("When enabled, lines that exceed the editor width wrap to the next line instead of scrolling horizontally.")
-            }
+            } 
 
             #if DEBUG
             Section {

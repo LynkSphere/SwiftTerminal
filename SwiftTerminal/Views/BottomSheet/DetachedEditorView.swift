@@ -4,6 +4,7 @@ struct DetachedEditorView: View {
     let content: EditorPanelContent
     @State private var editorPanel = EditorPanel()
     @State private var showingInfo = false
+    @AppStorage(EditorFontSize.key) private var editorFontSize: Double = EditorFontSize.default
 
     private var fileURL: URL {
         switch content {
@@ -36,7 +37,7 @@ struct DetachedEditorView: View {
         }
         .environment(editorPanel)
         .environment(\.isDetachedEditor, true)
-        .environment(\.editorFontSize, 13)
+        .environment(\.editorFontSize, CGFloat(editorFontSize))
         .onAppear {
             editorPanel.content = content
             editorPanel.isOpen = true

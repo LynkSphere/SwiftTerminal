@@ -5,6 +5,7 @@ struct BottomSheetView: View {
     @Environment(EditorPanel.self) private var panel
     @Environment(\.colorScheme) var colorScheme
     @AppStorage("editorPanelHeight") private var panelHeight: Double = 250
+    @AppStorage(EditorFontSize.key) private var editorFontSize: Double = EditorFontSize.default
 
     var body: some View {
         VStack(spacing: 0) {
@@ -15,6 +16,7 @@ struct BottomSheetView: View {
         .clipped()
         .allowsHitTesting(panel.isOpen)
         .background(.bar)
+        .environment(\.editorFontSize, CGFloat(editorFontSize))
     }
 
     private var borderColor: Color {
