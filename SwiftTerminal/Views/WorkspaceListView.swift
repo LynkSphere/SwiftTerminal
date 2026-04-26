@@ -6,6 +6,8 @@ struct WorkspaceListView: View {
     @Environment(WorkspaceStore.self) private var store
     @AppStorage("hideSettingsButton") private var hideSettingsButton = false
     @AppStorage("sidebarRowSize") private var sidebarRowSize: SidebarRowSizePreference = .medium
+    @AppStorage("defaultChatMode") private var defaultChatMode: AgentProvider = .claude
+    @AppStorage("defaultPermissionMode") private var defaultPermissionMode: PermissionMode = .bypassPermissions
 
     @State private var browsingWorkspace: Workspace?
 
@@ -63,6 +65,10 @@ struct WorkspaceListView: View {
                                 appState.expandedWorkspaceIDs.remove(workspaceID)
                             } else {
                                 appState.expandedWorkspaceIDs.insert(workspaceID)
+                                if !workspace.chats.contains(where: { !$0.isArchived }) {
+                                    let chat = workspace.addChat(provider: defaultChatMode, permissionMode: defaultPermissionMode)
+                                    appState.selectedChat = chat
+                                }
                             }
                         }
                     }
