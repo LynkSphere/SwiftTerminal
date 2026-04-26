@@ -129,7 +129,7 @@ final class WorkspaceStore {
 
     func addWorkspace(_ workspace: Workspace) {
         workspace.store = self
-        workspaces.append(workspace)
+        workspaces.insert(workspace, at: 0)
         scheduleSave()
     }
 

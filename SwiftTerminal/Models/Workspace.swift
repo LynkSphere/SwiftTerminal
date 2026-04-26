@@ -166,11 +166,12 @@ final class Workspace: Identifiable, Hashable, Codable {
 
     @discardableResult
     func addChat(title: String = "New Chat", provider: AgentProvider = .codex, permissionMode: PermissionMode = .bypassPermissions) -> Chat {
+        for existing in chats { existing.sortOrder += 1 }
         let chat = Chat(
             title: title,
             provider: provider,
             permissionMode: permissionMode,
-            sortOrder: chats.count
+            sortOrder: 0
         )
         chat.workspace = self
         chats.append(chat)
