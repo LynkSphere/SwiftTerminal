@@ -1,8 +1,17 @@
 import Foundation
 
-enum GitError: Error {
+enum GitError: LocalizedError {
     case gitUnavailable
     case commandFailed(command: String, message: String)
+
+    var errorDescription: String? {
+        switch self {
+        case .gitUnavailable:
+            return "Git is not available at /usr/bin/git."
+        case .commandFailed(let command, let message):
+            return message.isEmpty ? "\(command) failed." : message
+        }
+    }
 }
 
 struct GitExecutor: Sendable {

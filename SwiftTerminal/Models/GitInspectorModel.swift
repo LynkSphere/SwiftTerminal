@@ -17,7 +17,6 @@ final class GitInspectorModel {
 
     func refresh(directoryURL: URL) async {
         isLoading = snapshots.isEmpty
-        errorMessage = nil
 
         do {
             let newSnapshots = try await GitRepository.shared.statusSnapshots(in: directoryURL)
