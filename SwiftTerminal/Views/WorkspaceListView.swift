@@ -55,6 +55,11 @@ struct WorkspaceListView: View {
                     WorkspaceRow(workspace: workspace)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
+                    .background(DoubleClickRecognizer {
+                        let chat = workspace.addChat(provider: defaultChatMode, permissionMode: defaultPermissionMode)
+                        appState.expandedWorkspaceIDs.insert(workspaceID)
+                        appState.selectedChat = chat
+                    })
                     .onTapGesture {
                         withAnimation {
                             if appState.expandedWorkspaceIDs.contains(workspaceID) {
@@ -68,7 +73,6 @@ struct WorkspaceListView: View {
                             }
                         }
                     }
-                    .selectionDisabled()
                 }
             }
             .onMove { source, destination in
@@ -131,5 +135,52 @@ struct WorkspaceListView: View {
         appState.expandedWorkspaceIDs.insert("w:\(workspace.id.uuidString)")
         let chat = workspace.addChat(provider: defaultChatMode, permissionMode: defaultPermissionMode)
         appState.selectedChat = chat
+    }
+}
+
+private struct DoubleClickRecognizer: NSViewRepresentable {
+    let action: () -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = DetectorView()
+        view.action = action
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        (nsView as? DetectorView)?.action = action
+    }
+
+    final class DetectorView: NSView {
+        var action: (() -> Void)?
+        private var monitor: Any?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if let monitor = monitor {
+                NSEvent.removeMonitor(monitor)
+                self.monitor = nil
+            }
+            guard window != nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
+                guard let self = self,
+                      let window = self.window,
+                      event.window === window,
+                      event.clickCount == 2
+                else { return event }
+                let pointInView = self.convert(event.locationInWindow, from: nil)
+                if self.bounds.contains(pointInView) {
+                    self.action?()
+                    return nil
+                }
+                return event
+            }
+        }
+
+        deinit {
+            if let monitor = monitor {
+                NSEvent.removeMonitor(monitor)
+            }
+        }
     }
 }
