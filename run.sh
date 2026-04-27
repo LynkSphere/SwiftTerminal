@@ -13,13 +13,16 @@ Platforms:
 Options:
   --device     iOS only: install and run on a connected iPhone
   --open       macOS only: launch via 'open' for proper bundle identity
+  --build      Archive Release build and copy .app/.ipa to ~/Downloads
   -h, --help   Show this help
 
 Examples:
   $(basename "$0")                # auto-detect platform
   $(basename "$0") macos --open
+  $(basename "$0") macos --build
   $(basename "$0") ios
   $(basename "$0") ios --device
+  $(basename "$0") ios --build
 EOF
 }
 
@@ -47,6 +50,7 @@ esac
 
 USE_DEVICE=0
 MAC_MODE="run"
+DO_BUILD=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -54,6 +58,7 @@ while [[ $# -gt 0 ]]; do
     ios)         PLATFORM="ios" ;;
     --device)    USE_DEVICE=1; PLATFORM="ios" ;;
     --open)      MAC_MODE="open" ;;
+    --build)     MAC_MODE="build"; DO_BUILD=1 ;;
     -h|--help)   usage; exit 0 ;;
     *)           echo "unknown arg: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -69,6 +74,34 @@ find_app_bundle() {
     exit 1
   fi
   echo "$bundle"
+}
+
+build_macos() {
+  local ARCHIVE="/tmp/$APP_NAME.xcarchive"
+  xcodebuild \
+    -project "$PROJECT" \
+    -scheme "$APP_NAME" \
+    -destination "generic/platform=macOS" \
+    -configuration Release \
+    archive -archivePath "$ARCHIVE"
+  cp -R "$ARCHIVE/Products/Applications/"*.app ~/Downloads/
+  rm -rf "$ARCHIVE"
+  echo "Built $APP_NAME.app → ~/Downloads/"
+}
+
+build_ios() {
+  local ARCHIVE="/tmp/$APP_NAME.xcarchive"
+  xcodebuild \
+    -project "$PROJECT" \
+    -scheme "$APP_NAME" \
+    -destination "generic/platform=iOS" \
+    -configuration Release \
+    archive -archivePath "$ARCHIVE"
+  mkdir -p /tmp/ipa_payload/Payload
+  cp -R "$ARCHIVE/Products/Applications/"*.app /tmp/ipa_payload/Payload/
+  cd /tmp/ipa_payload && zip -qr ~/Downloads/"$APP_NAME.ipa" Payload
+  rm -rf "$ARCHIVE" /tmp/ipa_payload
+  echo "Built $APP_NAME.ipa → ~/Downloads/"
 }
 
 run_macos() {
@@ -163,9 +196,17 @@ run_ios_simulator() {
 }
 
 case "$PLATFORM" in
-  macos) run_macos ;;
+  macos)
+    if [[ "$MAC_MODE" == "build" ]]; then
+      build_macos
+    else
+      run_macos
+    fi
+    ;;
   ios)
-    if [[ "$USE_DEVICE" == "1" ]]; then
+    if [[ "$DO_BUILD" == "1" ]]; then
+      build_ios
+    elif [[ "$USE_DEVICE" == "1" ]]; then
       run_ios_device
     else
       run_ios_simulator
