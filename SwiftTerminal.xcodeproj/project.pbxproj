@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		0896F7692F829B9C0024299A /* ACP in Frameworks */ = {isa = PBXBuildFile; productRef = 0896F7682F829B9C0024299A /* ACP */; };
 		08BEFC282F74722D009C370D /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 08BEFC272F74722D009C370D /* SwiftTerm */; };
-		08BEFC2A2F74722D009C370E /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 08BEFC292F74722D009C370E /* Sparkle */; };
 		08BEFC322F74722D009C3710 /* Highlightr in Frameworks */ = {isa = PBXBuildFile; productRef = 08BEFC312F74722D009C3710 /* Highlightr */; };
 /* End PBXBuildFile section */
 
@@ -32,7 +31,6 @@
 			files = (
 				0896F7692F829B9C0024299A /* ACP in Frameworks */,
 				08BEFC282F74722D009C370D /* SwiftTerm in Frameworks */,
-				08BEFC2A2F74722D009C370E /* Sparkle in Frameworks */,
 				08BEFC322F74722D009C3710 /* Highlightr in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -78,7 +76,6 @@
 			packageProductDependencies = (
 				0896F7682F829B9C0024299A /* ACP */,
 				08BEFC272F74722D009C370D /* SwiftTerm */,
-				08BEFC292F74722D009C370E /* Sparkle */,
 				08BEFC312F74722D009C3710 /* Highlightr */,
 			);
 			productName = SwiftTerminal;
@@ -112,7 +109,6 @@
 			packageReferences = (
 				0896F7672F829B9C0024299A /* XCRemoteSwiftPackageReference "swift-acp" */,
 				08BEFC262F74722D009C370D /* XCRemoteSwiftPackageReference "SwiftTerm" */,
-				08BEFC2B2F74722D009C370E /* XCRemoteSwiftPackageReference "Sparkle" */,
 				08BEFC302F74722D009C3710 /* XCRemoteSwiftPackageReference "Highlightr" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -282,7 +278,6 @@
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "SwiftTerminal-Info.plist";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -342,7 +337,6 @@
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "SwiftTerminal-Info.plist";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -422,14 +416,6 @@
 				kind = branch;
 			};
 		};
-		08BEFC2B2F74722D009C370E /* XCRemoteSwiftPackageReference "Sparkle" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/sparkle-project/Sparkle";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.6.0;
-			};
-		};
 		08BEFC302F74722D009C3710 /* XCRemoteSwiftPackageReference "Highlightr" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/raspu/Highlightr";
@@ -450,11 +436,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 08BEFC262F74722D009C370D /* XCRemoteSwiftPackageReference "SwiftTerm" */;
 			productName = SwiftTerm;
-		};
-		08BEFC292F74722D009C370E /* Sparkle */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 08BEFC2B2F74722D009C370E /* XCRemoteSwiftPackageReference "Sparkle" */;
-			productName = Sparkle;
 		};
 		08BEFC312F74722D009C3710 /* Highlightr */ = {
 			isa = XCSwiftPackageProductDependency;

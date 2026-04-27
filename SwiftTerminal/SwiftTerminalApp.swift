@@ -6,7 +6,6 @@ struct SwiftTerminalApp: App {
 
     @State private var workspaceStore = WorkspaceStore()
     @State private var appState = AppState()
-    @State private var updater = UpdaterManager()
 
     var body: some Scene {
         Window("SwiftTerminal", id: "swiftterminal") {
@@ -17,7 +16,7 @@ struct SwiftTerminalApp: App {
         }
         .defaultSize(width: 900, height: 600)
         .commands {
-            AppCommands(appState: appState, updater: updater)
+            AppCommands(appState: appState)
         }
 
         WindowGroup("Editor", for: EditorPanelContent.self) { $content in
@@ -42,7 +41,6 @@ struct SwiftTerminalApp: App {
 
         Settings {
             SettingsView()
-                .environment(updater)
                 .environment(workspaceStore)
         }
     }

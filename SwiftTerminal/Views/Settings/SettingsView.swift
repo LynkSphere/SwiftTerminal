@@ -7,10 +7,6 @@ struct SettingsView: View {
                 GeneralSettingsView()
             }
 
-            Tab("Updates", systemImage: "arrow.down.circle") {
-                UpdatesSettingsView()
-            }
-
             Tab("Chat", systemImage: "bubble.left.and.bubble.right") {
                 ChatSettingsView()
             }
@@ -29,5 +25,4 @@ struct SettingsView: View {
 
 #Preview {
     SettingsView()
-        .environment(UpdaterManager())
 }
