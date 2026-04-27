@@ -102,7 +102,9 @@ struct ACPInputArea: View {
                 .buttonBorderShape(.circle)
                 .disabled(!session.isProcessing && (!canSend || session.isConnecting))
                 .offset(y: -2)
-                .keyboardShortcut(session.isProcessing ? "d" : .return, modifiers: [.command])
+                .if(!session.isProcessing) { view in
+                    view.keyboardShortcut(.return, modifiers: [.command])
+                }
             }
             .padding(12)
         }
@@ -140,5 +142,16 @@ struct ACPInputArea: View {
         guard !text.isEmpty || !attachments.isEmpty else { return }
         chat.prompt = ""
         chat.sendMessage(text, attachments: attachments)
+    }
+}
+
+extension View {
+    @ViewBuilder
+    func `if`<Content: View>(_ condition: Bool, transform: (Self) -> Content) -> some View {
+        if condition {
+            transform(self)
+        } else {
+            self
+        }
     }
 }
