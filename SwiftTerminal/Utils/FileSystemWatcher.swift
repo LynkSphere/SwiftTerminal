@@ -58,12 +58,13 @@ final class FileSystemWatcher {
 
 // MARK: - SwiftUI integration
 
-struct FileSystemWatcherModifier: ViewModifier {
+struct FileSystemWatcherModifier<ID: Equatable>: ViewModifier {
     let url: URL
+    let id: ID
     let action: @MainActor () -> Void
 
     func body(content: Content) -> some View {
-        content.task(id: url) {
+        content.task(id: WatcherTaskID(url: url, id: id)) {
             let watcher = FileSystemWatcher(url: url) {
                 Task { @MainActor in action() }
             }
@@ -75,8 +76,21 @@ struct FileSystemWatcherModifier: ViewModifier {
     }
 }
 
+private struct WatcherTaskID<ID: Equatable>: Equatable {
+    let url: URL
+    let id: ID
+}
+
 extension View {
     func watchFileSystem(at url: URL, action: @escaping @MainActor () -> Void) -> some View {
-        modifier(FileSystemWatcherModifier(url: url, action: action))
+        modifier(FileSystemWatcherModifier(url: url, id: url, action: action))
+    }
+
+    func watchFileSystem<ID: Equatable>(
+        at url: URL,
+        id: ID,
+        action: @escaping @MainActor () -> Void
+    ) -> some View {
+        modifier(FileSystemWatcherModifier(url: url, id: id, action: action))
     }
 }

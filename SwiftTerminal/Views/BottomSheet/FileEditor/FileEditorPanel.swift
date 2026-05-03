@@ -124,7 +124,7 @@ struct FileEditorPanel: View {
         .task(id: fileURL) {
             loadFile()
         }
-        .watchFileSystem(at: fileURL.deletingLastPathComponent()) {
+        .watchFileSystem(at: fileURL.deletingLastPathComponent(), id: fileURL) {
             reloadIfChanged()
         }
         .onChange(of: hasUnsavedChanges) { _, dirty in

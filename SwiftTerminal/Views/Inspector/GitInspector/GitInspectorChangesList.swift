@@ -42,7 +42,8 @@ struct GitInspectorChangesList: View {
                     } label: {
                         sectionHeader(
                             title: "Unpushed Commits",
-                            systemImage: "arrow.up.circle"
+                            systemImage: "arrow.up.circle",
+                            isExpanded: $state.unpushedExpanded
                         )
                         .contextMenu {
                             Button { handleAction(.push(snapshot)) } label: {
@@ -66,7 +67,8 @@ struct GitInspectorChangesList: View {
                     } label: {
                         sectionHeader(
                             title: "Staged Changes",
-                            systemImage: "checkmark.circle"
+                            systemImage: "checkmark.circle",
+                            isExpanded: $state.stagedExpanded
                         )
                         .contextMenu { GitRepoContextMenu(snapshot: snapshot, onAction: handleAction) }
                     }
@@ -79,7 +81,8 @@ struct GitInspectorChangesList: View {
                     } label: {
                         sectionHeader(
                             title: "Changes",
-                            systemImage: "circle.dashed"
+                            systemImage: "circle.dashed",
+                            isExpanded: $state.unstagedExpanded
                         )
                         .contextMenu { GitRepoContextMenu(snapshot: snapshot, onAction: handleAction) }
                     }
@@ -110,7 +113,7 @@ struct GitInspectorChangesList: View {
     // MARK: - Section Header
 
     @ViewBuilder
-    private func sectionHeader(title: String, systemImage: String) -> some View {
+    private func sectionHeader(title: String, systemImage: String, isExpanded: Binding<Bool>) -> some View {
         Label {
             Text(title)
         } icon: {
@@ -119,6 +122,13 @@ struct GitInspectorChangesList: View {
         }
         .font(.subheadline)
         .lineLimit(1)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation {
+                isExpanded.wrappedValue.toggle()
+            }
+        }
     }
 
     // MARK: - Rows

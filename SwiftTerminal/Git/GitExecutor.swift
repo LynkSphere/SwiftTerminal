@@ -1,8 +1,17 @@
 import Foundation
 
-enum GitError: Error {
+enum GitError: LocalizedError {
     case gitUnavailable
     case commandFailed(command: String, message: String)
+
+    var errorDescription: String? {
+        switch self {
+        case .gitUnavailable:
+            return "Git is not available at /usr/bin/git."
+        case .commandFailed(let command, let message):
+            return message.isEmpty ? "\(command) failed." : message
+        }
+    }
 }
 
 struct GitExecutor: Sendable {
@@ -21,6 +30,12 @@ struct GitExecutor: Sendable {
 
     func run(arguments: [String], stdinData: Data, at directoryURL: URL) async throws -> (exitCode: Int32, stderr: String) {
         let result = try await self.run(arguments: arguments, at: directoryURL, stdinData: stdinData)
+        let stderr = result.standardError.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (result.terminationStatus, stderr)
+    }
+
+    func runWithExitCode(arguments: [String], at directoryURL: URL) async throws -> (exitCode: Int32, stderr: String) {
+        let result = try await self.run(arguments: arguments, at: directoryURL, stdinData: nil)
         let stderr = result.standardError.trimmingCharacters(in: .whitespacesAndNewlines)
         return (result.terminationStatus, stderr)
     }

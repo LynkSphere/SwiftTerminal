@@ -125,6 +125,19 @@ struct GitInspectorView: View {
         } message: {
             Text("The branch \"\(snapshot?.branchName ?? "")\" does not exist on the remote. This will create a new branch on the remote and push your commits.")
         }
+        .alert("Branches Diverged", isPresented: $state.showPullRebaseAlert) {
+            Button("Rebase") {
+                state.syncWithRemote(directoryURL: directoryURL)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Your local branch and the remote have both moved forward. Rebase your local commits onto the remote to sync.")
+        }
+        .alert("Cannot Pull Cleanly", isPresented: $state.showPullConflictAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Pulling would create merge conflicts with your uncommitted changes. Your working directory has been left untouched. Commit or stash your changes manually, resolve the conflict, and try again.")
+        }
         .sheet(isPresented: $state.showSyncWithBranchSheet) {
             SyncWithBranchSheet(directoryURL: directoryURL, state: state)
         }
