@@ -6,10 +6,19 @@ enum EditorTextViewConstants {
     static let foldColumnWidth: CGFloat = 12
     static let minimapWidth: CGFloat = 16
 
+    /// Right edge x of the line number column. Shared between editor and
+    /// diff modes so the line numbers visually align in the same horizontal
+    /// strip from the left edge regardless of which mode is active. Anything
+    /// to the right of this (git markers, fold column) is mode-specific.
+    static let lineNumberEndX: CGFloat = 26
+
+    /// Left edge x of the git/diff marker bar. Shared between editor and
+    /// diff modes so the colored bar sits at the same horizontal position
+    /// regardless of which mode is active.
+    static let markerBarX: CGFloat = 30
+
     // Diff mode gutter layout (single line number, no fold column)
-    static let diffGutterWidth: CGFloat = 52
-    static let diffNumEndX: CGFloat = 42
-    static let diffMarkerX: CGFloat = 46
+    static let diffGutterWidth: CGFloat = 36
 }
 
 // MARK: - Editor Text View with Gutter
@@ -26,6 +35,7 @@ final class EditorTextView: NSTextView {
     var diffGutterClickHandler: ((Int, NSPoint) -> Void)?
     var repositoryRootURL: URL?
     var gutterDiffReloadHandler: (() async -> Void)?
+    var saveHandler: (() -> Void)?
 
     var editorFontSize: CGFloat = 12
     var lineNumberFontSize: CGFloat = 11
@@ -393,6 +403,12 @@ final class EditorTextView: NSTextView {
             toggleComment()
             return true
         }
+        if event.modifierFlags.intersection([.command, .shift, .option, .control]) == .command,
+           event.charactersIgnoringModifiers == "s",
+           let saveHandler {
+            saveHandler()
+            return true
+        }
         return super.performKeyEquivalent(with: event)
     }
 
@@ -557,9 +573,9 @@ final class EditorTextView: NSTextView {
                 // Marker bar per fragment.
                 kind.color.setFill()
                 NSRect(
-                    x: constants.diffMarkerX,
+                    x: constants.markerBarX,
                     y: fragmentRect.minY,
-                    width: 3,
+                    width: constants.markerBarWidth,
                     height: fragmentRect.height
                 ).fill()
             }
@@ -571,7 +587,7 @@ final class EditorTextView: NSTextView {
                 if let num = lineNum {
                     let str = "\(num)" as NSString
                     let size = str.size(withAttributes: lineNumAttrs)
-                    str.draw(at: NSPoint(x: constants.diffNumEndX - size.width, y: yCenter), withAttributes: lineNumAttrs)
+                    str.draw(at: NSPoint(x: constants.lineNumberEndX - size.width, y: yCenter), withAttributes: lineNumAttrs)
                 }
             }
 
@@ -624,15 +640,35 @@ final class EditorTextView: NSTextView {
         let containerOrigin = textContainerOrigin
         let text = string as NSString
 
-        guard text.length > 0 else { return }
-
-        let visibleGlyphRange = layoutManager.glyphRange(forBoundingRect: rect, in: textContainer)
-        let visibleCharRange = layoutManager.characterRange(forGlyphRange: visibleGlyphRange, actualGlyphRange: nil)
-
         let lineNumAttrs: [NSAttributedString.Key: Any] = [
             .font: lineNumberFont,
             .foregroundColor: NSColor.secondaryLabelColor,
         ]
+        let lineNumEndX = EditorTextViewConstants.lineNumberEndX
+
+        if text.length == 0 {
+            var fragmentRect = layoutManager.extraLineFragmentRect
+            if fragmentRect == .zero {
+                let resolvedFont = font ?? NSFont.monospacedSystemFont(ofSize: editorFontSize, weight: .regular)
+                let lineHeight = layoutManager.defaultLineHeight(for: resolvedFont)
+                fragmentRect = NSRect(x: 0, y: 0, width: 0, height: lineHeight)
+            }
+            let lineY = fragmentRect.minY + containerOrigin.y
+            let lineHeight = fragmentRect.height
+
+            currentLineHighlightColor.setFill()
+            NSRect(x: 0, y: lineY, width: bounds.width, height: lineHeight).fill()
+
+            let numStr = "1" as NSString
+            let size = numStr.size(withAttributes: lineNumAttrs)
+            let x = lineNumEndX - size.width
+            let y = lineY + (lineHeight - size.height) / 2
+            numStr.draw(at: NSPoint(x: x, y: y), withAttributes: lineNumAttrs)
+            return
+        }
+
+        let visibleGlyphRange = layoutManager.glyphRange(forBoundingRect: rect, in: textContainer)
+        let visibleCharRange = layoutManager.characterRange(forGlyphRange: visibleGlyphRange, actualGlyphRange: nil)
 
         let foldBadgeAttrs: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedSystemFont(ofSize: 10, weight: .medium),
@@ -646,8 +682,7 @@ final class EditorTextView: NSTextView {
             startLineNumber = preText.components(separatedBy: "\n").count
         }
 
-        let lineNumEndX = gutterWidth - foldColWidth - markerBarWidth - 6
-        let markerBarX = gutterWidth - foldColWidth - markerBarWidth - 1
+        let markerBarX = EditorTextViewConstants.markerBarX
         let foldCenterX = gutterWidth - foldColWidth / 2
 
         let cursorLine = currentCursorLine
@@ -720,21 +755,40 @@ final class EditorTextView: NSTextView {
                         triangle.fill()
 
                         if isFolded {
-                            let badgeText = " ⋯ " as NSString
+                            let closing = foldingManager.region(startingAt: lineNumber)?.closing ?? ""
+                            let badgeText = " ••• " as NSString
                             let usedRect = layoutManager.lineFragmentUsedRect(forGlyphAt: glyphRange.location, effectiveRange: nil)
                             let badgeSize = badgeText.size(withAttributes: foldBadgeAttrs)
                             let badgeX = containerOrigin.x + usedRect.maxX + 2
                             let badgeY = firstRect.minY + (firstRect.height - badgeSize.height) / 2
+                            badgeText.draw(at: NSPoint(x: badgeX, y: badgeY), withAttributes: foldBadgeAttrs)
 
-                            let badgeRect = NSRect(
-                                x: badgeX, y: badgeY - 1,
-                                width: badgeSize.width + 4, height: badgeSize.height + 2
-                            )
-                            NSColor.separatorColor.withAlphaComponent(0.15).setFill()
-                            NSBezierPath(roundedRect: badgeRect, xRadius: 3, yRadius: 3).fill()
-                            NSColor.separatorColor.withAlphaComponent(0.4).setStroke()
-                            NSBezierPath(roundedRect: badgeRect, xRadius: 3, yRadius: 3).stroke()
-                            badgeText.draw(at: NSPoint(x: badgeX + 2, y: badgeY), withAttributes: foldBadgeAttrs)
+                            // Render the closing token in the editor's own font + color so
+                            // it visually matches the opening bracket on this line.
+                            if !closing.isEmpty {
+                                var closingAttrs: [NSAttributedString.Key: Any] = [
+                                    .font: font ?? NSFont.monospacedSystemFont(ofSize: editorFontSize, weight: .regular),
+                                    .foregroundColor: textColor ?? NSColor.labelColor,
+                                ]
+                                if let textStorage, lineRange.length > 0 {
+                                    var sampleIdx = lineRange.location + lineRange.length - 1
+                                    while sampleIdx > lineRange.location {
+                                        let ch = text.character(at: sampleIdx)
+                                        if ch != 10 && ch != 13 { break }
+                                        sampleIdx -= 1
+                                    }
+                                    if sampleIdx >= 0 && sampleIdx < textStorage.length {
+                                        let storedAttrs = textStorage.attributes(at: sampleIdx, effectiveRange: nil)
+                                        if let f = storedAttrs[.font] as? NSFont { closingAttrs[.font] = f }
+                                        if let c = storedAttrs[.foregroundColor] as? NSColor { closingAttrs[.foregroundColor] = c }
+                                    }
+                                }
+                                let closingNS = (" " + closing) as NSString
+                                let closingSize = closingNS.size(withAttributes: closingAttrs)
+                                let closingX = badgeX + badgeSize.width
+                                let closingY = firstRect.minY + (firstRect.height - closingSize.height) / 2
+                                closingNS.draw(at: NSPoint(x: closingX, y: closingY), withAttributes: closingAttrs)
+                            }
                         }
                     }
                 }

@@ -1,6 +1,23 @@
 import AppKit
 import SwiftUI
 
+/// NSView subclass that fires a callback whenever AppKit changes its frame
+/// size. SwiftUI's `updateNSView` is not reliably re-invoked when the
+/// container resizes (e.g. when the bottom sheet finishes its open animation
+/// or when the source-control inspector swaps in a new editor instance), so
+/// the editor used to be stuck rendering whatever broken state was cached at
+/// the bad initial size. This callback gives us a deterministic hook to
+/// re-run the layout pass once the geometry is actually usable.
+final class LayoutAwareContainer: NSView {
+    var onResize: (() -> Void)?
+
+    override func setFrameSize(_ newSize: NSSize) {
+        let changed = newSize != frame.size
+        super.setFrameSize(newSize)
+        if changed { onResize?() }
+    }
+}
+
 struct CodeTextEditor: NSViewRepresentable {
     private enum Mode {
         case editable(gutterDiff: GutterDiffResult, highlightRequest: HighlightRequest?)
@@ -13,10 +30,12 @@ struct CodeTextEditor: NSViewRepresentable {
     }
 
     private let text: Binding<String>?
+    private let documentID: AnyHashable?
     let fileExtension: String
     private let mode: Mode
     private let repositoryRootURL: URL?
     private let onReloadFromDisk: (() async -> Void)?
+    private let onSave: (() -> Void)?
     @Environment(\.editorFontSize) private var fontSize
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("editorWrapLines") private var wrapLines: Bool = true
@@ -25,17 +44,21 @@ struct CodeTextEditor: NSViewRepresentable {
 
     init(
         text: Binding<String>,
+        documentID: AnyHashable,
         fileExtension: String,
         gutterDiff: GutterDiffResult,
         highlightRequest: HighlightRequest?,
         repositoryRootURL: URL? = nil,
-        onReloadFromDisk: (() async -> Void)? = nil
+        onReloadFromDisk: (() async -> Void)? = nil,
+        onSave: (() -> Void)? = nil
     ) {
         self.text = text
+        self.documentID = documentID
         self.fileExtension = fileExtension
         self.mode = .editable(gutterDiff: gutterDiff, highlightRequest: highlightRequest)
         self.repositoryRootURL = repositoryRootURL
         self.onReloadFromDisk = onReloadFromDisk
+        self.onSave = onSave
     }
 
     init(
@@ -46,9 +69,11 @@ struct CodeTextEditor: NSViewRepresentable {
         onReload: @escaping () async -> Void
     ) {
         text = nil
+        documentID = nil
         self.fileExtension = fileExtension
         repositoryRootURL = nil
         onReloadFromDisk = nil
+        onSave = nil
         mode = .diff(
             presentation: presentation,
             hunks: hunks,
@@ -62,7 +87,7 @@ struct CodeTextEditor: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSView {
-        let container = NSView()
+        let container = LayoutAwareContainer()
         container.autoresizesSubviews = true
 
         let scrollView = NSScrollView()
@@ -111,29 +136,40 @@ struct CodeTextEditor: NSViewRepresentable {
         context.coordinator.minimap = minimap
 
         scrollView.contentView.postsBoundsChangedNotifications = true
-        NotificationCenter.default.addObserver(
-            context.coordinator,
-            selector: #selector(Coordinator.scrollDidChange(_:)),
+        context.coordinator.installScrollObserver(
             name: NSView.boundsDidChangeNotification,
             object: scrollView.contentView
         )
 
-        configureMode(textView: textView, minimap: minimap, coordinator: context.coordinator)
+        // Don't call configureMode here. Loading the file's text in makeNSView
+        // means setAttributedString runs against a textContainer that hasn't
+        // been sized yet (scrollView.frame is still .zero until updateNSView
+        // runs), so the initial layout passes use an unbounded container width.
+        // Once updateNSView later runs applyWrapping, invalidateLayout marks
+        // the glyphs dirty but the wide cached layout sticks until something
+        // forces a fresh setAttributedString — which is why typing any
+        // character (the rehighlight path) made the gutter cut-off go away.
+        // Defer configureMode to updateNSView so text is laid out exactly once,
+        // in the correctly sized container.
 
-        Task { @MainActor in
-            scrollView.contentView.setBoundsOrigin(
-                NSPoint(x: 0, y: scrollView.contentView.bounds.origin.y)
-            )
-            minimap.updateViewport(from: scrollView)
+        container.onResize = { [weak coordinator = context.coordinator, weak container] in
+            guard let coordinator, let container else { return }
+            coordinator.parent.runLayoutPass(container: container, coordinator: coordinator)
         }
-
         return container
     }
 
     func updateNSView(_ container: NSView, context: Context) {
         context.coordinator.parent = self
+        runLayoutPass(container: container, coordinator: context.coordinator, fromSwiftUI: true)
+    }
 
-        guard let textView = context.coordinator.textView else { return }
+    /// Shared layout pass invoked both from SwiftUI's `updateNSView` and from
+    /// the container's frame-change callback. When `fromSwiftUI` is true and
+    /// `didConfigureMode` is already set, also drive `updateMode` for any
+    /// SwiftUI state changes (text binding, gutter diff, dark mode, etc).
+    fileprivate func runLayoutPass(container: NSView, coordinator: Coordinator, fromSwiftUI: Bool = false) {
+        guard let textView = coordinator.textView else { return }
         let bounds = container.bounds
         let minimapWidth = EditorTextViewConstants.minimapWidth
 
@@ -143,8 +179,8 @@ struct CodeTextEditor: NSViewRepresentable {
             width: bounds.width - minimapWidth,
             height: bounds.height
         )
-        context.coordinator.scrollView?.frame = scrollViewFrame
-        context.coordinator.minimap?.frame = NSRect(
+        coordinator.scrollView?.frame = scrollViewFrame
+        coordinator.minimap?.frame = NSRect(
             x: bounds.width - minimapWidth,
             y: 0,
             width: minimapWidth,
@@ -152,8 +188,30 @@ struct CodeTextEditor: NSViewRepresentable {
         )
 
         updateSharedTextView(textView)
-        applyWrapping(textView: textView, contentWidth: scrollViewFrame.width, coordinator: context.coordinator)
-        updateMode(textView: textView, coordinator: context.coordinator)
+
+        // We need bounds.width > 0 (otherwise the NSRect normalization
+        // shenanigans below kick in) AND room to fit at least the gutter
+        // inset on both sides — without this, `applyWrapping` derives a
+        // negative containerWidth (e.g. 16 - 96 = -80) and configureMode
+        // caches a broken layout that doesn't recover when the real width
+        // arrives. Check container.bounds.width, NOT scrollViewFrame.width:
+        // NSRect(width: -16) normalizes to (x: -16, width: 16), so a
+        // `scrollViewFrame.width > 0` guard passes even when bounds.width is
+        // 0.
+        guard let minimap = coordinator.minimap else { return }
+        let minimumWidth = EditorTextViewConstants.minimapWidth + 2 * textView.textContainerInset.width
+        let geometryUsable = bounds.width >= minimumWidth
+
+        if geometryUsable {
+            applyWrapping(textView: textView, contentWidth: scrollViewFrame.width, coordinator: coordinator)
+        }
+
+        if !coordinator.didConfigureMode, geometryUsable {
+            coordinator.didConfigureMode = true
+            configureMode(textView: textView, minimap: minimap, coordinator: coordinator)
+        } else if coordinator.didConfigureMode, fromSwiftUI {
+            updateMode(textView: textView, coordinator: coordinator)
+        }
         textView.needsDisplay = true
     }
 
@@ -166,6 +224,7 @@ struct CodeTextEditor: NSViewRepresentable {
     private func applyWrapping(textView: EditorTextView, contentWidth: CGFloat, coordinator: Coordinator) {
         guard let textContainer = textView.textContainer else { return }
         let layoutManager = textContainer.layoutManager
+        let scrollViewHeight = coordinator.scrollView?.contentSize.height ?? 0
 
         let stateChanged = coordinator.lastWrapLines != wrapLines
         let widthChanged = coordinator.lastWrapContentWidth != contentWidth
@@ -175,29 +234,47 @@ struct CodeTextEditor: NSViewRepresentable {
         if wrapLines {
             let inset = textView.textContainerInset.width * 2
             let containerWidth = max(0, contentWidth - inset)
-            textView.minSize = NSSize(width: 0, height: 0)
+            textView.minSize = NSSize(width: 0, height: scrollViewHeight)
             textView.maxSize = NSSize(width: contentWidth, height: .greatestFiniteMagnitude)
             textView.isHorizontallyResizable = false
             textContainer.containerSize = NSSize(width: containerWidth, height: .greatestFiniteMagnitude)
             textContainer.widthTracksTextView = true
-            textView.setFrameSize(NSSize(width: contentWidth, height: textView.frame.height))
+            let newHeight = max(textView.frame.height, scrollViewHeight)
+            textView.setFrameSize(NSSize(width: contentWidth, height: newHeight))
         } else {
             textContainer.widthTracksTextView = false
             textContainer.containerSize = NSSize(
                 width: CGFloat.greatestFiniteMagnitude,
                 height: CGFloat.greatestFiniteMagnitude
             )
+            textView.minSize = NSSize(width: 0, height: scrollViewHeight)
             textView.isHorizontallyResizable = true
             textView.maxSize = NSSize(
                 width: CGFloat.greatestFiniteMagnitude,
                 height: CGFloat.greatestFiniteMagnitude
             )
+            if textView.frame.height < scrollViewHeight {
+                textView.setFrameSize(NSSize(width: textView.frame.width, height: scrollViewHeight))
+            }
         }
 
         if (stateChanged || widthChanged), let layoutManager, let textStorage = textView.textStorage {
             layoutManager.textContainerChangedGeometry(textContainer)
             let fullRange = NSRange(location: 0, length: textStorage.length)
             layoutManager.invalidateLayout(forCharacterRange: fullRange, actualCharacterRange: nil)
+
+            // invalidateLayout marks layout dirty but AppKit keeps the
+            // cached glyph positions from the previous container width, so
+            // the visible text stays clipped/offset until something forces a
+            // fresh setAttributedString. Re-applying the existing storage
+            // forces a real relayout while preserving selection.
+            if coordinator.didConfigureMode, textStorage.length > 0 {
+                let preservedRanges = textView.selectedRanges
+                let snapshot = NSAttributedString(attributedString: textStorage)
+                textStorage.setAttributedString(snapshot)
+                textView.setSelectedRanges(preservedRanges, affinity: .downstream, stillSelecting: false)
+            }
+
             layoutManager.ensureLayout(for: textContainer)
             textView.needsLayout = true
             textView.needsDisplay = true
@@ -230,6 +307,20 @@ struct CodeTextEditor: NSViewRepresentable {
             height: CGFloat.greatestFiniteMagnitude
         )
         textView.autoresizingMask = []
+
+        // Set the gutter inset up front so the very first applyWrapping pass
+        // (in updateNSView, before configureMode runs) computes the correct
+        // container width = contentWidth - 2 * gutterInset. Otherwise the
+        // first paint wraps at the full content width and lines extend past
+        // the visible area until something forces a fresh setAttributedString
+        // (e.g. the rehighlight after typing a character) — which is the
+        // first-time-bottom-sheet-expansion gutter cut-off.
+        let gutterInset: CGFloat
+        switch mode {
+        case .editable: gutterInset = EditorTextViewConstants.gutterWidth
+        case .diff: gutterInset = EditorTextViewConstants.diffGutterWidth
+        }
+        textView.textContainerInset = NSSize(width: gutterInset, height: 4)
     }
 
     private func updateSharedTextView(_ textView: EditorTextView) {
@@ -256,6 +347,7 @@ struct CodeTextEditor: NSViewRepresentable {
             textView.diffGutterClickHandler = nil
             textView.repositoryRootURL = repositoryRootURL
             textView.gutterDiffReloadHandler = onReloadFromDisk
+            textView.saveHandler = onSave
 
             if let text {
                 coordinator.applyHighlight(
@@ -281,6 +373,15 @@ struct CodeTextEditor: NSViewRepresentable {
                     )
                 }
             }
+
+            // Seed the bookkeeping that updateMode compares against, so the
+            // first updateMode after any text edit doesn't incorrectly see
+            // documentChanged/colorSchemeChanged as true and reset the
+            // cursor to position 0 + scroll to top.
+            coordinator.lastDocumentID = documentID
+            coordinator.lastIsDark = isDark
+
+            finalizeInitialLayout(textView: textView, coordinator: coordinator)
 
         case .diff(let presentation, let hunks, let reference, let onReload):
             textView.isEditable = false
@@ -321,13 +422,45 @@ struct CodeTextEditor: NSViewRepresentable {
                     textView.scrollToLine(max(firstLine - 3, 1))
                 }
             }
+
+            coordinator.lastDocumentID = documentID
+
+            finalizeInitialLayout(textView: textView, coordinator: coordinator)
         }
 
         minimap.totalLines = max(textView.string.components(separatedBy: "\n").count, 1)
     }
 
+    /// Forces a fresh layout pass on the text view's contents and resets the
+    /// scroll origin to the top-left. Call once after the very first
+    /// setAttributedString in `configureMode`. Without this, the initial paint
+    /// can show stale glyph positions cached from when the text container had
+    /// its placeholder geometry, plus a non-zero clip view origin from
+    /// AppKit's auto-scroll-to-selection during the first text load — which
+    /// is what the post-edit re-highlight was inadvertently fixing.
+    private func finalizeInitialLayout(textView: EditorTextView, coordinator: Coordinator) {
+        if let layoutManager = textView.layoutManager,
+           let textContainer = textView.textContainer,
+           let textStorage = textView.textStorage,
+           textStorage.length > 0 {
+            let fullRange = NSRange(location: 0, length: textStorage.length)
+            layoutManager.invalidateLayout(forCharacterRange: fullRange, actualCharacterRange: nil)
+            layoutManager.ensureLayout(for: textContainer)
+        }
+
+        if let scrollView = coordinator.scrollView {
+            scrollView.contentView.setBoundsOrigin(.zero)
+            scrollView.reflectScrolledClipView(scrollView.contentView)
+            coordinator.minimap?.updateViewport(from: scrollView)
+        }
+
+        textView.needsLayout = true
+        textView.needsDisplay = true
+    }
+
     private func updateMode(textView: EditorTextView, coordinator: Coordinator) {
         let colorSchemeChanged = coordinator.lastIsDark != isDark
+        let documentChanged = coordinator.lastDocumentID != documentID
 
         switch mode {
         case .editable(let gutterDiff, let highlightRequest):
@@ -339,11 +472,12 @@ struct CodeTextEditor: NSViewRepresentable {
             textView.diffGutterClickHandler = nil
             textView.repositoryRootURL = repositoryRootURL
             textView.gutterDiffReloadHandler = onReloadFromDisk
+            textView.saveHandler = onSave
 
             coordinator.updateMinimapMarkers(gutterDiff: gutterDiff, text: textView.string)
 
             if let text, !coordinator.isEditing,
-               textView.string != text.wrappedValue || colorSchemeChanged {
+               textView.string != text.wrappedValue || colorSchemeChanged || documentChanged {
                 coordinator.applyHighlight(
                     source: text.wrappedValue,
                     fileExtension: fileExtension,
@@ -364,6 +498,18 @@ struct CodeTextEditor: NSViewRepresentable {
                         lineNumber: highlightRequest.lineNumber,
                         columnRange: highlightRequest.columnRange
                     )
+                }
+            } else if documentChanged {
+                coordinator.lastAppliedHighlight = nil
+                Task { @MainActor in
+                    textView.setSelectedRange(NSRange(location: 0, length: 0))
+                    if let scrollView = coordinator.scrollView {
+                        scrollView.contentView.setBoundsOrigin(.zero)
+                        scrollView.reflectScrolledClipView(scrollView.contentView)
+                        coordinator.minimap?.updateViewport(from: scrollView)
+                    } else {
+                        textView.scrollToLine(1)
+                    }
                 }
             }
 
@@ -397,6 +543,7 @@ struct CodeTextEditor: NSViewRepresentable {
             coordinator.updateMinimapMarkers(lineKinds: presentation.lineKinds, text: presentation.string)
         }
 
+        coordinator.lastDocumentID = documentID
         coordinator.lastIsDark = isDark
     }
 
@@ -527,7 +674,9 @@ struct CodeTextEditor: NSViewRepresentable {
         weak var scrollView: NSScrollView?
         weak var minimap: EditorMinimap?
         var isEditing = false
+        var didConfigureMode = false
         var lastAppliedHighlight: HighlightRequest?
+        var lastDocumentID: AnyHashable?
         var lastWrapLines: Bool?
         var lastWrapContentWidth: CGFloat?
         var lastIsDark: Bool?
@@ -541,12 +690,16 @@ struct CodeTextEditor: NSViewRepresentable {
         var onReload: (() async -> Void)?
         private var newLineToHunkIndex: [Int: Int] = [:]
         private var oldLineToHunkIndex: [Int: Int] = [:]
+        private var scrollObserver: NSObjectProtocol?
 
         init(parent: CodeTextEditor) {
             self.parent = parent
         }
 
         deinit {
+            if let scrollObserver {
+                NotificationCenter.default.removeObserver(scrollObserver)
+            }
             rehighlightTask?.cancel()
             highlightTask?.cancel()
         }
@@ -594,9 +747,18 @@ struct CodeTextEditor: NSViewRepresentable {
             }
         }
 
-        @objc func scrollDidChange(_ notification: Notification) {
-            guard let scrollView else { return }
-            minimap?.updateViewport(from: scrollView)
+        func installScrollObserver(name: NSNotification.Name, object: Any?) {
+            if let scrollObserver {
+                NotificationCenter.default.removeObserver(scrollObserver)
+            }
+            scrollObserver = NotificationCenter.default.addObserver(
+                forName: name,
+                object: object,
+                queue: .main
+            ) { [weak self] _ in
+                guard let self, let scrollView = self.scrollView else { return }
+                self.minimap?.updateViewport(from: scrollView)
+            }
         }
 
         func updateMinimapMarkers(gutterDiff: GutterDiffResult, text: String) {

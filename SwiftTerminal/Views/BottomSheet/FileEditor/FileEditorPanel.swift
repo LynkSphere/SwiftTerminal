@@ -68,11 +68,13 @@ struct FileEditorPanel: View {
                         get: { loader.content },
                         set: { loader.content = $0 }
                     ),
+                    documentID: fileURL,
                     fileExtension: fileURL.pathExtension.lowercased(),
                     gutterDiff: gutterDiff,
                     highlightRequest: panel.highlightRequest,
                     repositoryRootURL: directoryURL,
-                    onReloadFromDisk: { loader.load(fileURL: fileURL) }
+                    onReloadFromDisk: { loader.load(fileURL: fileURL) },
+                    onSave: { saveFile() }
                 )
             case .image(let image):
                 imagePreview(image)

@@ -3,6 +3,7 @@ import Foundation
 struct FoldRegion: Equatable {
     let startLine: Int // 1-based
     let endLine: Int   // 1-based, inclusive (the closing brace line)
+    let closing: String // text shown after the ellipsis when folded (e.g. "}", "*/")
 }
 
 final class FoldingManager {
@@ -85,7 +86,7 @@ final class FoldingManager {
                     if c == "*" && next == "/" {
                         inBlockComment = false
                         if let start = blockCommentStart, lineNum > start + 1 {
-                            regions.append(FoldRegion(startLine: start, endLine: lineNum))
+                            regions.append(FoldRegion(startLine: start, endLine: lineNum, closing: "*/"))
                         }
                         blockCommentStart = nil
                         i += 2; continue
@@ -111,7 +112,7 @@ final class FoldingManager {
                     braceStack.append(lineNum)
                 } else if c == "}" {
                     if let openLine = braceStack.popLast(), lineNum > openLine {
-                        regions.append(FoldRegion(startLine: openLine, endLine: lineNum))
+                        regions.append(FoldRegion(startLine: openLine, endLine: lineNum, closing: "}"))
                     }
                 }
 
