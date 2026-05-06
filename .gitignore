@@ -1,6 +1,5 @@
-SwiftTerminal/Claude/Bridge/node_modules/
-node_modules
 run.sh
 build.sh
 release.sh
 build
+SwiftTerminal.dmg
