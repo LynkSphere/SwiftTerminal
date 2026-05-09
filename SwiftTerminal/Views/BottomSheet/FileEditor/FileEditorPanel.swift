@@ -50,16 +50,6 @@ struct FileEditorPanel: View {
             .buttonStyle(.borderless)
             .keyboardShortcut("j", modifiers: [.command, .shift])
             .help("Show in File Tree")
-
-            // Save button removed but Cmd+S shortcut preserved
-            Button { panel.saveRequested = true } label: {
-                Color.clear.frame(width: 0, height: 0)
-            }
-            .buttonStyle(.plain)
-            .keyboardShortcut("s", modifiers: .command)
-            .frame(width: 0, height: 0)
-            .opacity(0)
-            .allowsHitTesting(false)
         } content: {
             switch loader.phase {
             case .text:
@@ -73,7 +63,10 @@ struct FileEditorPanel: View {
                     gutterDiff: gutterDiff,
                     highlightRequest: panel.highlightRequest,
                     repositoryRootURL: directoryURL,
-                    onReloadFromDisk: { loader.load(fileURL: fileURL) },
+                    onReloadFromDisk: {
+                        await loader.reloadInPlace(fileURL: fileURL)
+                        refreshGitState()
+                    },
                     onSave: { saveFile() }
                 )
             case .image(let image):
@@ -119,7 +112,7 @@ struct FileEditorPanel: View {
                 saveFile()
                 panel.confirmDiscard()
             }
-            Button("Discard", role: .destructive) {
+            Button("Discard", role: .confirm) {
                 panel.confirmDiscard()
             }
             Button("Cancel", role: .cancel) {
@@ -239,4 +232,3 @@ struct FileEditorPanel: View {
         return state
     }
 }
-

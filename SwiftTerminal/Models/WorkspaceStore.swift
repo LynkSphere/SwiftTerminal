@@ -103,8 +103,8 @@ final class WorkspaceStore {
                     _ = t.currentDirectory
                 }
                 for cmd in ws.commands {
-                    _ = cmd.name
-                    _ = cmd.command
+                    _ = cmd.title
+                    _ = cmd.runScript
                     _ = cmd.isDefault
                 }
             }
@@ -127,7 +127,7 @@ final class WorkspaceStore {
 
     func deleteWorkspace(_ workspace: Workspace) {
         for cmd in workspace.commands {
-            CommandRunner.remove(for: cmd.id)
+            cmd.terminate()
         }
         for terminal in workspace.terminals {
             terminal.terminate()

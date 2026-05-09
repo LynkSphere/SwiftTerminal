@@ -6,6 +6,7 @@ final class InspectorViewState {
     var fileTree = FileTreeInspectorState()
     var search = SearchInspectorState()
     var git = GitInspectorState()
+    var selectedCommand: Terminal?
 
     func revealInFileTree(_ url: URL, relativeTo rootURL: URL) {
         // Expand all ancestor folders
@@ -68,4 +69,5 @@ final class GitInspectorState {
     var renameCommitMessage = ""
     var showUndoLastCommitAlert = false
     var showSyncWithBranchSheet = false
+    var showCommitLogSheet = false
 }

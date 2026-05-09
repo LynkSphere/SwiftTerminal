@@ -2,16 +2,15 @@ import SwiftUI
 
 struct CommandEntrySheet: View {
     let workspace: Workspace
-    var entry: CommandEntry?
+    var terminal: Terminal?
 
     @Environment(\.dismiss) private var dismiss
 
     @State private var name = ""
-    @State private var command = ""
+    @State private var script = ""
 
     private var isValid: Bool {
-        !name.trimmingCharacters(in: .whitespaces).isEmpty &&
-        !command.trimmingCharacters(in: .whitespaces).isEmpty
+        !name.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     var body: some View {
@@ -19,13 +18,13 @@ struct CommandEntrySheet: View {
             Form {
                 TextField("Name", text: $name)
 
-                TextField("Command", text: $command, axis: .vertical)
+                TextField("Script", text: $script, axis: .vertical)
                     .lineLimit(5, reservesSpace: true)
                     .font(.system(.body, design: .monospaced))
                     .labelsHidden()
             }
             .formStyle(.grouped)
-            .navigationTitle(entry == nil ? "New Command" : "Edit Command")
+            .navigationTitle(terminal == nil ? "New Command" : "Edit Command")
             .toolbarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -35,7 +34,7 @@ struct CommandEntrySheet: View {
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(entry == nil ? "Add" : "Save") {
+                    Button(terminal == nil ? "Add" : "Save") {
                         save()
                         dismiss()
                     }
@@ -44,23 +43,26 @@ struct CommandEntrySheet: View {
             }
         }
         .onAppear {
-            if let entry {
-                name = entry.name
-                command = entry.command
+            if let terminal {
+                name = terminal.title
+                script = terminal.runScript ?? ""
             }
         }
     }
 
     private func save() {
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
-        let trimmedCommand = command.trimmingCharacters(in: .whitespaces)
-        guard !trimmedName.isEmpty, !trimmedCommand.isEmpty else { return }
+        let trimmedScript = script.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return }
 
-        if let entry {
-            entry.name = trimmedName
-            entry.command = trimmedCommand
+        if let terminal {
+            terminal.title = trimmedName
+            terminal.runScript = trimmedScript.isEmpty ? nil : trimmedScript
         } else {
-            workspace.addCommand(name: trimmedName, command: trimmedCommand)
+            workspace.addCommand(
+                title: trimmedName,
+                runScript: trimmedScript.isEmpty ? nil : trimmedScript
+            )
         }
     }
 }

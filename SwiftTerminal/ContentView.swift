@@ -8,7 +8,7 @@ struct ContentView: View {
     @State private var showingOnboarding = false
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: Bindable(appState).sidebarVisibility) {
             WorkspaceListView(searchText: searchText)
                 .navigationSplitViewColumnWidth(min: 160, ideal: 200, max: 300)
                 .searchable(text: $searchText, placement: .sidebar, prompt: "Filter workspaces")

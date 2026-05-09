@@ -5,19 +5,18 @@ struct BottomSheetView: View {
     @Environment(EditorPanel.self) private var panel
     @Environment(\.colorScheme) var colorScheme
     @AppStorage("editorPanelHeight") private var panelHeight: Double = 250
-    @State private var measuredHeaderHeight: CGFloat = 0
-
-    /// 1px drag border + measured header from PanelLayout.
-    private var collapsedHeight: CGFloat { 1 + measuredHeaderHeight }
+    @AppStorage(EditorFontSize.key) private var editorFontSize: Double = EditorFontSize.default
 
     var body: some View {
         VStack(spacing: 0) {
             dragBorder
             content
         }
-        .frame(maxHeight: panel.isOpen ? panelHeight : collapsedHeight, alignment: .top)
-        .onPreferenceChange(PanelHeaderHeightKey.self) { measuredHeaderHeight = $0 }
+        .frame(maxHeight: panel.isOpen ? panelHeight : 0, alignment: .top)
+        .clipped()
+        .allowsHitTesting(panel.isOpen)
         .background(.bar)
+        .environment(\.editorFontSize, CGFloat(editorFontSize))
     }
 
     private var borderColor: Color {
@@ -43,7 +42,6 @@ struct BottomSheetView: View {
         switch panel.content {
         case .file(let url):
             FileEditorPanel(fileURL: url, directoryURL: directoryURL)
-                .id(url)
         case .diff(let ref):
             DiffPanel(reference: ref)
         case .none:

@@ -11,7 +11,7 @@ final class Workspace: Identifiable, Hashable, Codable {
     var scratchPad: String
 
     private(set) var terminals: [Terminal]
-    private(set) var commands: [CommandEntry]
+    private(set) var commands: [Terminal]
 
     @ObservationIgnored
     weak var store: WorkspaceStore?
@@ -60,7 +60,7 @@ final class Workspace: Identifiable, Hashable, Codable {
         self.projectTypeRaw = try c.decodeIfPresent(String.self, forKey: .projectTypeRaw) ?? ProjectType.unknown.rawValue
         self.scratchPad = try c.decodeIfPresent(String.self, forKey: .scratchPad) ?? ""
         self.terminals = try c.decodeIfPresent([Terminal].self, forKey: .terminals) ?? []
-        self.commands = try c.decodeIfPresent([CommandEntry].self, forKey: .commands) ?? []
+        self.commands = try c.decodeIfPresent([Terminal].self, forKey: .commands) ?? []
         for t in terminals { t.workspace = self }
         for cmd in commands { cmd.workspace = self }
     }
@@ -124,27 +124,48 @@ final class Workspace: Identifiable, Hashable, Codable {
     // MARK: - Command Management
 
     @discardableResult
-    func addCommand(name: String, command: String) -> CommandEntry {
-        let entry = CommandEntry(workspace: self, name: name, command: command)
+    func addCommand(title: String = "Terminal", runScript: String? = nil) -> Terminal {
+        let entry = Terminal(workspace: self, title: title, runScript: runScript)
         commands.append(entry)
         store?.scheduleSave()
         return entry
     }
 
-    var defaultCommand: CommandEntry? {
+    var defaultCommand: Terminal? {
         commands.first { $0.isDefault }
     }
 
-    func setDefaultCommand(_ entry: CommandEntry) {
+    func setDefaultCommand(_ entry: Terminal) {
         for cmd in commands {
             cmd.isDefault = cmd.id == entry.id
         }
         store?.scheduleSave()
     }
 
-    func removeCommand(_ entry: CommandEntry) {
-        CommandRunner.remove(for: entry.id)
+    func removeCommand(_ entry: Terminal) {
+        if inspectorState.selectedCommand?.id == entry.id {
+            inspectorState.selectedCommand = nil
+        }
+        entry.terminate()
         commands.removeAll { $0.id == entry.id }
         store?.scheduleSave()
+    }
+
+    /// Selects the command in the inspector and sends its `runScript`.
+    /// If the terminal view hasn't been created yet, switches to the Commands
+    /// tab so the view renders and spawns the shell; otherwise runs in place
+    /// without disturbing the user's current tab.
+    func runCommand(_ entry: Terminal) {
+        inspectorState.selectedCommand = entry
+        let needsSpawn = entry.localProcessTerminalView == nil
+        if needsSpawn {
+            inspectorState.selectedTab = .commands
+        }
+        Task { @MainActor in
+            if needsSpawn {
+                try? await Task.sleep(for: .milliseconds(300))
+            }
+            entry.run()
+        }
     }
 }

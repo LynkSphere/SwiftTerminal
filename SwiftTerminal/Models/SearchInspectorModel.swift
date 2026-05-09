@@ -6,10 +6,13 @@ struct SearchFileResult: Identifiable, Equatable, Sendable {
     let fileURL: URL
     let fileName: String
     let relativePath: String
+    let disambiguator: String?
     let matches: [SearchMatch]
 
     static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.relativePath == rhs.relativePath && lhs.matches.count == rhs.matches.count
+        lhs.relativePath == rhs.relativePath
+            && lhs.disambiguator == rhs.disambiguator
+            && lhs.matches.count == rhs.matches.count
     }
 }
 
@@ -100,14 +103,50 @@ private enum SearchEngine {
                         fileURL: fileURL,
                         fileName: fileURL.lastPathComponent,
                         relativePath: relativePath,
+                        disambiguator: nil,
                         matches: matches
                     ))
                     matchCount += matches.count
                 }
             }
 
-            return fileResults
+            return assignDisambiguators(fileResults)
         }.value
+    }
+
+    private static func assignDisambiguators(_ results: [SearchFileResult]) -> [SearchFileResult] {
+        let grouped = Dictionary(grouping: results, by: \.fileName)
+        return results.map { result in
+            guard let group = grouped[result.fileName], group.count > 1 else {
+                return result
+            }
+            let myDirs = Array(result.relativePath.split(separator: "/").map(String.init).dropLast())
+            let otherDirsList = group
+                .filter { $0.relativePath != result.relativePath }
+                .map { Array($0.relativePath.split(separator: "/").map(String.init).dropLast()) }
+
+            var disambiguator: String?
+            for depth in 0..<myDirs.count {
+                let i = myDirs.count - 1 - depth
+                let candidate = myDirs[i]
+                let collision = otherDirsList.contains { other in
+                    let otherI = other.count - 1 - depth
+                    return otherI >= 0 && other[otherI] == candidate
+                }
+                if !collision {
+                    disambiguator = candidate
+                    break
+                }
+            }
+
+            return SearchFileResult(
+                fileURL: result.fileURL,
+                fileName: result.fileName,
+                relativePath: result.relativePath,
+                disambiguator: disambiguator ?? myDirs.last,
+                matches: result.matches
+            )
+        }
     }
 
     private static func highlight(line: String, match: Range<String.Index>) -> AttributedString {

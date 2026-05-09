@@ -11,16 +11,7 @@ struct InspectorView: View {
             .toolbar {
                 if let defaultCommand = workspace.defaultCommand {
                     ToolbarItem(placement: .primaryAction) {
-                        Button {
-                            if defaultCommand.runner.isRunning {
-                                defaultCommand.runner.stop()
-                            } else {
-                                defaultCommand.run()
-                            }
-                        } label: {
-                            Image(systemName: defaultCommand.runner.isRunning ? "stop.fill" : "play.fill")
-                                .contentTransition(.symbolEffect(.replace))
-                        }
+                        runCommandControl(for: defaultCommand)
                     }
                 }
 
@@ -50,8 +41,59 @@ struct InspectorView: View {
             }
     }
 
+    @ViewBuilder
+    private func runCommandControl(for defaultCommand: Terminal) -> some View {
+        let runnable = workspace.commands.filter { cmd in
+            !(cmd.runScript?.trimmingCharacters(in: .whitespaces).isEmpty ?? true)
+        }
+
+        if runnable.count <= 1 {
+            Button {
+                trigger(defaultCommand)
+            } label: {
+                runIcon(for: defaultCommand)
+            }
+        } else {
+            Menu {
+                Picker("Default Command", selection: Binding(
+                    get: { workspace.defaultCommand?.id ?? defaultCommand.id },
+                    set: { newID in
+                        if let cmd = workspace.commands.first(where: { $0.id == newID }) {
+                            workspace.setDefaultCommand(cmd)
+                        }
+                    }
+                )) {
+                    ForEach(runnable) { cmd in
+                        Label(cmd.title, systemImage: "play.fill").tag(cmd.id)
+                            .labelStyle(.titleOnly)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.inline)
+            } label: {
+                runIcon(for: defaultCommand)
+            } primaryAction: {
+                trigger(defaultCommand)
+            }
+            .id(defaultCommand.id)
+        }
+    }
+
+    private func trigger(_ cmd: Terminal) {
+        if cmd.hasChildProcess {
+            cmd.interrupt()
+        } else {
+            workspace.runCommand(cmd)
+        }
+    }
+
+    private func runIcon(for cmd: Terminal) -> some View {
+        Image(systemName: cmd.hasChildProcess ? "stop.fill" : "play.fill")
+            .contentTransition(.symbolEffect(.replace))
+    }
+
     private func iconName(for tab: InspectorTab) -> String {
-        if tab == .commands && workspace.commands.contains(where: { $0.runner.isRunning }) {
+        if tab == .commands && workspace.commands.contains(where: { $0.hasChildProcess }) {
             return "terminal.fill"
         }
         return tab.icon
