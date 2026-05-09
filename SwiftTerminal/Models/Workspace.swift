@@ -9,6 +9,8 @@ final class Workspace: Identifiable, Hashable, Codable {
     var directory: String
     var projectTypeRaw: String
     var scratchPad: String
+    var isArchived: Bool = false
+    private(set) var customIconFilename: String?
 
     private(set) var terminals: [Terminal]
     private(set) var commands: [Terminal]
@@ -35,6 +37,57 @@ final class Workspace: Identifiable, Hashable, Codable {
         projectType = ProjectType.detect(at: url)
     }
 
+    // MARK: - Custom Icon
+
+    static func iconsDirectory() -> URL {
+        let fm = FileManager.default
+        let appSupport = (try? fm.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )) ?? fm.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support")
+        let dir = appSupport
+            .appendingPathComponent("SwiftTerminal", isDirectory: true)
+            .appendingPathComponent("WorkspaceIcons", isDirectory: true)
+        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    var customIconURL: URL? {
+        guard let name = customIconFilename, !name.isEmpty else { return nil }
+        return Self.iconsDirectory().appendingPathComponent(name)
+    }
+
+    func setCustomIcon(from sourceURL: URL) throws {
+        let fm = FileManager.default
+        let dir = Self.iconsDirectory()
+        let allowed: Set<String> = ["icns", "png", "jpg", "jpeg"]
+        let ext = sourceURL.pathExtension.lowercased()
+        let safeExt = allowed.contains(ext) ? ext : "png"
+        let filename = "\(id.uuidString).\(safeExt)"
+        let dest = dir.appendingPathComponent(filename)
+
+        if let prior = customIconFilename {
+            try? fm.removeItem(at: dir.appendingPathComponent(prior))
+        }
+        if fm.fileExists(atPath: dest.path) {
+            try fm.removeItem(at: dest)
+        }
+        try fm.copyItem(at: sourceURL, to: dest)
+        customIconFilename = filename
+        store?.scheduleSave()
+    }
+
+    func clearCustomIcon() {
+        if let name = customIconFilename {
+            let url = Self.iconsDirectory().appendingPathComponent(name)
+            try? FileManager.default.removeItem(at: url)
+        }
+        customIconFilename = nil
+        store?.scheduleSave()
+    }
+
     init(name: String, directory: String) {
         self.id = UUID()
         self.name = name
@@ -48,7 +101,8 @@ final class Workspace: Identifiable, Hashable, Codable {
     // MARK: - Codable
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, directory, projectTypeRaw, scratchPad
+        case id, name, directory, projectTypeRaw, scratchPad, isArchived
+        case customIconFilename
         case terminals, commands
     }
 
@@ -57,8 +111,13 @@ final class Workspace: Identifiable, Hashable, Codable {
         self.id = try c.decode(UUID.self, forKey: .id)
         self.name = try c.decode(String.self, forKey: .name)
         self.directory = try c.decode(String.self, forKey: .directory)
-        self.projectTypeRaw = try c.decodeIfPresent(String.self, forKey: .projectTypeRaw) ?? ProjectType.unknown.rawValue
+        let rawProjectType = try c.decodeIfPresent(String.self, forKey: .projectTypeRaw) ?? ProjectType.unknown.rawValue
+        // Legacy: "xcode" was folded into "swiftPackage" (now displayed as "Swift")
+        // since Xcode projects are just one flavor of Swift project.
+        self.projectTypeRaw = rawProjectType == "xcode" ? ProjectType.swiftPackage.rawValue : rawProjectType
         self.scratchPad = try c.decodeIfPresent(String.self, forKey: .scratchPad) ?? ""
+        self.isArchived = try c.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
+        self.customIconFilename = try c.decodeIfPresent(String.self, forKey: .customIconFilename)
         self.terminals = try c.decodeIfPresent([Terminal].self, forKey: .terminals) ?? []
         self.commands = try c.decodeIfPresent([Terminal].self, forKey: .commands) ?? []
         for t in terminals { t.workspace = self }
@@ -72,6 +131,8 @@ final class Workspace: Identifiable, Hashable, Codable {
         try c.encode(directory, forKey: .directory)
         try c.encode(projectTypeRaw, forKey: .projectTypeRaw)
         try c.encode(scratchPad, forKey: .scratchPad)
+        try c.encode(isArchived, forKey: .isArchived)
+        try c.encodeIfPresent(customIconFilename, forKey: .customIconFilename)
         try c.encode(terminals, forKey: .terminals)
         try c.encode(commands, forKey: .commands)
     }
@@ -149,6 +210,21 @@ final class Workspace: Identifiable, Hashable, Codable {
         entry.terminate()
         commands.removeAll { $0.id == entry.id }
         store?.scheduleSave()
+    }
+
+    var hasRunningTerminals: Bool {
+        terminals.contains { $0.localProcessTerminalView != nil }
+            || commands.contains { $0.localProcessTerminalView != nil }
+    }
+
+    var hasActiveChildProcess: Bool {
+        terminals.contains { $0.hasChildProcess }
+            || commands.contains { $0.hasChildProcess }
+    }
+
+    func killAllRunningTerminals() {
+        for t in terminals { t.terminate() }
+        for cmd in commands { cmd.terminate() }
     }
 
     /// Selects the command in the inspector and sends its `runScript`.

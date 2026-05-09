@@ -13,7 +13,13 @@ struct WorkspaceListView: View {
     }
 
     private var visibleWorkspaces: [Workspace] {
-        guard !searchText.isEmpty else { return store.workspaces }
+        guard !searchText.isEmpty else {
+            return store.workspaces.filter { ws in
+                appState.showArchivedWorkspaces
+                    || !ws.isArchived
+                    || ws.hasActiveChildProcess
+            }
+        }
         return store.workspaces.filter { $0.name.localizedStandardContains(searchText) }
     }
 

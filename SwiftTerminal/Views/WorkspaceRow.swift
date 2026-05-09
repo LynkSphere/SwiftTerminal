@@ -1,4 +1,6 @@
 import SwiftUI
+import AppKit
+import UniformTypeIdentifiers
 
 struct WorkspaceRow: View {
     @Environment(AppState.self) private var appState
@@ -7,32 +9,51 @@ struct WorkspaceRow: View {
     let workspace: Workspace
 
     @State private var isRenaming = false
-    @FocusState private var isNameFieldFocused: Bool
+    @State private var renameText = ""
 
     @State private var busyCount = 0
     @State private var hasBell = false
 
-    var body: some View {
-        HStack(spacing: 8) {
-            if workspace.projectType != .unknown {
-                Image(workspace.projectType.iconName)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 16, height: 16)
-            } else {
-                Image(systemName: "folder")
-            }
+    private var customIconImage: NSImage? {
+        guard let url = workspace.customIconURL else { return nil }
+        return NSImage(contentsOf: url)
+    }
 
-            if isRenaming {
-                TextField("Workspace Name", text: Bindable(workspace).name)
-                    .textFieldStyle(.plain)
-                    .focused($isNameFieldFocused)
-                    .onSubmit { isRenaming = false }
-                    .onExitCommand { isRenaming = false }
-                    .onAppear { isNameFieldFocused = true }
-            } else {
+    var body: some View {
+        HStack(spacing: 5) {
+            Label {
                 Text(workspace.name)
                     .lineLimit(1)
+            } icon: {
+                if let nsImage = customIconImage {
+                    Image(nsImage: nsImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 18, height: 18)
+                        .clipShape(.rect(cornerRadius: 6))
+                } else if workspace.projectType != .unknown {
+                    Image(workspace.projectType.iconName)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 18, height: 18)
+                } else {
+                    Image(systemName: "folder")
+                }
+            }
+
+            Spacer(minLength: 4)
+
+            if !workspace.scratchPad.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Button {
+                    appState.scratchPadRequest = workspace
+                    appState.selectedWorkspace = workspace
+                } label: {
+                    Image(systemName: "note.text")
+                        .imageScale(.small)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Open Scratch Pad")
             }
         }
         .badge(hasBell ? Text("") : Text(busyCount > 0 ? "\(busyCount)" : ""))
@@ -44,34 +65,89 @@ struct WorkspaceRow: View {
                 try? await Task.sleep(for: .seconds(2))
             }
         }
+        .alert("Rename Workspace", isPresented: $isRenaming) {
+            TextField("Workspace Name", text: $renameText)
+            Button("Cancel", role: .cancel) { }
+            Button("Rename") {
+                let trimmed = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    workspace.name = trimmed
+                }
+            }
+        }
         .contextMenu {
             RenameButton()
 
-            Menu("Project Type") {
-                ForEach(ProjectType.allCases, id: \.self) { type in
-                    Button {
-                        workspace.projectType = type
-                    } label: {
+            Button {
+                NSWorkspace.shared.activateFileViewerSelecting([workspace.url])
+            } label: {
+                Label("Reveal in Finder", systemImage: "folder")
+            }
+
+            Divider()
+
+            Menu {
+                Picker("Project Type", selection: Bindable(workspace).projectType) {
+                    ForEach(ProjectType.allCases, id: \.self) { type in
                         Label {
                             Text(type.displayName)
                         } icon: {
-                            if workspace.projectType == type {
-                                Image(systemName: "checkmark")
-                            } else if !type.iconName.isEmpty {
+                            if !type.iconName.isEmpty {
                                 Image(type.iconName)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(width: 18, height: 18)
                             }
                         }
+                        .tag(type)
                     }
                 }
+                .pickerStyle(.inline)
+                .labelsHidden()
 
                 Divider()
 
                 Button("Auto-Detect") {
                     workspace.detectProjectType()
                 }
+            } label: {
+                Label("Project Type", systemImage: "shippingbox")
+            }
+
+            Button {
+                chooseCustomIcon()
+            } label: {
+                Label("Choose Icon…", systemImage: "photo")
+            }
+
+            if workspace.customIconFilename != nil {
+                Button {
+                    workspace.clearCustomIcon()
+                } label: {
+                    Label("Reset Icon", systemImage: "arrow.uturn.backward")
+                }
             }
 
             Divider()
+
+            Button {
+                workspace.killAllRunningTerminals()
+            } label: {
+                Label("Kill All Terminals", systemImage: "xmark.octagon")
+            }
+            .disabled(!workspace.hasRunningTerminals)
+
+            Divider()
+
+            Button {
+                toggleArchive()
+            } label: {
+                Label(
+                    workspace.isArchived ? "Unarchive" : "Archive",
+                    systemImage: workspace.isArchived ? "tray.and.arrow.up" : "archivebox"
+                )
+            }
+
             Button(role: .destructive) {
                 if appState.selectedWorkspace === workspace {
                     appState.selectedWorkspace = nil
@@ -83,7 +159,36 @@ struct WorkspaceRow: View {
             }
         }
         .renameAction {
+            renameText = workspace.name
             isRenaming = true
         }
+    }
+
+    private func chooseCustomIcon() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.icns, .png, .jpeg]
+        panel.message = "Choose an icon image"
+        panel.prompt = "Set Icon"
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try workspace.setCustomIcon(from: url)
+        } catch {
+            print("WorkspaceRow: failed to set custom icon: \(error)")
+        }
+    }
+
+    private func toggleArchive() {
+        if !workspace.isArchived {
+            if appState.selectedWorkspace === workspace {
+                appState.selectedWorkspace = nil
+                appState.selectedTerminal = nil
+            }
+            workspace.killAllRunningTerminals()
+        }
+        workspace.isArchived.toggle()
     }
 }

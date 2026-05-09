@@ -34,6 +34,12 @@ struct WorkspaceDetailView: View {
         .sheet(isPresented: $showingScratchPad) {
             ScratchPadSheet(workspace: workspace)
         }
+        .onChange(of: appState.scratchPadRequest) { _, newValue in
+            if newValue === workspace {
+                showingScratchPad = true
+                appState.scratchPadRequest = nil
+            }
+        }
         .navigationTitle(workspace.name)
         .navigationSubtitle(workspace.directory.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
         .environment(workspace.editorPanel)

@@ -98,6 +98,8 @@ final class WorkspaceStore {
                 _ = ws.directory
                 _ = ws.projectTypeRaw
                 _ = ws.scratchPad
+                _ = ws.isArchived
+                _ = ws.customIconFilename
                 for t in ws.terminals {
                     _ = t.title
                     _ = t.currentDirectory
@@ -132,6 +134,7 @@ final class WorkspaceStore {
         for terminal in workspace.terminals {
             terminal.terminate()
         }
+        workspace.clearCustomIcon()
         workspaces.removeAll { $0.id == workspace.id }
         scheduleSave()
     }

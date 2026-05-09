@@ -14,4 +14,11 @@ final class AppState {
 
     // Close tab confirmation
     var terminalPendingClose: Terminal?
+
+    // Whether archived workspaces are temporarily revealed in the sidebar.
+    var showArchivedWorkspaces = false
+
+    // Workspace whose scratch pad should be opened. WorkspaceDetailView watches
+    // this and presents the sheet when its workspace matches.
+    var scratchPadRequest: Workspace?
 }
