@@ -110,7 +110,13 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
             let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
             let shellBasename = (shell as NSString).lastPathComponent
             let home = FileManager.default.homeDirectoryForCurrentUser.path
-            let startingDirectory = resolvedWorkingDirectoryPath(from: tab.currentDirectory) ?? home
+            // Prefer the tab's own cwd (set by tab-bar terminals on creation, then
+            // kept current via OSC 7). Fall back to the workspace directory so
+            // commands — which never set currentDirectory — spawn in the project
+            // root instead of $HOME.
+            let startingDirectory = resolvedWorkingDirectoryPath(from: tab.currentDirectory)
+                ?? resolvedWorkingDirectoryPath(from: tab.workspace?.directory)
+                ?? home
 
             let plan = ShellIntegration.plan(forShellPath: shell)
 
