@@ -2,8 +2,10 @@ import SwiftUI
 import SwiftTerm
 
 /// Displays a single terminal tab's view inside a SwiftUI hierarchy.
-/// The `LocalProcessTerminalView` is retained by `TerminalTab` so it survives
-/// tab switches without being destroyed/recreated.
+/// The `LocalProcessTerminalView` is retained by the `Terminal` model so it
+/// survives tab and workspace switches: only the selected tab's view is
+/// mounted in the container at any time, and switching tabs re-parents the
+/// existing view rather than tearing down its shell process.
 struct TerminalContainerRepresentable: NSViewRepresentable {
     let tab: Terminal
     let appState: AppState
@@ -27,7 +29,10 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
 
         terminalView.processDelegate = coordinator
 
-        // Add to container if not already a subview (never remove — just hide/show)
+        for subview in container.subviews where subview !== terminalView {
+            subview.removeFromSuperview()
+        }
+
         if terminalView.superview !== container {
             terminalView.translatesAutoresizingMaskIntoConstraints = false
             container.addSubview(terminalView)
@@ -38,12 +43,6 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
                 terminalView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
             ])
         }
-
-        // Hide all, then show the selected one
-        for subview in container.subviews {
-            subview.isHidden = (subview !== terminalView)
-        }
-        terminalView.isHidden = false
 
         DispatchQueue.main.async {
             terminalView.window?.makeFirstResponder(terminalView)
@@ -95,7 +94,7 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
                 Task { @MainActor in
                     guard let tab else { return }
                     let isSelected = appState?.selectedTerminal === tab
-                    let isVisible = isSelected && (tv.map { !$0.isHidden && $0.window != nil } ?? false)
+                    let isVisible = isSelected && (tv?.window != nil)
                     if !isVisible {
                         tab.hasBellNotification = true
                     }
