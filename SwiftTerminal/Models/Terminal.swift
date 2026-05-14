@@ -17,7 +17,7 @@ final class Terminal: Identifiable, Hashable, Codable {
     var isDefault: Bool = false
 
     /// Name of the current foreground child process, if any. Driven by the
-    /// shell-integration OSC 133 handler in `TerminalRepresentable`:
+    /// shell-integration OSC 133 handler installed in `TerminalRepresentable`:
     /// set on `133;C` (preexec), cleared on `133;D` (precmd).
     var foregroundProcessName: String?
 

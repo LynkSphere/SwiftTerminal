@@ -12,7 +12,6 @@ struct DocumentTabBar: View {
     @State private var dragOffset: CGFloat = 0
     @State private var lastDragTranslation: CGFloat = 0
     @State private var renamingTab: Terminal?
-    @State private var processNames: [UUID: String] = [:]
     @State private var hoveredCloseTabID: UUID?
 
     var body: some View {
@@ -46,18 +45,6 @@ struct DocumentTabBar: View {
         }
         .padding(.horizontal, 8)
         .padding(.bottom, 3)
-        .task {
-            while !Task.isCancelled {
-                var names: [UUID: String] = [:]
-                for terminal in terminals {
-                    if let name = terminal.foregroundProcessName {
-                        names[terminal.id] = name
-                    }
-                }
-                processNames = names
-                try? await Task.sleep(for: .seconds(2))
-            }
-        }
         .alert("Rename Tab", isPresented: Binding(get: { renamingTab != nil }, set: { if !$0 { renamingTab = nil } }), presenting: renamingTab) { tab in
             TextField("Tab Name", text: Bindable(tab).title)
             Button("Cancel", role: .cancel) { renamingTab = nil }
@@ -113,7 +100,7 @@ struct DocumentTabBar: View {
             HStack(spacing: 0) {
                 Color.clear.frame(width: 10, height: 10)
 
-                Text(processNames[terminal.id].map { "\(terminal.title) \u{2014} \($0)" } ?? terminal.title)
+                Text(terminal.foregroundProcessName.map { "\(terminal.title) \u{2014} \($0)" } ?? terminal.title)
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundStyle(isSelected ? .primary : .secondary)
@@ -121,7 +108,11 @@ struct DocumentTabBar: View {
                     .truncationMode(.middle)
                     .frame(maxWidth: .infinity, alignment: .center)
 
-                if terminal.hasBellNotification {
+                if terminal.hasChildProcess {
+                    ProgressView()
+                        .controlSize(.mini)
+                        .frame(width: 10, height: 10)
+                } else if terminal.hasBellNotification {
                     Circle()
                         .fill(.orange)
                         .frame(width: 6, height: 6)

@@ -54,6 +54,12 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
         Coordinator()
     }
 
+    /// Weak wrapper so OSC handler closures don't retain the Terminal model.
+    private final class WeakTab {
+        weak var value: Terminal?
+        init(_ value: Terminal) { self.value = value }
+    }
+
     final class Coordinator: NSObject, LocalProcessTerminalViewDelegate {
         /// SwiftTerm parses OSC 7 (`\e]7;file://host/path\a`) and forwards the
         /// reported directory here. The shell-integration scripts emit this on
@@ -132,6 +138,8 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
 
             tv.processDelegate = self
 
+            installSemanticPromptHandler(on: tv, for: tab)
+
             tv.startProcess(
                 executable: shell,
                 args: plan.args,
@@ -163,30 +171,48 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
             viewMap.removeValue(forKey: ObjectIdentifier(local))
         }
 
-        /// SwiftTerm parses OSC 133;C (FinalTerm semantic prompt — command
-        /// started) and forwards the result here. The shell-integration scripts
-        /// emit this on `preexec`, making it the authoritative "shell is busy"
-        /// signal, independent of window title or child-process scanning.
-        func semanticPromptCommandStarted(source: TerminalView, command: String?) {
-            guard let local = source as? LocalProcessTerminalView,
-                  let entry = viewMap[ObjectIdentifier(local)] else { return }
-            let value = (command?.isEmpty == false) ? command! : "(running)"
-            DispatchQueue.main.async {
-                if entry.tab.foregroundProcessName != value {
-                    entry.tab.foregroundProcessName = value
+        /// Registers an OSC 133 (FinalTerm semantic prompt) handler on the
+        /// underlying `Terminal`. The shell-integration scripts emit:
+        ///   - `\e]133;C;<command>\a` when a foreground command starts
+        ///   - `\e]133;D;<exit>\a`    when it finishes
+        /// Attaching the handler to the SwiftTerm parser (rather than
+        /// `processDelegate`) means it survives the same terminal being shown
+        /// in multiple `TerminalContainerRepresentable` instances (main tab
+        /// bar + commands inspector), which would otherwise fight over the
+        /// delegate and silence updates for one of them.
+        func installSemanticPromptHandler(on view: LocalProcessTerminalView, for tab: Terminal) {
+            let weakTab = WeakTab(tab)
+            view.getTerminal().registerOscHandler(code: 133) { data in
+                let payload = String(bytes: data, encoding: .utf8) ?? ""
+                let verb: String
+                let arg: String
+                if let semi = payload.firstIndex(of: ";") {
+                    verb = String(payload[..<semi])
+                    arg = String(payload[payload.index(after: semi)...])
+                } else {
+                    verb = payload
+                    arg = ""
                 }
-            }
-        }
-
-        /// SwiftTerm parses OSC 133;D (command finished) and forwards the exit
-        /// code here. Clears `foregroundProcessName` so the inspector goes back
-        /// to "idle" and records `lastExitCode` for future status display.
-        func semanticPromptCommandFinished(source: TerminalView, exitCode: Int32?) {
-            guard let local = source as? LocalProcessTerminalView,
-                  let entry = viewMap[ObjectIdentifier(local)] else { return }
-            DispatchQueue.main.async {
-                entry.tab.foregroundProcessName = nil
-                entry.tab.lastExitCode = exitCode
+                switch verb {
+                case "C":
+                    let name = arg.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let value = name.isEmpty ? "(running)" : name
+                    DispatchQueue.main.async {
+                        guard let tab = weakTab.value else { return }
+                        if tab.foregroundProcessName != value {
+                            tab.foregroundProcessName = value
+                        }
+                    }
+                case "D":
+                    let exit = Int32(arg.trimmingCharacters(in: .whitespacesAndNewlines))
+                    DispatchQueue.main.async {
+                        guard let tab = weakTab.value else { return }
+                        tab.foregroundProcessName = nil
+                        tab.lastExitCode = exit
+                    }
+                default:
+                    break  // 133;A (prompt-start) and 133;B (prompt-end) ignored
+                }
             }
         }
 

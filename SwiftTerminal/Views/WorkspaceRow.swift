@@ -11,8 +11,17 @@ struct WorkspaceRow: View {
     @State private var isRenaming = false
     @State private var renameText = ""
 
-    @State private var busyCount = 0
-    @State private var hasBell = false
+    private var busyCount: Int {
+        workspace.terminals.filter(\.hasChildProcess).count
+    }
+
+    private var hasBell: Bool {
+        workspace.terminals.contains(where: \.hasBellNotification)
+    }
+
+    private var hasRunningCommand: Bool {
+        workspace.commands.contains(where: \.hasChildProcess)
+    }
 
     private var customIconImage: NSImage? {
         guard let url = workspace.customIconURL else { return nil }
@@ -55,16 +64,22 @@ struct WorkspaceRow: View {
                 .buttonStyle(.plain)
                 .help("Open Scratch Pad")
             }
-        }
-        .badge(hasBell ? Text("") : Text(busyCount > 0 ? "\(busyCount)" : ""))
-        .badgeProminence(hasBell ? .increased : .standard)
-        .task {
-            while !Task.isCancelled {
-                busyCount = workspace.terminals.filter(\.hasChildProcess).count
-                hasBell = workspace.terminals.contains(where: \.hasBellNotification)
-                try? await Task.sleep(for: .seconds(2))
+
+            if hasRunningCommand {
+                Button {
+                    appState.selectedWorkspace = workspace
+                    workspace.inspectorState.selectedTab = .commands
+                } label: {
+                    Image(systemName: "terminal.fill")
+                        .imageScale(.small)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("A command is running")
             }
         }
+        .badge(hasBell ? Text("") : (busyCount > 0 ? Text("\(busyCount)") : nil))
+        .badgeProminence(hasBell ? .increased : .standard)
         .alert("Rename Workspace", isPresented: $isRenaming) {
             TextField("Workspace Name", text: $renameText)
             Button("Cancel", role: .cancel) { }
