@@ -38,7 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
-        NSApplication.shared.dockTile.badgeLabel = nil
+        AppDelegate.clearBadge()
     }
 
     // Show notifications even when the app is in the foreground
@@ -68,7 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 ]
             )
         }
-        NSApplication.shared.dockTile.badgeLabel = nil
+        AppDelegate.clearBadge()
         completionHandler()
     }
 
@@ -94,12 +94,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         NSApplication.shared.requestUserAttention(.criticalRequest)
     }
 
-    static func updateBadge(count: Int) {
-        if count > 0 {
-            NSApplication.shared.dockTile.badgeLabel = "\(count)"
-        } else {
-            NSApplication.shared.dockTile.badgeLabel = nil
-        }
+    static func showBadge() {
+        NSApplication.shared.dockTile.badgeLabel = " "
+    }
+
+    static func clearBadge() {
+        NSApplication.shared.dockTile.badgeLabel = nil
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
