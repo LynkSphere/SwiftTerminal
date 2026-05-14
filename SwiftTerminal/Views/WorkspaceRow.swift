@@ -10,6 +10,8 @@ struct WorkspaceRow: View {
 
     @State private var isRenaming = false
     @State private var renameText = ""
+    @State private var customIconImage: NSImage?
+    @State private var loadedIconFilename: String?
 
     private var busyCount: Int {
         workspace.terminals.filter(\.hasChildProcess).count
@@ -23,9 +25,15 @@ struct WorkspaceRow: View {
         workspace.commands.contains(where: \.hasChildProcess)
     }
 
-    private var customIconImage: NSImage? {
-        guard let url = workspace.customIconURL else { return nil }
-        return NSImage(contentsOf: url)
+    private func reloadCustomIconIfNeeded() {
+        let filename = workspace.customIconFilename
+        guard filename != loadedIconFilename else { return }
+        loadedIconFilename = filename
+        if let url = workspace.customIconURL {
+            customIconImage = NSImage(contentsOf: url)
+        } else {
+            customIconImage = nil
+        }
     }
 
     var body: some View {
@@ -176,6 +184,9 @@ struct WorkspaceRow: View {
         .renameAction {
             renameText = workspace.name
             isRenaming = true
+        }
+        .task(id: workspace.customIconFilename) {
+            reloadCustomIconIfNeeded()
         }
     }
 
