@@ -19,7 +19,7 @@ struct SettingsView: View {
                 CreditsSettingsView()
             }
         }
-        .frame(width: 480, height: 400)
+        .frame(width: 480, height: 460)
     }
 }
 

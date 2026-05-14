@@ -110,6 +110,7 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
 
             tv.configureNativeColors()
             tv.getTerminal().setCursorStyle(.blinkBar)
+            tv.getTerminal().changeScrollback(TerminalProcessRegistry.scrollback)
             tv.font = NSFont(descriptor: tv.font.fontDescriptor, size: TerminalProcessRegistry.fontSize) ?? tv.font
             tab.localProcessTerminalView = tv
             register(tv, for: tab)

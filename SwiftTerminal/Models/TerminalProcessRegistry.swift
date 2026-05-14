@@ -16,6 +16,10 @@ enum TerminalProcessRegistry {
     static let minFontSize: CGFloat = 8
     static let maxFontSize: CGFloat = 20
 
+    static let scrollbackKey = "terminalScrollback"
+    static let defaultScrollback: Int = 2000
+    static let scrollbackOptions: [Int] = [1000, 2000, 3000, 4000]
+
     static var fontSize: CGFloat {
         get {
             let stored = UserDefaults.standard.object(forKey: fontSizeKey) as? Double
@@ -26,6 +30,11 @@ enum TerminalProcessRegistry {
             UserDefaults.standard.set(Double(clamped), forKey: fontSizeKey)
             applyFontSizeToAll(clamped)
         }
+    }
+
+    static var scrollback: Int {
+        let stored = UserDefaults.standard.object(forKey: scrollbackKey) as? Int
+        return stored ?? defaultScrollback
     }
 
     static func applyFontSizeToAll(_ size: CGFloat) {

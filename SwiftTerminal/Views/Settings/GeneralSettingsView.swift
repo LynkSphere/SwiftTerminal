@@ -7,6 +7,7 @@ struct GeneralSettingsView: View {
     @AppStorage("editorWrapLines") private var editorWrapLines = true
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage(TerminalProcessRegistry.fontSizeKey) private var terminalFontSize: Double = Double(TerminalProcessRegistry.defaultFontSize)
+    @AppStorage(TerminalProcessRegistry.scrollbackKey) private var terminalScrollback: Int = TerminalProcessRegistry.defaultScrollback
 
     var body: some View {
         Form {
@@ -32,6 +33,15 @@ struct GeneralSettingsView: View {
                     }
                 } label: {
                     Text("Font size")
+                }
+
+                Picker(selection: $terminalScrollback) {
+                    ForEach(TerminalProcessRegistry.scrollbackOptions, id: \.self) { value in
+                        Text("\(value, format: .number.grouping(.never)) lines").tag(value)
+                    }
+                } label: {
+                    Text("Scrollback")
+                    Text("How many lines of history each terminal keeps")
                 }
             } header: {
                 Text("Terminal")
