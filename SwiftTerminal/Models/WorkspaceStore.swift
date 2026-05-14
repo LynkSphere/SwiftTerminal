@@ -123,7 +123,7 @@ final class WorkspaceStore {
 
     func addWorkspace(_ workspace: Workspace) {
         workspace.store = self
-        workspaces.append(workspace)
+        workspaces.insert(workspace, at: 0)
         scheduleSave()
     }
 
@@ -141,6 +141,11 @@ final class WorkspaceStore {
 
     func moveWorkspaces(from source: IndexSet, to destination: Int) {
         workspaces.move(fromOffsets: source, toOffset: destination)
+        scheduleSave()
+    }
+
+    func reorderWorkspaces(_ newOrder: [Workspace]) {
+        workspaces = newOrder
         scheduleSave()
     }
 }

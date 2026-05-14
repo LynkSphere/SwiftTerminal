@@ -3,25 +3,21 @@ import SwiftUI
 struct SettingsView: View {
     var body: some View {
         TabView {
-            GeneralSettingsView()
-                .tabItem {
-                    Label("General", systemImage: "gearshape")
-                }
+            Tab("General", systemImage: "gearshape") {
+                GeneralSettingsView()
+            }
 
-            UpdatesSettingsView()
-                .tabItem {
-                    Label("Updates", systemImage: "arrow.down.circle")
-                }
+            Tab("Updates", systemImage: "arrow.down.circle") {
+                UpdatesSettingsView()
+            }
 
-            ShortcutsSettingsView()
-                .tabItem {
-                    Label("Shortcuts", systemImage: "keyboard")
-                }
+            Tab("Shortcuts", systemImage: "keyboard") {
+                ShortcutsSettingsView()
+            }
 
-            CreditsSettingsView()
-                .tabItem {
-                    Label("Credits", systemImage: "heart")
-                }
+            Tab("Credits", systemImage: "heart") {
+                CreditsSettingsView()
+            }
         }
         .frame(width: 480, height: 400)
     }

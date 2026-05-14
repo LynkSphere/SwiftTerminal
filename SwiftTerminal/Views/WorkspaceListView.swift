@@ -30,7 +30,20 @@ struct WorkspaceListView: View {
                     .tag(workspace)
             }
             .onMove { source, destination in
-                store.moveWorkspaces(from: source, to: destination)
+                withAnimation {
+                    let visible = visibleWorkspaces
+                    let visibleIDs = Set(visible.map { $0.id })
+                    let slots = store.workspaces.indices.filter { visibleIDs.contains(store.workspaces[$0].id) }
+
+                    var newVisible = visible
+                    newVisible.move(fromOffsets: source, toOffset: destination)
+
+                    var newAll = store.workspaces
+                    for (slot, ws) in zip(slots, newVisible) {
+                        newAll[slot] = ws
+                    }
+                    store.reorderWorkspaces(newAll)
+                }
             }
         }
         .safeAreaInset(edge: .bottom) {
