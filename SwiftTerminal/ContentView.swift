@@ -22,6 +22,7 @@ struct ContentView: View {
                     systemImage: "sidebar.left",
                     description: Text("Select a workspace to get started.")
                 )
+                .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
             }
         }
         .inspector(isPresented: Bindable(appState).showingInspector) {
@@ -48,6 +49,25 @@ struct ContentView: View {
             if !hasCompletedOnboarding {
                 showingOnboarding = true
             }
+        }
+        .alert(
+            "Replace running command?",
+            isPresented: Binding(
+                get: { appState.pendingRunReplacement != nil },
+                set: { if !$0 { appState.pendingRunReplacement = nil } }
+            ),
+            presenting: appState.pendingRunReplacement
+        ) { command in
+            Button("Replace", role: .confirm) {
+                command.interrupt()
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(300))
+                    command.workspace?.runCommand(command)
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: { command in
+            Text("\"\(command.title)\" is currently running. Replacing will stop it and start a new instance.")
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToSession)) { notification in
             guard let workspaceID = notification.userInfo?["workspaceID"] as? String,

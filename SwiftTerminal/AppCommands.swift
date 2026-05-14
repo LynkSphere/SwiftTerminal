@@ -150,12 +150,17 @@ struct AppCommands: Commands {
                 Button {
                     guard let workspace = appState.selectedWorkspace,
                           let command = workspace.defaultCommand else { return }
-                    workspace.runCommand(command)
+                    appState.showingInspector = true
+                    if command.hasChildProcess {
+                        appState.pendingRunReplacement = command
+                    } else {
+                        workspace.runCommand(command)
+                    }
                 } label: {
                     Label("Run", systemImage: "play.fill")
                 }
                 .keyboardShortcut("r", modifiers: .command)
-                .disabled(appState.selectedWorkspace?.defaultCommand == nil || appState.selectedWorkspace?.defaultCommand?.hasChildProcess == true)
+                .disabled(appState.selectedWorkspace?.defaultCommand == nil)
 
                 Button {
                     guard let workspace = appState.selectedWorkspace,

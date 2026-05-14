@@ -21,4 +21,8 @@ final class AppState {
     // Workspace whose scratch pad should be opened. WorkspaceDetailView watches
     // this and presents the sheet when its workspace matches.
     var scratchPadRequest: Workspace?
+
+    // Set when the user invokes Run on a command that's already running.
+    // ContentView shows a confirmation alert that interrupts then re-runs.
+    var pendingRunReplacement: Terminal?
 }
