@@ -2,6 +2,15 @@ import AppKit
 import Observation
 import SwiftTerm
 
+/// Mirrors `SwiftTerm.Terminal.ProgressReportState` so the model layer doesn't
+/// expose the dependency type. Driven by OSC 9;4 (ConEmu progress).
+enum TerminalProgressState: Int {
+    case set = 1
+    case error = 2
+    case indeterminate = 3
+    case pause = 4
+}
+
 @Observable
 final class Terminal: Identifiable, Hashable, Codable {
     var id: UUID
@@ -25,11 +34,18 @@ final class Terminal: Identifiable, Hashable, Codable {
     /// by OSC 133;D. Nil before the first command finishes.
     var lastExitCode: Int32?
 
+    /// Most recent OSC 9;4 progress report from the running foreground command
+    /// (ConEmu/Windows-Terminal "progress" spec). Set by the OSC 9 handler in
+    /// `TerminalRepresentable`, cleared on OSC 133;D and on process exit.
+    var progressState: TerminalProgressState?
+
+    /// 0…100 when `progressState == .set` or `.error`; nil otherwise.
+    var progressValue: UInt8?
+
     @ObservationIgnored
     weak var workspace: Workspace?
 
     /// Not encoded; reset per launch.
-    @ObservationIgnored
     var hasBellNotification = false
 
     var localProcessTerminalView: LocalProcessTerminalView? {

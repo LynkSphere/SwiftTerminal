@@ -100,7 +100,9 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
                         tab.hasBellNotification = true
                     }
                     AppDelegate.bounceDockIcon()
-                    AppDelegate.updateBadge(count: 1)
+                    if !NSApplication.shared.isActive {
+                        AppDelegate.showBadge()
+                    }
                     if let workspaceID = tab.workspace?.id {
                         AppDelegate.sendNotification(workspaceID: workspaceID, terminalID: tab.id)
                     }
@@ -139,6 +141,7 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
             tv.processDelegate = self
 
             installSemanticPromptHandler(on: tv, for: tab)
+            installProgressReportHandler(on: tv, for: tab)
 
             tv.startProcess(
                 executable: shell,
@@ -167,6 +170,8 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
                   let entry = viewMap[ObjectIdentifier(local)] else { return }
             DispatchQueue.main.async {
                 entry.tab.foregroundProcessName = nil
+                entry.tab.progressState = nil
+                entry.tab.progressValue = nil
             }
             viewMap.removeValue(forKey: ObjectIdentifier(local))
         }
@@ -209,9 +214,52 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
                         guard let tab = weakTab.value else { return }
                         tab.foregroundProcessName = nil
                         tab.lastExitCode = exit
+                        tab.progressState = nil
+                        tab.progressValue = nil
                     }
                 default:
                     break  // 133;A (prompt-start) and 133;B (prompt-end) ignored
+                }
+            }
+        }
+
+        /// Registers an OSC 9;4 (ConEmu progress report) handler. Payload shape:
+        ///   `9;4;<state>[;<progress>]` where state is 0=remove, 1=set,
+        ///   2=error, 3=indeterminate, 4=pause; progress is 0…100.
+        /// Preempts SwiftTerm's built-in `oscProgressReport` (which would
+        /// otherwise render a thin bar at the terminal's bottom edge); we want
+        /// to surface progress in the tab UI instead.
+        func installProgressReportHandler(on view: LocalProcessTerminalView, for tab: Terminal) {
+            let weakTab = WeakTab(tab)
+            view.getTerminal().registerOscHandler(code: 9) { data in
+                let payload = String(bytes: data, encoding: .utf8) ?? ""
+                // Only `4;…` is a progress report; ignore other OSC 9 forms.
+                let parts = payload.split(separator: ";", omittingEmptySubsequences: false).map(String.init)
+                guard parts.first == "4", parts.count >= 2,
+                      let rawState = Int(parts[1]) else { return }
+
+                let progress: UInt8? = {
+                    guard parts.count >= 3, let raw = Int(parts[2]) else { return nil }
+                    return UInt8(max(0, min(raw, 100)))
+                }()
+
+                DispatchQueue.main.async {
+                    guard let tab = weakTab.value else { return }
+                    if rawState == 0 {  // remove
+                        tab.progressState = nil
+                        tab.progressValue = nil
+                        return
+                    }
+                    guard let state = TerminalProgressState(rawValue: rawState) else { return }
+                    tab.progressState = state
+                    switch state {
+                    case .set, .error:
+                        tab.progressValue = progress ?? tab.progressValue ?? 0
+                    case .indeterminate:
+                        tab.progressValue = nil
+                    case .pause:
+                        tab.progressValue = progress ?? tab.progressValue
+                    }
                 }
             }
         }

@@ -108,18 +108,7 @@ struct DocumentTabBar: View {
                     .truncationMode(.middle)
                     .frame(maxWidth: .infinity, alignment: .center)
 
-                if terminal.hasChildProcess {
-                    ProgressView()
-                        .controlSize(.mini)
-                        .frame(width: 10, height: 10)
-                } else if terminal.hasBellNotification {
-                    Circle()
-                        .fill(.orange)
-                        .frame(width: 6, height: 6)
-                        .frame(width: 10, height: 10)
-                } else {
-                    Color.clear.frame(width: 10, height: 10)
-                }
+                trailingIndicator(for: terminal)
             }
             .padding(.vertical, 5)
             .padding(.horizontal, 10)
@@ -176,6 +165,39 @@ struct DocumentTabBar: View {
         .onHover { isHovering in
             hoveredTabID = isHovering ? terminal.id : (hoveredTabID == terminal.id ? nil : hoveredTabID)
         }
+    }
+
+    /// Trailing-edge status pip for a tab. Only renders when the running
+    /// command actively reports progress via OSC 9;4 — being merely "busy"
+    /// (foreground process alive, e.g. `man`, `vim`, `sleep`) is not enough,
+    /// so the spinner stays out of interactive sessions. The bell dot
+    /// overlays the progress circle so both can show simultaneously.
+    @ViewBuilder
+    private func trailingIndicator(for terminal: Terminal) -> some View {
+        Group {
+            if terminal.hasBellNotification {
+                Circle()
+                    .fill(.orange)
+                    .frame(width: 6, height: 6)
+            } else if let value = terminal.progressValue, terminal.progressState != .indeterminate {
+                if value >= 100 {
+                    Circle()
+                        .fill(.secondary)
+                        .frame(width: 6, height: 6)
+                } else {
+                    ProgressView(value: Double(value), total: 100)
+                        .progressViewStyle(.circular)
+                        .controlSize(.mini)
+                        .tint(terminal.progressState == .error ? .red : nil)
+                }
+            } else if terminal.progressState == .indeterminate {
+                ProgressView()
+                    .controlSize(.mini)
+            } else {
+                Color.clear
+            }
+        }
+        .frame(width: 12, height: 12)
     }
 
     private func computedDragOffset(for terminal: Terminal, at index: Int, tabStride: CGFloat) -> CGFloat {
