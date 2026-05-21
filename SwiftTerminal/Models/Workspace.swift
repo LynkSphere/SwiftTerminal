@@ -1,5 +1,4 @@
-import Foundation
-import Observation
+import SwiftUI
 
 @Observable
 final class Workspace: Identifiable, Hashable, Codable {
@@ -200,6 +199,11 @@ final class Workspace: Identifiable, Hashable, Codable {
         for cmd in commands {
             cmd.isDefault = cmd.id == entry.id
         }
+        store?.scheduleSave()
+    }
+
+    func moveCommands(from source: IndexSet, to destination: Int) {
+        commands.move(fromOffsets: source, toOffset: destination)
         store?.scheduleSave()
     }
 
