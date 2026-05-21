@@ -59,6 +59,13 @@ struct GitInspectorBranchBar: View {
                 Label("New Branch", systemImage: "plus")
             }
 
+            Button {
+                state.showBranchListSheet = true
+            } label: {
+                Label("Branches…", systemImage: "list.bullet.indent")
+            }
+            .disabled(snapshot == nil)
+
             Divider()
 
             Button {
@@ -75,16 +82,14 @@ struct GitInspectorBranchBar: View {
                 Label("Apply Latest Stash", systemImage: "tray.and.arrow.up")
             }
 
-            Divider()
+            Button {
+                state.showStashListSheet = true
+            } label: {
+                Label("Stashes…", systemImage: "tray.full")
+            }
+            .disabled(snapshot == nil)
 
-//            Button {
-//                state.undoLastCommit(directoryURL: directoryURL)
-//            } label: {
-//                Label("Undo Last Commit", systemImage: "arrow.uturn.backward")
-//            }
-//            .disabled(snapshot?.unpushedCommits.isEmpty != false)
-//
-//            Divider()
+            Divider()
 
             Button {
                 state.showSyncWithBranchSheet = true
@@ -99,8 +104,6 @@ struct GitInspectorBranchBar: View {
                 Label("Sync with Remote", systemImage: "arrow.2.squarepath")
             }
             .disabled(snapshot?.hasTrackingBranch != true)
-
-            Divider()
 
             Button {
                 openPullRequestPage()

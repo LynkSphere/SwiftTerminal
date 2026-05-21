@@ -92,6 +92,10 @@ struct GitCommitDiffSheet: View {
         }
         isLoading = true
         defer { isLoading = false }
-        files = (try? await GitRepository.shared.changedFiles(forCommit: item.hash, at: item.repositoryRootURL)) ?? []
+        if let stashIndex = item.stashIndex {
+            files = (try? await GitRepository.shared.stashChangedFiles(index: stashIndex, at: item.repositoryRootURL)) ?? []
+        } else {
+            files = (try? await GitRepository.shared.changedFiles(forCommit: item.hash, at: item.repositoryRootURL)) ?? []
+        }
     }
 }

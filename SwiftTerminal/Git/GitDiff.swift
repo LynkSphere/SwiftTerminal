@@ -470,7 +470,9 @@ struct GitDiffCommand: GitCommand {
             case .unstaged:
                 ["diff", "--no-color", "--no-ext-diff", "--", reference.repositoryRelativePath]
             case .commit(let hash):
-                ["show", "--format=", "--no-color", "--no-ext-diff", hash, "--", reference.repositoryRelativePath]
+                // -m --first-parent so stash WIP merges show changes vs HEAD-before-stash
+                // rather than the combined diff that `git show` emits for merge commits.
+                ["show", "-m", "--first-parent", "--format=", "--no-color", "--no-ext-diff", hash, "--", reference.repositoryRelativePath]
         }
     }
 
@@ -487,7 +489,7 @@ struct GitFullContextDiffCommand: GitCommand {
             case .unstaged:
                 ["diff", "--no-color", "--no-ext-diff", "-U99999", "--", reference.repositoryRelativePath]
             case .commit(let hash):
-                ["show", "--format=", "--no-color", "--no-ext-diff", "-U99999", hash, "--", reference.repositoryRelativePath]
+                ["show", "-m", "--first-parent", "--format=", "--no-color", "--no-ext-diff", "-U99999", hash, "--", reference.repositoryRelativePath]
         }
     }
 

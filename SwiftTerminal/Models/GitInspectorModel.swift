@@ -207,6 +207,51 @@ final class GitInspectorModel {
         }
     }
 
+    func branches(snapshot: GitRepositoryStatusSnapshot) async -> [GitBranchInfo] {
+        do {
+            return try await GitRepository.shared.localBranchesDetailed(at: snapshot.repositoryRootURL)
+        } catch {
+            errorMessage = error.localizedDescription
+            return []
+        }
+    }
+
+    func deleteBranch(_ name: String, force: Bool, snapshot: GitRepositoryStatusSnapshot) async -> Bool {
+        await perform(successLabel: "Deleted branch \(name)") {
+            try await GitRepository.shared.deleteBranch(name, force: force, at: snapshot.repositoryRootURL)
+        }
+    }
+
+    func stashList(snapshot: GitRepositoryStatusSnapshot) async -> [GitStashEntry] {
+        do {
+            return try await GitRepository.shared.stashList(at: snapshot.repositoryRootURL)
+        } catch {
+            errorMessage = error.localizedDescription
+            return []
+        }
+    }
+
+    func dropStash(index: Int, snapshot: GitRepositoryStatusSnapshot) async -> Bool {
+        await perform(successLabel: "Stash dropped") {
+            try await GitRepository.shared.dropStash(index: index, at: snapshot.repositoryRootURL)
+        }
+    }
+
+    func applyStash(index: Int, snapshot: GitRepositoryStatusSnapshot) async {
+        await perform(successLabel: "Stash applied") {
+            try await GitRepository.shared.applyStash(index: index, at: snapshot.repositoryRootURL)
+        }
+    }
+
+    func stashChangedFiles(index: Int, snapshot: GitRepositoryStatusSnapshot) async -> [GitChangedFile] {
+        do {
+            return try await GitRepository.shared.stashChangedFiles(index: index, at: snapshot.repositoryRootURL)
+        } catch {
+            errorMessage = error.localizedDescription
+            return []
+        }
+    }
+
     func initializeRepository(at directoryURL: URL) async {
         await perform(successLabel: "Repository initialized") {
             try await GitRepository.shared.initializeRepository(at: directoryURL)

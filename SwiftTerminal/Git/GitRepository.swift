@@ -346,6 +346,39 @@ actor GitRepository {
         try await self.executor.execute(GitStashPopCommand(), at: repositoryRootURL)
     }
 
+    // MARK: - Branch Management
+
+    func localBranchesDetailed(at repositoryRootURL: URL) async throws -> [GitBranchInfo] {
+        try await self._runBranchListDetailed(at: repositoryRootURL)
+    }
+
+    func deleteBranch(_ name: String, force: Bool, at repositoryRootURL: URL) async throws {
+        try await self.executor.execute(GitDeleteBranchCommand(name: name, force: force), at: repositoryRootURL)
+    }
+
+    // MARK: - Stash Management
+
+    func stashList(at repositoryRootURL: URL) async throws -> [GitStashEntry] {
+        try await self.executor.execute(GitStashListCommand(), at: repositoryRootURL)
+    }
+
+    func dropStash(index: Int, at repositoryRootURL: URL) async throws {
+        try await self.executor.execute(GitStashDropAtCommand(index: index), at: repositoryRootURL)
+    }
+
+    func applyStash(index: Int, at repositoryRootURL: URL) async throws {
+        try await self.executor.execute(GitStashApplyAtCommand(index: index), at: repositoryRootURL)
+    }
+
+    func stashChangedFiles(index: Int, at repositoryRootURL: URL) async throws -> [GitChangedFile] {
+        let entries = try await self.executor.execute(GitStashChangedFilesCommand(index: index), at: repositoryRootURL)
+        return entries.compactMap { entry in
+            guard let kind = Self.changeKindFromDiffTreeStatus(entry.status) else { return nil }
+            let fileURL = repositoryRootURL.appending(path: entry.path).standardizedFileURL
+            return GitChangedFile(fileURL: fileURL, repositoryRelativePath: entry.path, kind: kind)
+        }
+    }
+
     // MARK: - Private
 
     private func fetchUnpushedCommits(at repositoryRootURL: URL, hasTrackingBranch: Bool, aheadCount: Int, branchName: String?) async -> [GitUnpushedCommit] {
@@ -508,6 +541,23 @@ struct GitLogEntry: Equatable, Identifiable, Sendable {
     var author: String
     var date: Date?
     var subject: String
+}
+
+struct GitBranchInfo: Equatable, Hashable, Identifiable {
+    var name: String
+    var isCurrent: Bool
+    var isMerged: Bool
+    var upstream: String?
+    var id: String { name }
+}
+
+struct GitStashEntry: Equatable, Hashable, Identifiable {
+    var index: Int
+    var hash: String
+    var branch: String?
+    var message: String
+    var date: Date?
+    var id: String { hash }
 }
 
 struct GitChangedFile: Equatable, Hashable {
@@ -868,6 +918,128 @@ private struct GitCommitFilesCommand: GitCommand {
 
     var arguments: [String] {
         ["diff-tree", "--no-commit-id", "-r", "--name-status", hash]
+    }
+
+    func parse(output: String) throws -> [(status: Character, path: String)] {
+        let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+        return trimmed.split(separator: "\n", omittingEmptySubsequences: true).compactMap { line in
+            let parts = line.split(separator: "\t")
+            guard parts.count >= 2, let status = parts[0].first else { return nil }
+            let path = String(parts.last!)
+            return (status: status, path: path)
+        }
+    }
+}
+
+extension GitRepository {
+    fileprivate func _runBranchListDetailed(at repositoryRootURL: URL) async throws -> [GitBranchInfo] {
+        async let allRaw = self.executor.execute(GitAllBranchesRawCommand(), at: repositoryRootURL)
+        async let mergedRaw = self.executor.execute(GitMergedBranchesRawCommand(), at: repositoryRootURL)
+        let all = try await allRaw
+        let merged = Set(try await mergedRaw)
+        return all.map { GitBranchInfo(name: $0.name, isCurrent: $0.isCurrent, isMerged: merged.contains($0.name), upstream: $0.upstream) }
+    }
+}
+
+private struct GitAllBranchesRawCommand: GitCommand {
+    var arguments: [String] {
+        ["branch", "--list", "--format=%(HEAD)%00%(refname:short)%00%(upstream:short)"]
+    }
+
+    func parse(output: String) throws -> [(name: String, isCurrent: Bool, upstream: String?)] {
+        output.split(separator: "\n", omittingEmptySubsequences: true).compactMap { line in
+            let parts = line.split(separator: "\0", omittingEmptySubsequences: false).map(String.init)
+            guard parts.count >= 2 else { return nil }
+            let isCurrent = parts[0].trimmingCharacters(in: .whitespaces) == "*"
+            let name = parts[1].trimmingCharacters(in: .whitespaces)
+            guard !name.isEmpty else { return nil }
+            let upstream = parts.count >= 3 && !parts[2].isEmpty ? parts[2] : nil
+            return (name, isCurrent, upstream)
+        }
+    }
+}
+
+private struct GitMergedBranchesRawCommand: GitCommand {
+    var arguments: [String] {
+        ["branch", "--list", "--merged", "HEAD", "--format=%(refname:short)"]
+    }
+
+    func parse(output: String) throws -> [String] {
+        output.split(separator: "\n", omittingEmptySubsequences: true)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+    }
+}
+
+private struct GitDeleteBranchCommand: GitCommand {
+    let name: String
+    let force: Bool
+    var arguments: [String] {
+        ["branch", force ? "-D" : "-d", name]
+    }
+    func parse(output: String) throws { }
+}
+
+private struct GitStashListCommand: GitCommand {
+    var arguments: [String] {
+        // %gd → stash@{N}, %H full hash, %gs reflog subject, %aI iso date
+        ["stash", "list", "--format=%gd%x1f%H%x1f%gs%x1f%aI"]
+    }
+
+    func parse(output: String) throws -> [GitStashEntry] {
+        let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let fallbackFormatter = ISO8601DateFormatter()
+        fallbackFormatter.formatOptions = [.withInternetDateTime]
+
+        return trimmed.split(separator: "\n", omittingEmptySubsequences: true).compactMap { line in
+            let parts = line.split(separator: "\u{1f}", omittingEmptySubsequences: false).map(String.init)
+            guard parts.count >= 4 else { return nil }
+            let ref = parts[0]
+            // ref looks like "stash@{3}"
+            guard let openIdx = ref.firstIndex(of: "{"), let closeIdx = ref.firstIndex(of: "}") else { return nil }
+            let indexString = ref[ref.index(after: openIdx)..<closeIdx]
+            guard let index = Int(indexString) else { return nil }
+            let hash = parts[1]
+            let reflogSubject = parts[2]
+            // reflogSubject typical: "WIP on main: abcdef1 commit message" or "On main: My message"
+            var branch: String?
+            var message = reflogSubject
+            if let colonIdx = reflogSubject.firstIndex(of: ":") {
+                let head = String(reflogSubject[..<colonIdx])
+                let tail = reflogSubject[reflogSubject.index(after: colonIdx)...].trimmingCharacters(in: .whitespaces)
+                if head.hasPrefix("WIP on ") {
+                    branch = String(head.dropFirst("WIP on ".count))
+                } else if head.hasPrefix("On ") {
+                    branch = String(head.dropFirst("On ".count))
+                }
+                message = tail
+            }
+            let date = formatter.date(from: parts[3]) ?? fallbackFormatter.date(from: parts[3])
+            return GitStashEntry(index: index, hash: hash, branch: branch, message: message, date: date)
+        }
+    }
+}
+
+private struct GitStashDropAtCommand: GitCommand {
+    let index: Int
+    var arguments: [String] { ["stash", "drop", "stash@{\(index)}"] }
+    func parse(output: String) throws { }
+}
+
+private struct GitStashApplyAtCommand: GitCommand {
+    let index: Int
+    var arguments: [String] { ["stash", "apply", "--index", "stash@{\(index)}"] }
+    func parse(output: String) throws { }
+}
+
+private struct GitStashChangedFilesCommand: GitCommand {
+    let index: Int
+    var arguments: [String] {
+        ["stash", "show", "--name-status", "stash@{\(index)}"]
     }
 
     func parse(output: String) throws -> [(status: Character, path: String)] {

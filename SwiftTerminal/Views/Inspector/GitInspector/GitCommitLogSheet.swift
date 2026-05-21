@@ -25,6 +25,7 @@ struct GitCommitLogSheet: View {
                 } else {
                     List(entries) { entry in
                         commitRow(entry)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
                             .onTapGesture { openDiffs(for: entry) }
                             .listRowSeparator(.visible)

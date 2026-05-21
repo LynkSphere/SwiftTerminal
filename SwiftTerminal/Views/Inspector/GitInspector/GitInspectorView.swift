@@ -149,6 +149,26 @@ struct GitInspectorView: View {
         .sheet(isPresented: $state.showCommitLogSheet) {
             GitCommitLogSheet(state: state)
         }
+        .sheet(isPresented: $state.showBranchListSheet) {
+            GitBranchListSheet(directoryURL: directoryURL, state: state)
+        }
+        .sheet(isPresented: $state.showStashListSheet) {
+            GitStashListSheet(directoryURL: directoryURL, state: state)
+        }
+        .alert("Delete Unmerged Branch?", isPresented: branchDeleteAlertBinding) {
+            Button("Delete", role: .destructive) {
+                guard let branch = state.branchPendingDelete else { return }
+                state.branchPendingDelete = nil
+                Task {
+                    guard let snap = state.currentSnapshot else { return }
+                    _ = await state.model.deleteBranch(branch.name, force: true, snapshot: snap)
+                    await state.refresh(directoryURL: directoryURL)
+                }
+            }
+            Button("Cancel", role: .cancel) { state.branchPendingDelete = nil }
+        } message: {
+            Text("\"\(state.branchPendingDelete?.name ?? "")\" is not fully merged into the current branch. Deleting it may discard commits permanently.")
+        }
         .sheet(item: $state.commitDiffSheetItem) { item in
             GitCommitDiffSheet(item: item)
         }
@@ -265,6 +285,13 @@ struct GitInspectorView: View {
         Binding(
             get: { state.pendingBranchSwitch != nil },
             set: { if !$0 { state.pendingBranchSwitch = nil } }
+        )
+    }
+
+    private var branchDeleteAlertBinding: Binding<Bool> {
+        Binding(
+            get: { state.branchPendingDelete != nil },
+            set: { if !$0 { state.branchPendingDelete = nil } }
         )
     }
 

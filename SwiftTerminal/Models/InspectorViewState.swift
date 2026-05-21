@@ -70,6 +70,9 @@ final class GitInspectorState {
     var showUndoLastCommitAlert = false
     var showSyncWithBranchSheet = false
     var showCommitLogSheet = false
+    var showBranchListSheet = false
+    var showStashListSheet = false
+    var branchPendingDelete: GitBranchInfo?
     var commitDiffSheetItem: GitCommitDiffSheetItem?
 }
 
@@ -78,5 +81,16 @@ struct GitCommitDiffSheetItem: Identifiable {
     let message: String
     let repositoryRootURL: URL
     let preloadedFiles: [GitChangedFile]?
+    /// When set, this represents a stash; the sheet will load its file list
+    /// via `git stash show` and individual file diffs via the stash ref.
+    let stashIndex: Int?
     var id: String { hash }
+
+    init(hash: String, message: String, repositoryRootURL: URL, preloadedFiles: [GitChangedFile]?, stashIndex: Int? = nil) {
+        self.hash = hash
+        self.message = message
+        self.repositoryRootURL = repositoryRootURL
+        self.preloadedFiles = preloadedFiles
+        self.stashIndex = stashIndex
+    }
 }
