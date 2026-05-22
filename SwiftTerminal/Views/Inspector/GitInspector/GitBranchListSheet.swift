@@ -48,10 +48,28 @@ struct GitBranchListSheet: View {
         }
         .frame(width: 420, height: 440)
         .task { await load() }
-        .task(id: state.model.successMessage) {
-            // Refresh list after a successful delete from the parent confirmation alert.
-            if !isLoading { await load() }
+        .alert("Delete Unmerged Branch?", isPresented: deleteAlertBinding) {
+            Button("Delete", role: .destructive) {
+                guard let branch = state.branchPendingDelete else { return }
+                state.branchPendingDelete = nil
+                Task {
+                    guard let snap = state.currentSnapshot else { return }
+                    _ = await state.model.deleteBranch(branch.name, force: true, snapshot: snap)
+                    await load()
+                    await state.refresh(directoryURL: directoryURL)
+                }
+            }
+            Button("Cancel", role: .cancel) { state.branchPendingDelete = nil }
+        } message: {
+            Text("\"\(state.branchPendingDelete?.name ?? "")\" is not fully merged into the current branch. Deleting it may discard commits permanently.")
         }
+    }
+
+    private var deleteAlertBinding: Binding<Bool> {
+        Binding(
+            get: { state.branchPendingDelete != nil },
+            set: { if !$0 { state.branchPendingDelete = nil } }
+        )
     }
 
     @ViewBuilder
