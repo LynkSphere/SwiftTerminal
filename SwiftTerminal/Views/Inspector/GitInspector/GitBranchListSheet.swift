@@ -49,7 +49,7 @@ struct GitBranchListSheet: View {
         .frame(width: 420, height: 440)
         .task { await load() }
         .alert("Delete Unmerged Branch?", isPresented: deleteAlertBinding) {
-            Button("Delete", role: .destructive) {
+            Button("Delete", role: .confirm) {
                 guard let branch = state.branchPendingDelete else { return }
                 state.branchPendingDelete = nil
                 Task {

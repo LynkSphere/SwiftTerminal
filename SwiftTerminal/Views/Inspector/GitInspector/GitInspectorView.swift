@@ -92,7 +92,7 @@ struct GitInspectorView: View {
             Task { await state.refresh(directoryURL: directoryURL) }
         }
         .alert("Discard Changes?", isPresented: discardAlertBinding) {
-            Button("Discard", role: .destructive) {
+            Button("Discard", role: .confirm) {
                 guard let target = state.discardTarget else { return }
                 state.performDiscard(target, directoryURL: directoryURL)
             }
@@ -101,7 +101,7 @@ struct GitInspectorView: View {
             Text(discardAlertMessage)
         }
         .alert("Stash Changes?", isPresented: stashAlertBinding) {
-            Button("Stash & Switch", role: .destructive) {
+            Button("Stash & Switch", role: .confirm) {
                 state.confirmStashAndSwitch(directoryURL: directoryURL)
             }
             Button("Cancel", role: .cancel) { state.pendingBranchSwitch = nil }
@@ -159,7 +159,7 @@ struct GitInspectorView: View {
             GitCommitDiffSheet(item: item)
         }
         .alert("Undo Last Commit?", isPresented: $state.showUndoLastCommitAlert) {
-            Button("Undo", role: .destructive) {
+            Button("Undo", role: .confirm) {
                 state.undoLastCommit(directoryURL: directoryURL)
             }
             Button("Cancel", role: .cancel) {}

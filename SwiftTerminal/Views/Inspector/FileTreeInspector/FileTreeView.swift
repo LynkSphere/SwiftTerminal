@@ -74,7 +74,7 @@ struct FileTreeView: View {
             ),
             presenting: pendingTrashURL
         ) { url in
-            Button("Move to Trash", role: .destructive) {
+            Button("Move to Trash", role: .confirm) {
                 state.model.moveToTrash(url: url, directoryURL: directoryURL)
             }
             Button("Cancel", role: .cancel) {}

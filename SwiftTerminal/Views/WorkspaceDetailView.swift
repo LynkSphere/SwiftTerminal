@@ -59,7 +59,7 @@ struct WorkspaceDetailView: View {
                 set: { if !$0 { appState.terminalPendingClose = nil } }
             )
         ) {
-            Button("Close", role: .destructive) {
+            Button("Close", role: .confirm) {
                 guard let terminal = appState.terminalPendingClose else { return }
                 let next = workspace.terminalAfter(terminal) ?? workspace.terminalBefore(terminal)
                 workspace.closeTerminal(terminal)
