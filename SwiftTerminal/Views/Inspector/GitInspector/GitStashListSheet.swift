@@ -4,9 +4,9 @@ struct GitStashListSheet: View {
     let directoryURL: URL
     @Bindable var state: GitInspectorState
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openWindow) private var openWindow
     @State private var stashes: [GitStashEntry] = []
     @State private var isLoading = true
-    @State private var diffItem: GitCommitDiffSheetItem?
 
     private var snapshot: GitRepositoryStatusSnapshot? { state.currentSnapshot }
 
@@ -56,9 +56,6 @@ struct GitStashListSheet: View {
         }
         .frame(width: 520, height: 480)
         .task { await load() }
-        .sheet(item: $diffItem) { item in
-            GitCommitDiffSheet(item: item)
-        }
     }
 
     @ViewBuilder
@@ -92,13 +89,14 @@ struct GitStashListSheet: View {
 
     private func openDiffs(for entry: GitStashEntry) {
         guard let snapshot else { return }
-        diffItem = GitCommitDiffSheetItem(
+        openWindow(value: GitCommitDiffSheetItem(
             hash: entry.hash,
             message: entry.message,
             repositoryRootURL: snapshot.repositoryRootURL,
             preloadedFiles: nil,
             stashIndex: entry.index
-        )
+        ))
+        dismiss()
     }
 
     private func drop(_ entry: GitStashEntry) {

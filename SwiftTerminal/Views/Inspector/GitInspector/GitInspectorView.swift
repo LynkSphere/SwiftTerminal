@@ -158,9 +158,6 @@ struct GitInspectorView: View {
         .sheet(isPresented: $state.showStashListSheet) {
             GitStashListSheet(directoryURL: directoryURL, state: state)
         }
-        .sheet(item: $state.commitDiffSheetItem) { item in
-            GitCommitDiffSheet(item: item)
-        }
         .alert("Undo Last Commit?", isPresented: $state.showUndoLastCommitAlert) {
             Button("Undo", role: .confirm) {
                 state.undoLastCommit(directoryURL: directoryURL)

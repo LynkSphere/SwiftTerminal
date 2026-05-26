@@ -591,7 +591,7 @@ struct GitStashEntry: Equatable, Hashable, Identifiable {
     var id: String { hash }
 }
 
-struct GitChangedFile: Equatable, Hashable {
+struct GitChangedFile: Equatable, Hashable, Codable {
     var fileURL: URL
     var repositoryRelativePath: String
     var kind: GitChangeKind

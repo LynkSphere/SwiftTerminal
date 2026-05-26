@@ -6,6 +6,7 @@ struct GitInspectorChangesList: View {
     var onShowInFileTree: ((URL) -> Void)?
 
     @Environment(EditorPanel.self) private var editorPanel
+    @Environment(\.openWindow) private var openWindow
 
     private var snapshot: GitRepositoryStatusSnapshot? { state.currentSnapshot }
 
@@ -36,12 +37,12 @@ struct GitInspectorChangesList: View {
                                         state.showUndoLastCommitAlert = true
                                     },
                                     onShowChanges: {
-                                        state.commitDiffSheetItem = GitCommitDiffSheetItem(
+                                        openWindow(value: GitCommitDiffSheetItem(
                                             hash: commit.hash,
                                             message: commit.message,
                                             repositoryRootURL: snapshot.repositoryRootURL,
                                             preloadedFiles: nil
-                                        )
+                                        ))
                                     }
                                 )
                             }

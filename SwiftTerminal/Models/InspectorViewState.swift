@@ -73,10 +73,9 @@ final class GitInspectorState {
     var showBranchListSheet = false
     var showStashListSheet = false
     var branchPendingDelete: GitBranchInfo?
-    var commitDiffSheetItem: GitCommitDiffSheetItem?
 }
 
-struct GitCommitDiffSheetItem: Identifiable {
+struct GitCommitDiffSheetItem: Identifiable, Hashable, Codable {
     let hash: String
     let message: String
     let repositoryRootURL: URL
@@ -112,7 +111,7 @@ struct GitCommitDiffSheetItem: Identifiable {
     }
 }
 
-struct GitBranchRange: Hashable {
+struct GitBranchRange: Hashable, Codable {
     var base: String
     var head: String
 }

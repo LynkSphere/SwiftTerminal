@@ -4,9 +4,9 @@ import SwiftUI
 struct GitCommitLogSheet: View {
     @Bindable var state: GitInspectorState
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openWindow) private var openWindow
     @State private var entries: [GitLogEntry] = []
     @State private var isLoading = true
-    @State private var diffItem: GitCommitDiffSheetItem?
 
     private var snapshot: GitRepositoryStatusSnapshot? { state.currentSnapshot }
 
@@ -44,19 +44,17 @@ struct GitCommitLogSheet: View {
         .task {
             await load()
         }
-        .sheet(item: $diffItem) { item in
-            GitCommitDiffSheet(item: item)
-        }
     }
 
     private func openDiffs(for entry: GitLogEntry) {
         guard let snapshot else { return }
-        diffItem = GitCommitDiffSheetItem(
+        openWindow(value: GitCommitDiffSheetItem(
             hash: entry.hash,
             message: entry.subject,
             repositoryRootURL: snapshot.repositoryRootURL,
             preloadedFiles: nil
-        )
+        ))
+        dismiss()
     }
 
     @ViewBuilder

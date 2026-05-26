@@ -1,10 +1,11 @@
 import SwiftUI
 
-struct GitCommitDiffSheet: View {
+struct GitCommitDiffWindow: View {
     let item: GitCommitDiffSheetItem
-    @Environment(\.dismiss) private var dismiss
+    @State private var editorPanel = EditorPanel()
     @State private var files: [GitChangedFile] = []
     @State private var isLoading = false
+    @State private var selection: GitChangedFile?
 
     private var shortHash: String {
         String(item.hash.prefix(7))
@@ -18,7 +19,7 @@ struct GitCommitDiffSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationSplitView {
             Group {
                 if isLoading {
                     ProgressView()
@@ -27,37 +28,37 @@ struct GitCommitDiffSheet: View {
                     ContentUnavailableView(
                         "No Changes",
                         systemImage: "doc.richtext",
-                        description: Text("This commit has no file changes.")
+                        description: Text("Nothing to show here.")
                     )
                 } else {
-                    List(files, id: \.repositoryRelativePath) { file in
-                        NavigationLink(value: file) {
-                            fileRow(file)
-                        }
+                    List(files, id: \.self, selection: $selection) { file in
+                        fileRow(file)
+                            .tag(file)
                     }
-                    .listStyle(.inset)
+                    .listStyle(.sidebar)
                 }
             }
-            .navigationTitle(navTitle)
-            .navigationSubtitle(item.message)
-            .navigationDestination(for: GitChangedFile.self) { file in
-                DiffPanel(reference: reference(for: file))
-                    .navigationTitle(file.fileURL.lastPathComponent)
-                    .navigationSubtitle(file.repositoryRelativePath)
-                    .toolbar { doneToolbar }
+            .navigationSplitViewColumnWidth(min: 240, ideal: 3000, max: 420)
+        } detail: {
+            if let selection {
+                DiffPanel(reference: reference(for: selection))
+                    .navigationTitle(selection.fileURL.lastPathComponent)
+                    .navigationSubtitle(selection.repositoryRelativePath)
+                    .id(selection)
+            } else if !files.isEmpty {
+                ContentUnavailableView(
+                    "Select a File",
+                    systemImage: "sidebar.left",
+                    description: Text("Pick a file from the sidebar to see its diff.")
+                )
             }
-            .toolbar { doneToolbar }
         }
-        .frame(minWidth: 720, idealWidth: 900, minHeight: 520, idealHeight: 720)
+        .navigationTitle(navTitle)
+        .navigationSubtitle(item.message)
+        .frame(minWidth: 900, minHeight: 560)
+        .environment(editorPanel)
         .environment(\.isDetachedEditor, true)
         .task(id: item.id) { await load() }
-    }
-
-    @ToolbarContentBuilder
-    private var doneToolbar: some ToolbarContent {
-        ToolbarItem(placement: .confirmationAction) {
-            Button(role: .confirm) { dismiss() }
-        }
     }
 
     @ViewBuilder
@@ -101,16 +102,20 @@ struct GitCommitDiffSheet: View {
     private func load() async {
         if let preloaded = item.preloadedFiles {
             files = preloaded
+            selection = selection ?? preloaded.first
             return
         }
         isLoading = true
         defer { isLoading = false }
+        let loaded: [GitChangedFile]
         if let range = item.range {
-            files = (try? await GitRepository.shared.changedFiles(base: range.base, head: range.head, at: item.repositoryRootURL)) ?? []
+            loaded = (try? await GitRepository.shared.changedFiles(base: range.base, head: range.head, at: item.repositoryRootURL)) ?? []
         } else if let stashIndex = item.stashIndex {
-            files = (try? await GitRepository.shared.stashChangedFiles(index: stashIndex, at: item.repositoryRootURL)) ?? []
+            loaded = (try? await GitRepository.shared.stashChangedFiles(index: stashIndex, at: item.repositoryRootURL)) ?? []
         } else {
-            files = (try? await GitRepository.shared.changedFiles(forCommit: item.hash, at: item.repositoryRootURL)) ?? []
+            loaded = (try? await GitRepository.shared.changedFiles(forCommit: item.hash, at: item.repositoryRootURL)) ?? []
         }
+        files = loaded
+        selection = selection ?? loaded.first
     }
 }

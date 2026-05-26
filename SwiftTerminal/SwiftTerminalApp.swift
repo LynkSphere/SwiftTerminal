@@ -20,13 +20,14 @@ struct SwiftTerminalApp: App {
             AppCommands(appState: appState, updater: updater)
         }
 
-        WindowGroup("Editor", for: EditorPanelContent.self) { $content in
-            if let content {
-                DetachedEditorView(content: content)
-                    .frame(minWidth: 400, minHeight: 300)
+        WindowGroup("Diff", for: GitCommitDiffSheetItem.self) { $item in
+            if let item {
+                GitCommitDiffWindow(item: item)
+                    .environment(appState)
+                    .environment(workspaceStore)
             }
         }
-        .defaultSize(width: 875, height: 625)
+        .defaultSize(width: 1100, height: 700)
         .restorationBehavior(.disabled)
 
         Window("About SwiftTerminal", id: "about") {

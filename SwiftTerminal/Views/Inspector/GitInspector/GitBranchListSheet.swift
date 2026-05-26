@@ -4,6 +4,7 @@ struct GitBranchListSheet: View {
     let directoryURL: URL
     @Bindable var state: GitInspectorState
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openWindow) private var openWindow
     @State private var branches: [GitBranchInfo] = []
     @State private var isLoading = true
 
@@ -100,11 +101,11 @@ struct GitBranchListSheet: View {
 
     private func openCompare(base: String, head: String) {
         guard let snapshot else { return }
-        state.commitDiffSheetItem = GitCommitDiffSheetItem(
+        openWindow(value: GitCommitDiffSheetItem(
             range: GitBranchRange(base: base, head: head),
             message: "Comparing \(head) against \(base)",
             repositoryRootURL: snapshot.repositoryRootURL
-        )
+        ))
         dismiss()
     }
 
