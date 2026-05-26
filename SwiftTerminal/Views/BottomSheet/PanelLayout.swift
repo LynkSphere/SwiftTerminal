@@ -17,8 +17,6 @@ struct PanelHeaderHeightKey: PreferenceKey {
 struct PanelLayout<Title: View, Actions: View, Content: View>: View {
     @Environment(EditorPanel.self) private var panel
     @Environment(AppState.self) private var appState
-    // @Environment(\.openWindow) private var openWindow
-    @Environment(\.isDetachedEditor) private var isDetached
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("editorPanelHeight") private var panelHeight: Double = 250
 
@@ -31,21 +29,17 @@ struct PanelLayout<Title: View, Actions: View, Content: View>: View {
     }
 
     var body: some View {
-        if isDetached {
+        VStack(spacing: 0) {
+            header
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.preference(key: PanelHeaderHeightKey.self, value: geo.size.height)
+                    }
+                )
+            Rectangle()
+                .fill(borderColor)
+                .frame(height: 1)
             content
-        } else {
-            VStack(spacing: 0) {
-                header
-                    .background(
-                        GeometryReader { geo in
-                            Color.clear.preference(key: PanelHeaderHeightKey.self, value: geo.size.height)
-                        }
-                    )
-                Rectangle()
-                    .fill(borderColor)
-                    .frame(height: 1)
-                content
-            }
         }
     }
 

@@ -2,7 +2,7 @@ import SwiftUI
 
 struct GitCommitDiffWindow: View {
     let item: GitCommitDiffSheetItem
-    @State private var editorPanel = EditorPanel()
+    @State private var diffLoader = DiffLoadModel()
     @State private var files: [GitChangedFile] = []
     @State private var isLoading = false
     @State private var selection: GitChangedFile?
@@ -41,10 +41,9 @@ struct GitCommitDiffWindow: View {
             .navigationSplitViewColumnWidth(min: 240, ideal: 3000, max: 420)
         } detail: {
             if let selection {
-                DiffPanel(reference: reference(for: selection))
+                DiffBodyView(reference: reference(for: selection), loader: diffLoader)
                     .navigationTitle(selection.fileURL.lastPathComponent)
                     .navigationSubtitle(selection.repositoryRelativePath)
-                    .id(selection)
             } else if !files.isEmpty {
                 ContentUnavailableView(
                     "Select a File",
@@ -56,8 +55,6 @@ struct GitCommitDiffWindow: View {
         .navigationTitle(navTitle)
         .navigationSubtitle(item.message)
         .frame(minWidth: 900, minHeight: 560)
-        .environment(editorPanel)
-        .environment(\.isDetachedEditor, true)
         .task(id: item.id) { await load() }
     }
 

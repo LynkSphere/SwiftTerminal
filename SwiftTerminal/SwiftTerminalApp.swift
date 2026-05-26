@@ -23,8 +23,6 @@ struct SwiftTerminalApp: App {
         WindowGroup("Diff", for: GitCommitDiffSheetItem.self) { $item in
             if let item {
                 GitCommitDiffWindow(item: item)
-                    .environment(appState)
-                    .environment(workspaceStore)
             }
         }
         .defaultSize(width: 1100, height: 700)
