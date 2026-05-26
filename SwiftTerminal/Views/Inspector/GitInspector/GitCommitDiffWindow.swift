@@ -54,6 +54,7 @@ struct GitCommitDiffWindow: View {
         }
         .navigationTitle(navTitle)
         .navigationSubtitle(item.message)
+        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .frame(minWidth: 900, minHeight: 560)
         .task(id: item.id) { await load() }
     }
