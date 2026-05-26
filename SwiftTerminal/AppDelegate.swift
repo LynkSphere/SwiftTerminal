@@ -6,35 +6,90 @@ extension Notification.Name {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
+    private static let mainWindowIdentifier = "swiftterminal"
+    private var savedCloseMenuItem: NSMenuItem?
+    private var savedCloseMenuIndex: Int?
+    private var mainWindowIsKey = false
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         let center = UNUserNotificationCenter.current()
         center.delegate = self
         center.requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
 
-        // Remove the system "Close" (Cmd+W) from File menu so our custom Close Tab command takes priority.
-        // SwiftUI can rebuild the menu after launch, so observe changes and re-strip it.
-        removeCloseMenuItem()
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(menuDidChange),
-            name: NSMenu.didAddItemNotification,
-            object: nil
-        )
+        let nc = NotificationCenter.default
+        nc.addObserver(self, selector: #selector(windowDidBecomeKey(_:)),
+                       name: NSWindow.didBecomeKeyNotification, object: nil)
+        nc.addObserver(self, selector: #selector(windowDidResignKey(_:)),
+                       name: NSWindow.didResignKeyNotification, object: nil)
+        nc.addObserver(self, selector: #selector(menuDidChange(_:)),
+                       name: NSMenu.didAddItemNotification, object: nil)
+    }
+
+    private func isMainAppWindow(_ window: NSWindow?) -> Bool {
+        guard let window else { return false }
+        if let id = window.identifier?.rawValue,
+           id == Self.mainWindowIdentifier || id.contains(Self.mainWindowIdentifier) {
+            return true
+        }
+        return window.title == "SwiftTerminal"
+    }
+
+    @objc private func windowDidBecomeKey(_ note: Notification) {
+        guard let window = note.object as? NSWindow else { return }
+        if isMainAppWindow(window) {
+            mainWindowIsKey = true
+            removeCloseMenuItem()
+        }
+    }
+
+    @objc private func windowDidResignKey(_ note: Notification) {
+        guard let window = note.object as? NSWindow else { return }
+        if isMainAppWindow(window) {
+            mainWindowIsKey = false
+            restoreCloseMenuItem()
+        }
     }
 
     @objc private func menuDidChange(_ notification: Notification) {
-        removeCloseMenuItem()
+        // SwiftUI rebuilds menus from time to time. If the main window is key,
+        // strip File > Close again whenever it reappears.
+        if mainWindowIsKey {
+            removeCloseMenuItem()
+        }
     }
 
-    /// Removes the default File > Close menu item so that our Cmd+W shortcut always maps to Close Tab.
+    private func fileMenu() -> NSMenu? {
+        NSApplication.shared.mainMenu?.items
+            .first(where: { $0.submenu?.title == "File" })?.submenu
+    }
+
+    private func isSystemCloseItem(_ item: NSMenuItem) -> Bool {
+        item.keyEquivalent == "w"
+            && item.keyEquivalentModifierMask == .command
+            && item.title.localizedCaseInsensitiveContains("close")
+            && !item.title.localizedCaseInsensitiveContains("tab")
+    }
+
     private func removeCloseMenuItem() {
-        guard let mainMenu = NSApplication.shared.mainMenu,
-              let fileMenu = mainMenu.items.first(where: { $0.submenu?.title == "File" })?.submenu else { return }
-        for item in fileMenu.items where item.keyEquivalent == "w" && item.keyEquivalentModifierMask == .command
-            && item.title.localizedCaseInsensitiveContains("close") && !item.title.localizedCaseInsensitiveContains("tab") {
+        guard let fileMenu = fileMenu() else { return }
+        for (index, item) in fileMenu.items.enumerated() where isSystemCloseItem(item) {
+            if savedCloseMenuItem == nil {
+                savedCloseMenuItem = item
+                savedCloseMenuIndex = index
+            }
             fileMenu.removeItem(item)
             break
         }
+    }
+
+    private func restoreCloseMenuItem() {
+        guard let fileMenu = fileMenu(), let item = savedCloseMenuItem else { return }
+        if !fileMenu.items.contains(where: isSystemCloseItem) {
+            let idx = min(savedCloseMenuIndex ?? fileMenu.items.count, fileMenu.items.count)
+            fileMenu.insertItem(item, at: idx)
+        }
+        savedCloseMenuItem = nil
+        savedCloseMenuIndex = nil
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
