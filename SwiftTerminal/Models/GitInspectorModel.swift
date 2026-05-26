@@ -213,7 +213,7 @@ final class GitInspectorModel {
 
     func branches(snapshot: GitRepositoryStatusSnapshot) async -> [GitBranchInfo] {
         do {
-            return try await GitRepository.shared.localBranchesDetailed(at: snapshot.repositoryRootURL)
+            return try await GitRepository.shared.allBranchesDetailed(at: snapshot.repositoryRootURL)
         } catch {
             errorMessage = error.localizedDescription
             return []

@@ -9,6 +9,10 @@ struct GitBranchListSheet: View {
 
     private var snapshot: GitRepositoryStatusSnapshot? { state.currentSnapshot }
 
+    private var localBranches: [GitBranchInfo] { branches.filter { !$0.isRemote } }
+    private var remoteBranches: [GitBranchInfo] { branches.filter { $0.isRemote } }
+    private var currentBranchName: String? { branches.first(where: { $0.isCurrent })?.name }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -23,17 +27,28 @@ struct GitBranchListSheet: View {
                     )
                 } else {
                     List {
-                        ForEach(branches) { branch in
-                            branchRow(branch)
-                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                    if !branch.isCurrent {
-                                        Button(role: .destructive) {
-                                            handleDelete(branch)
-                                        } label: {
-                                            Label("Delete", systemImage: "trash")
+                        Section("Local") {
+                            ForEach(localBranches) { branch in
+                                branchRow(branch)
+                                    .contextMenu { compareMenu(for: branch) }
+                                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                        if !branch.isCurrent {
+                                            Button(role: .destructive) {
+                                                handleDelete(branch)
+                                            } label: {
+                                                Label("Delete", systemImage: "trash")
+                                            }
                                         }
                                     }
+                            }
+                        }
+                        if !remoteBranches.isEmpty {
+                            Section("Remote") {
+                                ForEach(remoteBranches) { branch in
+                                    branchRow(branch)
+                                        .contextMenu { compareMenu(for: branch) }
                                 }
+                            }
                         }
                     }
                     .listStyle(.inset)
@@ -73,9 +88,30 @@ struct GitBranchListSheet: View {
     }
 
     @ViewBuilder
+    private func compareMenu(for branch: GitBranchInfo) -> some View {
+        if !branch.isCurrent, let head = currentBranchName {
+            Button {
+                openCompare(base: branch.name, head: head)
+            } label: {
+                Label("Compare with Current Branch…", systemImage: "arrow.left.arrow.right")
+            }
+        }
+    }
+
+    private func openCompare(base: String, head: String) {
+        guard let snapshot else { return }
+        state.commitDiffSheetItem = GitCommitDiffSheetItem(
+            range: GitBranchRange(base: base, head: head),
+            message: "Comparing \(head) against \(base)",
+            repositoryRootURL: snapshot.repositoryRootURL
+        )
+        dismiss()
+    }
+
+    @ViewBuilder
     private func branchRow(_ branch: GitBranchInfo) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: branch.isCurrent ? "checkmark.circle.fill" : "arrow.triangle.branch")
+            Image(systemName: rowIcon(for: branch))
                 .foregroundStyle(branch.isCurrent ? Color.accentColor : .secondary)
             VStack(alignment: .leading, spacing: 2) {
                 Text(branch.name)
@@ -99,6 +135,12 @@ struct GitBranchListSheet: View {
             }
         }
         .padding(.vertical, 2)
+    }
+
+    private func rowIcon(for branch: GitBranchInfo) -> String {
+        if branch.isCurrent { return "checkmark.circle.fill" }
+        if branch.isRemote { return "cloud" }
+        return "arrow.triangle.branch"
     }
 
     private func handleDelete(_ branch: GitBranchInfo) {

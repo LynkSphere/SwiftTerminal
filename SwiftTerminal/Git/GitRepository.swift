@@ -315,6 +315,19 @@ actor GitRepository {
         }
     }
 
+    func changedFiles(base: String, head: String, at repositoryRootURL: URL) async throws -> [GitChangedFile] {
+        let entries = try await self.executor.execute(GitRangeFilesCommand(base: base, head: head), at: repositoryRootURL)
+        return entries.compactMap { entry in
+            guard let kind = Self.changeKindFromDiffTreeStatus(entry.status) else { return nil }
+            let fileURL = repositoryRootURL.appending(path: entry.path).standardizedFileURL
+            return GitChangedFile(fileURL: fileURL, repositoryRelativePath: entry.path, kind: kind)
+        }
+    }
+
+    func rangeAheadBehind(base: String, head: String, at repositoryRootURL: URL) async throws -> (ahead: Int, behind: Int) {
+        try await self.executor.execute(GitRangeAheadBehindCommand(base: base, head: head), at: repositoryRootURL)
+    }
+
     func switchBranch(to branch: String, at repositoryRootURL: URL) async throws {
         try await self.executor.execute(GitSwitchCommand(branch: branch), at: repositoryRootURL)
     }
@@ -364,6 +377,10 @@ actor GitRepository {
 
     func localBranchesDetailed(at repositoryRootURL: URL) async throws -> [GitBranchInfo] {
         try await self._runBranchListDetailed(at: repositoryRootURL)
+    }
+
+    func allBranchesDetailed(at repositoryRootURL: URL) async throws -> [GitBranchInfo] {
+        try await self._runAllBranchListDetailed(at: repositoryRootURL)
     }
 
     func deleteBranch(_ name: String, force: Bool, at repositoryRootURL: URL) async throws {
@@ -561,6 +578,7 @@ struct GitBranchInfo: Equatable, Hashable, Identifiable {
     var isCurrent: Bool
     var isMerged: Bool
     var upstream: String?
+    var isRemote: Bool = false
     var id: String { name }
 }
 
@@ -971,6 +989,66 @@ extension GitRepository {
         let all = try await allRaw
         let merged = Set(try await mergedRaw)
         return all.map { GitBranchInfo(name: $0.name, isCurrent: $0.isCurrent, isMerged: merged.contains($0.name), upstream: $0.upstream) }
+    }
+
+    fileprivate func _runAllBranchListDetailed(at repositoryRootURL: URL) async throws -> [GitBranchInfo] {
+        async let localTask = self._runBranchListDetailed(at: repositoryRootURL)
+        async let remotesRaw = self.executor.execute(GitRemoteBranchesRawCommand(), at: repositoryRootURL)
+        let local = try await localTask
+        let remotes = (try? await remotesRaw) ?? []
+        let remoteBranches = remotes.map {
+            GitBranchInfo(name: $0, isCurrent: false, isMerged: false, upstream: nil, isRemote: true)
+        }
+        return local + remoteBranches
+    }
+}
+
+private struct GitRangeFilesCommand: GitCommand {
+    let base: String
+    let head: String
+
+    var arguments: [String] {
+        ["diff", "--name-status", "\(base)...\(head)"]
+    }
+
+    func parse(output: String) throws -> [(status: Character, path: String)] {
+        let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+        return trimmed.split(separator: "\n", omittingEmptySubsequences: true).compactMap { line in
+            let parts = line.split(separator: "\t")
+            guard parts.count >= 2, let status = parts[0].first else { return nil }
+            let path = String(parts.last!)
+            return (status: status, path: path)
+        }
+    }
+}
+
+private struct GitRangeAheadBehindCommand: GitCommand {
+    let base: String
+    let head: String
+
+    var arguments: [String] {
+        ["rev-list", "--left-right", "--count", "\(base)...\(head)"]
+    }
+
+    func parse(output: String) throws -> (ahead: Int, behind: Int) {
+        let parts = output.trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(separator: "\t", omittingEmptySubsequences: true)
+            .compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+        guard parts.count == 2 else { return (0, 0) }
+        return (ahead: parts[1], behind: parts[0])
+    }
+}
+
+private struct GitRemoteBranchesRawCommand: GitCommand {
+    var arguments: [String] {
+        ["branch", "--remotes", "--list", "--format=%(refname:short)"]
+    }
+
+    func parse(output: String) throws -> [String] {
+        output.split(separator: "\n", omittingEmptySubsequences: true)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && !$0.contains(" -> ") && $0.contains("/") }
     }
 }
 

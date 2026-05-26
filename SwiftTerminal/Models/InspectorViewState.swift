@@ -84,7 +84,14 @@ struct GitCommitDiffSheetItem: Identifiable {
     /// When set, this represents a stash; the sheet will load its file list
     /// via `git stash show` and individual file diffs via the stash ref.
     let stashIndex: Int?
-    var id: String { hash }
+    /// When set, this represents a branch-to-branch comparison (three-dot diff).
+    /// `hash` carries head; `message` carries the title text.
+    let range: GitBranchRange?
+    var id: String {
+        if let range { return "range:\(range.base)...\(range.head)" }
+        if let stashIndex { return "stash:\(stashIndex)" }
+        return hash
+    }
 
     init(hash: String, message: String, repositoryRootURL: URL, preloadedFiles: [GitChangedFile]?, stashIndex: Int? = nil) {
         self.hash = hash
@@ -92,5 +99,20 @@ struct GitCommitDiffSheetItem: Identifiable {
         self.repositoryRootURL = repositoryRootURL
         self.preloadedFiles = preloadedFiles
         self.stashIndex = stashIndex
+        self.range = nil
     }
+
+    init(range: GitBranchRange, message: String, repositoryRootURL: URL) {
+        self.hash = range.head
+        self.message = message
+        self.repositoryRootURL = repositoryRootURL
+        self.preloadedFiles = nil
+        self.stashIndex = nil
+        self.range = range
+    }
+}
+
+struct GitBranchRange: Hashable {
+    var base: String
+    var head: String
 }

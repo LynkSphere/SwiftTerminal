@@ -10,6 +10,13 @@ struct GitCommitDiffSheet: View {
         String(item.hash.prefix(7))
     }
 
+    private var navTitle: String {
+        if let range = item.range {
+            return "\(range.base) … \(range.head)"
+        }
+        return "Changes in \(shortHash)"
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -31,7 +38,7 @@ struct GitCommitDiffSheet: View {
                     .listStyle(.inset)
                 }
             }
-            .navigationTitle("Changes in \(shortHash)")
+            .navigationTitle(navTitle)
             .navigationSubtitle(item.message)
             .navigationDestination(for: GitChangedFile.self) { file in
                 DiffPanel(reference: reference(for: file))
@@ -76,11 +83,17 @@ struct GitCommitDiffSheet: View {
     }
 
     private func reference(for file: GitChangedFile) -> GitDiffReference {
-        GitDiffReference(
+        let stage: GitDiffStage
+        if let range = item.range {
+            stage = .range(base: range.base, head: range.head)
+        } else {
+            stage = .commit(hash: item.hash)
+        }
+        return GitDiffReference(
             repositoryRootURL: item.repositoryRootURL,
             fileURL: file.fileURL,
             repositoryRelativePath: file.repositoryRelativePath,
-            stage: .commit(hash: item.hash),
+            stage: stage,
             kind: file.kind
         )
     }
@@ -92,7 +105,9 @@ struct GitCommitDiffSheet: View {
         }
         isLoading = true
         defer { isLoading = false }
-        if let stashIndex = item.stashIndex {
+        if let range = item.range {
+            files = (try? await GitRepository.shared.changedFiles(base: range.base, head: range.head, at: item.repositoryRootURL)) ?? []
+        } else if let stashIndex = item.stashIndex {
             files = (try? await GitRepository.shared.stashChangedFiles(index: stashIndex, at: item.repositoryRootURL)) ?? []
         } else {
             files = (try? await GitRepository.shared.changedFiles(forCommit: item.hash, at: item.repositoryRootURL)) ?? []
