@@ -82,9 +82,12 @@ struct GitInspectorView: View {
             if state.selectedRepoURL == nil {
                 state.selectedRepoURL = state.model.snapshots.first?.repositoryRootURL
             }
+            guard let snapshot = state.currentSnapshot else { return }
+            await state.model.fetch(snapshot: snapshot)
+            await state.refresh(directoryURL: directoryURL)
         }
         .task(id: snapshot?.branchName) {
-            guard let snapshot else { return }
+            guard let snapshot, snapshot.branchName != nil else { return }
             await state.model.fetch(snapshot: snapshot)
             await state.refresh(directoryURL: directoryURL)
         }

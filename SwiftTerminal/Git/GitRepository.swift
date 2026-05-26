@@ -16,14 +16,28 @@ actor GitRepository {
         return try await withThrowingTaskGroup(of: GitRepositoryStatusSnapshot.self) { group in
             for repositoryRootURL in repositoryRootURLs {
                 group.addTask {
-                    let status = try await self.executor.execute(GitStatusCommand(), at: repositoryRootURL)
+                    var status = try await self.executor.execute(GitStatusCommand(), at: repositoryRootURL)
+
+                    if !status.hasUpstream, let branchName = status.branchName {
+                        let remoteRef = "origin/\(branchName)"
+                        if let counts = try? await self.executor.execute(
+                            GitAheadBehindAgainstRefCommand(remoteRef: remoteRef),
+                            at: repositoryRootURL
+                        ) {
+                            status.hasUpstream = true
+                            status.upstreamBranch = remoteRef
+                            status.aheadCount = counts.ahead
+                            status.behindCount = counts.behind
+                        }
+                    }
 
                     async let localBranches = (try? self.executor.execute(GitLocalBranchesCommand(), at: repositoryRootURL)) ?? []
                     async let unpushedCommits = self.fetchUnpushedCommits(
                         at: repositoryRootURL,
                         hasTrackingBranch: status.hasUpstream,
                         aheadCount: status.aheadCount,
-                        branchName: status.branchName
+                        branchName: status.branchName,
+                        upstreamRef: status.upstreamBranch
                     )
 
                     var stagedFiles: [GitChangedFile] = []
@@ -381,14 +395,13 @@ actor GitRepository {
 
     // MARK: - Private
 
-    private func fetchUnpushedCommits(at repositoryRootURL: URL, hasTrackingBranch: Bool, aheadCount: Int, branchName: String?) async -> [GitUnpushedCommit] {
+    private func fetchUnpushedCommits(at repositoryRootURL: URL, hasTrackingBranch: Bool, aheadCount: Int, branchName: String?, upstreamRef: String? = nil) async -> [GitUnpushedCommit] {
         let commitEntries: [(hash: String, message: String)]
         if hasTrackingBranch {
-            // Status v2's branch.ab line already told us how many commits are ahead;
-            // skip the spawn entirely when there are none.
             guard aheadCount > 0 else { return [] }
+            let command = GitUnpushedCommitListCommand(upstreamRef: upstreamRef ?? "@{u}")
             guard let entries = try? await self.executor.execute(
-                GitUnpushedCommitListCommand(), at: repositoryRootURL
+                command, at: repositoryRootURL
             ) else { return [] }
             commitEntries = entries
         } else {
@@ -834,14 +847,33 @@ private struct GitRevParseHeadCommand: GitCommand {
     }
 }
 
+private struct GitAheadBehindAgainstRefCommand: GitCommand {
+    let remoteRef: String
+    var arguments: [String] {
+        ["rev-list", "--left-right", "--count", "HEAD...\(remoteRef)"]
+    }
+
+    func parse(output: String) throws -> (ahead: Int, behind: Int) {
+        let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        let parts = trimmed.split(whereSeparator: { $0 == " " || $0 == "\t" })
+        guard parts.count == 2,
+              let ahead = Int(parts[0]),
+              let behind = Int(parts[1]) else {
+            return (0, 0)
+        }
+        return (ahead, behind)
+    }
+}
+
 enum PullPreservingResult: Equatable, Sendable {
     case clean
     case wouldConflict
 }
 
 private struct GitUnpushedCommitListCommand: GitCommand {
+    var upstreamRef: String = "@{u}"
     var arguments: [String] {
-        ["log", "@{u}..HEAD", "--pretty=format:%H%x00%s"]
+        ["log", "\(upstreamRef)..HEAD", "--pretty=format:%H%x00%s"]
     }
 
     func parse(output: String) throws -> [(hash: String, message: String)] {

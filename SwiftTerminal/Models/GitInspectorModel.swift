@@ -86,7 +86,11 @@ final class GitInspectorModel {
 
     func push(snapshot: GitRepositoryStatusSnapshot) async {
         await perform(successLabel: "Pushed successfully") {
-            try await GitRepository.shared.push(at: snapshot.repositoryRootURL)
+            if let branch = snapshot.branchName {
+                try await GitRepository.shared.pushSetUpstream(branch: branch, at: snapshot.repositoryRootURL)
+            } else {
+                try await GitRepository.shared.push(at: snapshot.repositoryRootURL)
+            }
         }
     }
 
