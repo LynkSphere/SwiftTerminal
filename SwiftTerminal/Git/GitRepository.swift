@@ -302,6 +302,50 @@ actor GitRepository {
         try await self.executor.execute(GitFetchCommand(), at: repositoryRootURL)
     }
 
+    func syncBranchWithUpstream(localBranch: String, upstreamBranch: String, at repositoryRootURL: URL) async throws -> GitBranchSyncResult {
+        let parts = upstreamBranch.split(separator: "/", maxSplits: 1)
+        guard parts.count == 2 else {
+            throw GitError.commandFailed(
+                command: "syncBranchWithUpstream",
+                message: "Invalid upstream branch format: \(upstreamBranch)"
+            )
+        }
+        let remote = String(parts[0])
+        let remoteBranch = String(parts[1])
+
+        // 1. Fetch remote branch
+        try await self.executor.execute(GitFetchBranchCommand(remote: remote, branch: remoteBranch), at: repositoryRootURL)
+
+        // 2. Query hashes
+        let localHash = try await self.executor.execute(GitRevParseCommand(ref: localBranch), at: repositoryRootURL)
+        let remoteHash = try await self.executor.execute(GitRevParseCommand(ref: upstreamBranch), at: repositoryRootURL)
+
+        if localHash == remoteHash {
+            return .alreadyUpToDate
+        }
+
+        // 3. Find common ancestor
+        let mergeBase = try await self.executor.execute(GitMergeBaseCommand(ref1: localBranch, ref2: upstreamBranch), at: repositoryRootURL)
+
+        if mergeBase == localHash {
+            // Fast-forward is possible!
+            try await self.executor.execute(GitUpdateRefCommand(localBranch: localBranch, targetCommit: remoteHash), at: repositoryRootURL)
+            return .synced
+        } else if mergeBase == remoteHash {
+            // Local is ahead of remote (already contains all remote changes)
+            throw GitError.commandFailed(
+                command: "syncBranchWithUpstream",
+                message: "Local branch '\(localBranch)' is ahead of remote '\(upstreamBranch)' and already contains all upstream commits."
+            )
+        } else {
+            // Diverged
+            throw GitError.commandFailed(
+                command: "syncBranchWithUpstream",
+                message: "Local branch '\(localBranch)' and remote '\(upstreamBranch)' have diverged. You must checkout the branch and merge or rebase manually."
+            )
+        }
+    }
+
     func commitLog(at repositoryRootURL: URL, limit: Int = 200) async throws -> [GitLogEntry] {
         try await self.executor.execute(GitLogCommand(limit: limit), at: repositoryRootURL)
     }
@@ -1259,4 +1303,42 @@ enum GitStatusParser {
         guard let start = pathStart else { return nil }
         return GitStatusEntry(path: String(token[start...]), indexStatus: indexStatus, workTreeStatus: workTreeStatus)
     }
+}
+
+// MARK: - Sync Non-Current Branch Commands
+
+enum GitBranchSyncResult: String, Sendable {
+    case alreadyUpToDate
+    case synced
+}
+
+struct GitFetchBranchCommand: GitCommand {
+    let remote: String
+    let branch: String
+    var arguments: [String] { ["fetch", remote, branch] }
+    func parse(output: String) throws {}
+}
+
+struct GitRevParseCommand: GitCommand {
+    let ref: String
+    var arguments: [String] { ["rev-parse", ref] }
+    func parse(output: String) throws -> String {
+        output.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+struct GitMergeBaseCommand: GitCommand {
+    let ref1: String
+    let ref2: String
+    var arguments: [String] { ["merge-base", ref1, ref2] }
+    func parse(output: String) throws -> String {
+        output.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+struct GitUpdateRefCommand: GitCommand {
+    let localBranch: String
+    let targetCommit: String
+    var arguments: [String] { ["update-ref", "refs/heads/\(localBranch)", targetCommit] }
+    func parse(output: String) throws {}
 }

@@ -79,6 +79,11 @@ struct GitBranchListSheet: View {
         } message: {
             Text("\"\(state.branchPendingDelete?.name ?? "")\" is not fully merged into the current branch. Deleting it may discard commits permanently.")
         }
+        .alert("Sync Failure", isPresented: errorAlertBinding) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(state.model.errorMessage ?? "")
+        }
     }
 
     private var deleteAlertBinding: Binding<Bool> {
@@ -88,14 +93,38 @@ struct GitBranchListSheet: View {
         )
     }
 
+    private var errorAlertBinding: Binding<Bool> {
+        Binding(
+            get: { state.model.errorMessage != nil },
+            set: { if !$0 { state.model.errorMessage = nil } }
+        )
+    }
+
     @ViewBuilder
     private func compareMenu(for branch: GitBranchInfo) -> some View {
         if !branch.isCurrent, let head = currentBranchName {
+            if branch.upstream != nil {
+                Button {
+                    syncWithUpstream(for: branch)
+                } label: {
+                    Label("Sync with Upstream", systemImage: "arrow.triangle.2.circlepath")
+                }
+                Divider()
+            }
             Button {
                 openCompare(base: branch.name, head: head)
             } label: {
                 Label("Compare with Current Branch…", systemImage: "arrow.left.arrow.right")
             }
+        }
+    }
+
+    private func syncWithUpstream(for branch: GitBranchInfo) {
+        guard let snapshot else { return }
+        Task {
+            await state.model.syncBranchWithUpstream(branch, snapshot: snapshot)
+            await load()
+            await state.refresh(directoryURL: directoryURL)
         }
     }
 

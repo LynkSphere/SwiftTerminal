@@ -220,6 +220,34 @@ final class GitInspectorModel {
         }
     }
 
+    func syncBranchWithUpstream(_ branch: GitBranchInfo, snapshot: GitRepositoryStatusSnapshot) async {
+        guard let upstream = branch.upstream else {
+            errorMessage = "Branch '\(branch.name)' does not have an upstream tracking branch configured."
+            return
+        }
+
+        activeTaskCount += 1
+        defer { activeTaskCount -= 1 }
+        errorMessage = nil
+        successMessage = nil
+
+        do {
+            let result = try await GitRepository.shared.syncBranchWithUpstream(
+                localBranch: branch.name,
+                upstreamBranch: upstream,
+                at: snapshot.repositoryRootURL
+            )
+            switch result {
+            case .alreadyUpToDate:
+                successMessage = "'\(branch.name)' is already up to date with upstream."
+            case .synced:
+                successMessage = "Synced '\(branch.name)' with upstream successfully."
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func deleteBranch(_ name: String, force: Bool, snapshot: GitRepositoryStatusSnapshot) async -> Bool {
         await perform(successLabel: "Deleted branch \(name)") {
             try await GitRepository.shared.deleteBranch(name, force: force, at: snapshot.repositoryRootURL)
