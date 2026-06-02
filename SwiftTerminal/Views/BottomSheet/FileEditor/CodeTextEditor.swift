@@ -463,6 +463,11 @@ struct CodeTextEditor: NSViewRepresentable {
         switch mode {
         case .editable(let gutterDiff, let highlightRequest):
             textView.isEditable = true
+            // Re-assert undo support every update, not just in configureMode.
+            // The text view is reused across modes; once it has shown a diff
+            // (allowsUndo = false) switching back to editable would otherwise
+            // leave undo disabled — edits work but Cmd+Z does nothing.
+            textView.allowsUndo = true
             textView.textContainerInset = NSSize(width: EditorTextViewConstants.gutterWidth, height: 4)
             textView.gutterDiff = gutterDiff
             textView.diffLineKinds = [:]
@@ -522,6 +527,7 @@ struct CodeTextEditor: NSViewRepresentable {
 
         case .diff(let presentation, let hunks, let reference, let onReload):
             textView.isEditable = false
+            textView.allowsUndo = false
             textView.textContainerInset = NSSize(width: EditorTextViewConstants.diffGutterWidth, height: 4)
             textView.gutterDiff = .empty
             textView.diffLineKinds = presentation.lineKinds
