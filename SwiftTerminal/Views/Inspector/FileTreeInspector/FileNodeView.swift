@@ -4,6 +4,7 @@ struct FileNodeView: View {
     let item: FileItem
     @Environment(FileTreeInspectorState.self) private var state
     @Environment(EditorPanel.self) private var editorPanel
+    @Environment(\.fileTreeAction) private var onAction
 
     var body: some View {
         @Bindable var state = state
@@ -34,8 +35,9 @@ struct FileNodeView: View {
                             }
                         }
                     }
-                    .contextMenu { FileTreeContextMenu(item: item) }
+                    .contextMenu { FileTreeContextMenu(item: item, onAction: onAction) }
             }
+            .tag(item.id)
             .listRowSeparator(.hidden)
         } else {
             FileRowView(item: item)
@@ -49,7 +51,7 @@ struct FileNodeView: View {
                         state.selectedID = item.id
                     }
                 }
-                .contextMenu { FileTreeContextMenu(item: item) }
+                .contextMenu { FileTreeContextMenu(item: item, onAction: onAction) }
                 .listRowSeparator(.hidden)
         }
     }
