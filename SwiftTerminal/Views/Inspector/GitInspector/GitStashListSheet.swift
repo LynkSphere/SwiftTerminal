@@ -29,18 +29,15 @@ struct GitStashListSheet: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentShape(Rectangle())
                                 .onTapGesture { openDiffs(for: entry) }
+                                .contextMenu {
+                                    applyButton(entry)
+                                    dropButton(entry)
+                                }
+                                .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                                    applyButton(entry)
+                                }
                                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                    Button(role: .destructive) {
-                                        drop(entry)
-                                    } label: {
-                                        Label("Drop", systemImage: "trash")
-                                    }
-                                    Button {
-                                        apply(entry)
-                                    } label: {
-                                        Label("Apply", systemImage: "tray.and.arrow.up")
-                                    }
-                                    .tint(.accentColor)
+                                    dropButton(entry)
                                 }
                         }
                     }
@@ -113,6 +110,25 @@ struct GitStashListSheet: View {
         Task {
             await state.model.applyStash(index: entry.index, snapshot: snapshot)
             await state.refresh(directoryURL: directoryURL)
+        }
+    }
+
+    @ViewBuilder
+    private func applyButton(_ entry: GitStashEntry) -> some View {
+        Button {
+            apply(entry)
+        } label: {
+            Label("Apply", systemImage: "tray.and.arrow.up")
+        }
+        .tint(.accentColor)
+    }
+
+    @ViewBuilder
+    private func dropButton(_ entry: GitStashEntry) -> some View {
+        Button(role: .destructive) {
+            drop(entry)
+        } label: {
+            Label("Drop", systemImage: "trash")
         }
     }
 
