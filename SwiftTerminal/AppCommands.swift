@@ -7,6 +7,7 @@ struct AppCommands: Commands {
     @FocusedValue(\.editorPanel) private var editorPanel
     @FocusedValue(\.isMainWindow) private var isMainWindow
     @AppStorage("showHiddenFiles") var showHiddenFiles = false
+    @AppStorage(EditorFontSize.key) private var editorFontSize: Double = EditorFontSize.default
 
     /// Whether the focused window is the main SwiftTerminal window.
     private var mainWindowActive: Bool { isMainWindow == true }
@@ -67,27 +68,27 @@ struct AppCommands: Commands {
             CommandGroup(replacing: .toolbar) {
                 Button {
                     appState.selectedTerminal?.increaseFontSize()
+                    editorFontSize = min(editorFontSize + 0.5, EditorFontSize.max)
                 } label: {
                     Label("Zoom In", systemImage: "plus.magnifyingglass")
                 }
                 .keyboardShortcut("+", modifiers: .command)
-                .disabled(appState.selectedTerminal?.localProcessTerminalView == nil)
 
                 Button {
                     appState.selectedTerminal?.decreaseFontSize()
+                    editorFontSize = max(editorFontSize - 0.5, EditorFontSize.min)
                 } label: {
                     Label("Zoom Out", systemImage: "minus.magnifyingglass")
                 }
                 .keyboardShortcut("-", modifiers: .command)
-                .disabled(appState.selectedTerminal?.localProcessTerminalView == nil)
 
                 Button {
                     appState.selectedTerminal?.resetFontSize()
+                    editorFontSize = EditorFontSize.default
                 } label: {
                     Label("Actual Size", systemImage: "1.magnifyingglass")
                 }
                 .keyboardShortcut("0", modifiers: .command)
-                .disabled(appState.selectedTerminal?.localProcessTerminalView == nil)
 
                 Divider()
 

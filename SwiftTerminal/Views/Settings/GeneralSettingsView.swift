@@ -8,6 +8,7 @@ struct GeneralSettingsView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage(TerminalProcessRegistry.fontSizeKey) private var terminalFontSize: Double = Double(TerminalProcessRegistry.defaultFontSize)
     @AppStorage(TerminalProcessRegistry.scrollbackKey) private var terminalScrollback: Int = TerminalProcessRegistry.defaultScrollback
+    @AppStorage(EditorFontSize.key) private var editorFontSize: Double = EditorFontSize.default
 
     var body: some View {
         Form {
@@ -51,6 +52,24 @@ struct GeneralSettingsView: View {
             }
 
             Section {
+                LabeledContent {
+                    HStack {
+                        Slider(
+                            value: Binding(
+                                get: { editorFontSize },
+                                set: { editorFontSize = (($0 * 2).rounded()) / 2 }
+                            ),
+                            in: EditorFontSize.min...EditorFontSize.max
+                        )
+                        Text(String(format: "%.1f", editorFontSize))
+                            .font(.subheadline.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .frame(width: 25, alignment: .trailing)
+                    }
+                } label: {
+                    Text("Font size")
+                }
+
                 Toggle("Wrap long lines", isOn: $editorWrapLines)
             } header: {
                 Text("Editor")
