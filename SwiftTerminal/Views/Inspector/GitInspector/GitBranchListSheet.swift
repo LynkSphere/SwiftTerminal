@@ -31,14 +31,16 @@ struct GitBranchListSheet: View {
                         Section("Local") {
                             ForEach(localBranches) { branch in
                                 branchRow(branch)
-                                    .contextMenu { compareMenu(for: branch) }
+                                    .contextMenu {
+                                        compareMenu(for: branch)
+                                        if !branch.isCurrent {
+                                            Divider()
+                                            deleteButton(branch)
+                                        }
+                                    }
                                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                         if !branch.isCurrent {
-                                            Button(role: .destructive) {
-                                                handleDelete(branch)
-                                            } label: {
-                                                Label("Delete", systemImage: "trash")
-                                            }
+                                            deleteButton(branch)
                                         }
                                     }
                             }
@@ -183,6 +185,14 @@ struct GitBranchListSheet: View {
             }
         } else {
             state.branchPendingDelete = branch
+        }
+    }
+
+    private func deleteButton(_ branch: GitBranchInfo) -> some View {
+        Button(role: .destructive) {
+            handleDelete(branch)
+        } label: {
+            Label("Delete", systemImage: "trash")
         }
     }
 
