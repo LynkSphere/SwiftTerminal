@@ -3,6 +3,7 @@ import SwiftUI
 struct DiffPanel: View {
     let reference: GitDiffReference
     @State private var loader = DiffLoadModel()
+    @State private var scrollAnchor = DiffScrollAnchor()
 
     @Environment(EditorPanel.self) private var panel
 
@@ -31,13 +32,15 @@ struct DiffPanel: View {
                 diffStats(stats)
             }
         } actions: {
-            Button { panel.openFile(reference.fileURL) } label: {
+            Button {
+                panel.openFile(reference.fileURL, scrollToLine: scrollAnchor.currentNewFileLine())
+            } label: {
                 Image(systemName: "arrow.up.forward.square")
             }
             .buttonStyle(.borderless)
             .help("Open File")
         } content: {
-            DiffBodyView(reference: reference, loader: loader)
+            DiffBodyView(reference: reference, loader: loader, scrollAnchor: scrollAnchor)
         }
     }
 
@@ -62,6 +65,7 @@ struct DiffPanel: View {
 struct DiffBodyView: View {
     let reference: GitDiffReference
     let loader: DiffLoadModel
+    var scrollAnchor: DiffScrollAnchor?
 
     var body: some View {
         Group {
@@ -87,6 +91,7 @@ struct DiffBodyView: View {
                         fileExtension: reference.fileURL.pathExtension.lowercased(),
                         hunks: file?.hunks ?? [],
                         reference: reference,
+                        scrollAnchor: scrollAnchor,
                         onReload: { await loader.reloadInPlace(reference: reference) }
                     )
                 }

@@ -32,6 +32,11 @@ final class EditorPanel {
     /// Pending highlight to apply after the file loads.
     var highlightRequest: HighlightRequest?
 
+    /// Pending line to scroll to the top of the editor after the file loads.
+    /// Set when opening a file from the diff view so the editor lands at
+    /// roughly the same place the diff was scrolled to.
+    var pendingScrollLine: Int?
+
     var showUnsavedAlert: Bool { pendingContent != nil }
     var canGoBack: Bool { !backStack.isEmpty }
     var canGoForward: Bool { !forwardStack.isEmpty }
@@ -40,13 +45,15 @@ final class EditorPanel {
         isOpen.toggle()
     }
 
-    func openFile(_ url: URL) {
+    func openFile(_ url: URL, scrollToLine line: Int? = nil) {
         highlightRequest = nil
+        pendingScrollLine = line
         navigate(to: .file(url))
     }
 
     func openFileAndHighlight(_ url: URL, lineNumber: Int, columnRange: Range<Int>) {
         let request = HighlightRequest(lineNumber: lineNumber, columnRange: columnRange)
+        pendingScrollLine = nil
         navigate(to: .file(url))
         highlightRequest = request
     }

@@ -62,6 +62,7 @@ struct FileEditorPanel: View {
                     fileExtension: fileURL.pathExtension.lowercased(),
                     gutterDiff: gutterDiff,
                     highlightRequest: panel.highlightRequest,
+                    scrollToLine: panel.pendingScrollLine,
                     repositoryRootURL: directoryURL,
                     onReloadFromDisk: {
                         await loader.reloadInPlace(fileURL: fileURL)

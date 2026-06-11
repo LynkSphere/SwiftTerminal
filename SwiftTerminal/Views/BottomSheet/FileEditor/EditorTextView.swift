@@ -872,6 +872,69 @@ final class EditorTextView: NSTextView {
         scrollRangeToVisible(lineRange)
     }
 
+    /// 1-based logical line currently at the very top of the visible viewport.
+    /// Used to hand the diff view's scroll position to the editor when "Open
+    /// File" is tapped, so the editor lands at roughly the same place.
+    func topVisibleLine() -> Int? {
+        guard let layoutManager, let textContainer else { return nil }
+        let text = string as NSString
+        guard text.length > 0 else { return 1 }
+        let glyphRange = layoutManager.glyphRange(forBoundingRect: visibleRect, in: textContainer)
+        let charRange = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+        guard charRange.location != NSNotFound else { return nil }
+        if charRange.location == 0 { return 1 }
+        return text.substring(to: charRange.location).components(separatedBy: "\n").count
+    }
+
+    /// Scrolls so `lineNumber` sits at the top of the viewport (clamped to the
+    /// document). Unlike `scrollToLine` — which only guarantees visibility and
+    /// so can leave the target line pinned to the bottom edge when scrolling
+    /// down from the top — this pins it to the top, matching where the diff
+    /// view had it.
+    func scrollLineToTop(_ lineNumber: Int) {
+        guard let scrollView = enclosingScrollView else { return }
+        let clipView = scrollView.contentView
+
+        guard lineNumber > 1 else {
+            clipView.setBoundsOrigin(.zero)
+            scrollView.reflectScrolledClipView(clipView)
+            return
+        }
+        guard let layoutManager, let textContainer else { return }
+        let text = string as NSString
+        guard text.length > 0 else { return }
+
+        var currentLine = 1
+        var lineStart = 0
+        while currentLine < lineNumber && lineStart < text.length {
+            let lineRange = text.lineRange(for: NSRange(location: lineStart, length: 0))
+            lineStart = NSMaxRange(lineRange)
+            currentLine += 1
+        }
+        // Target line is past EOF — fall back to plain visibility scroll.
+        guard currentLine == lineNumber else {
+            scrollToLine(lineNumber)
+            return
+        }
+
+        layoutManager.ensureLayout(for: textContainer)
+        let glyphRange = layoutManager.glyphRange(
+            forCharacterRange: NSRange(location: lineStart, length: 0),
+            actualCharacterRange: nil
+        )
+        guard glyphRange.location != NSNotFound, glyphRange.location < layoutManager.numberOfGlyphs else {
+            scrollToLine(lineNumber)
+            return
+        }
+        var fragmentRect = layoutManager.lineFragmentRect(forGlyphAt: glyphRange.location, effectiveRange: nil)
+        fragmentRect.origin.y += textContainerOrigin.y
+
+        let target = NSRect(origin: NSPoint(x: 0, y: fragmentRect.minY), size: clipView.bounds.size)
+        let constrained = clipView.constrainBoundsRect(target)
+        clipView.setBoundsOrigin(constrained.origin)
+        scrollView.reflectScrolledClipView(clipView)
+    }
+
     override func mouseDown(with event: NSEvent) {
         let localPoint = convert(event.locationInWindow, from: nil)
 
