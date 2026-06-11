@@ -166,6 +166,21 @@ final class Workspace: Identifiable, Hashable, Codable {
         store?.scheduleSave()
     }
 
+    /// A terminal that lives inside a split layout, not as a tab (not appended to
+    /// `terminals`). Owned by the `AppState` pane tree.
+    func makeDetachedPane(currentDirectory: String?) -> Terminal {
+        Terminal(workspace: self, currentDirectory: currentDirectory ?? directory)
+    }
+
+    /// Swaps a tab's representative terminal in place, preserving its position,
+    /// when a surviving split pane is promoted to be the tab.
+    func replaceTerminal(_ old: Terminal, with new: Terminal) {
+        guard let idx = terminals.firstIndex(where: { $0 === old }) else { return }
+        new.workspace = self
+        terminals[idx] = new
+        store?.scheduleSave()
+    }
+
     func reorderTerminals(_ newOrder: [Terminal]) {
         terminals = newOrder
         store?.scheduleSave()

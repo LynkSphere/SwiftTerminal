@@ -10,10 +10,17 @@ struct WorkspaceDetailView: View {
            DocumentTabBar(workspace: workspace)
                    
             if let terminal = appState.selectedTerminal {
-                TerminalContainerRepresentable(
-                    tab: terminal, 
-                    appState: appState
-                )
+                Group {
+                    if let tree = appState.paneTrees[terminal.id] {
+                        SplitTreeView(node: tree, tab: terminal, appState: appState)
+                            .background(PaneFocusTracker(appState: appState, tab: terminal))
+                    } else {
+                        TerminalContainerRepresentable(
+                            tab: terminal,
+                            appState: appState
+                        )
+                    }
+                }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
@@ -22,6 +29,24 @@ struct WorkspaceDetailView: View {
         }
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .toolbar {
+            ToolbarItemGroup(placement: .automatic) {
+                Button {
+                    appState.splitActivePane(.horizontal)
+                } label: {
+                    Label("Split Right", systemImage: "rectangle.split.2x1")
+                }
+                .disabled(appState.selectedTerminal == nil)
+
+                Button {
+                    appState.splitActivePane(.vertical)
+                } label: {
+                    Label("Split Down", systemImage: "rectangle.split.1x2")
+                }
+                .disabled(appState.selectedTerminal == nil)
+            }
+            
+            ToolbarSpacer(.fixed)
+
             ToolbarItem(placement: .automatic) {
                 Button {
                     showingScratchPad = true
@@ -62,6 +87,7 @@ struct WorkspaceDetailView: View {
             Button("Close", role: .confirm) {
                 guard let terminal = appState.terminalPendingClose else { return }
                 let next = workspace.terminalAfter(terminal) ?? workspace.terminalBefore(terminal)
+                appState.tearDownPanes(for: terminal)
                 workspace.closeTerminal(terminal)
                 if appState.selectedTerminal === terminal {
                     appState.selectedTerminal = next
@@ -76,6 +102,29 @@ struct WorkspaceDetailView: View {
                 Text("\"\(name)\" is still running in this tab. Are you sure you want to close it?")
             } else {
                 Text("A process is still running in this tab. Are you sure you want to close it?")
+            }
+        }
+        .alert(
+            "Close Pane?",
+            isPresented: Binding(
+                get: { appState.panePendingClose != nil },
+                set: { if !$0 { appState.panePendingClose = nil } }
+            )
+        ) {
+            Button("Close", role: .confirm) {
+                guard let pane = appState.panePendingClose,
+                      let tab = appState.selectedTerminal else { return }
+                appState.closePane(pane, in: tab)
+                appState.panePendingClose = nil
+            }
+            Button("Cancel", role: .cancel) {
+                appState.panePendingClose = nil
+            }
+        } message: {
+            if let pane = appState.panePendingClose, let name = pane.foregroundProcessName {
+                Text("\"\(name)\" is still running in this pane. Are you sure you want to close it?")
+            } else {
+                Text("A process is still running in this pane. Are you sure you want to close it?")
             }
         }
     }

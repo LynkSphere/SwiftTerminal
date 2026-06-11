@@ -9,6 +9,9 @@ import SwiftTerm
 struct TerminalContainerRepresentable: NSViewRepresentable {
     let tab: Terminal
     let appState: AppState
+    /// Only the active pane may take first-responder; otherwise mounted split
+    /// panes fight over it on every layout pass.
+    var isActive: Bool = true
 
     func makeNSView(context: Context) -> NSView {
         let container = NSView(frame: .zero)
@@ -44,8 +47,10 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
             ])
         }
 
-        DispatchQueue.main.async {
-            terminalView.window?.makeFirstResponder(terminalView)
+        if isActive {
+            DispatchQueue.main.async {
+                terminalView.window?.makeFirstResponder(terminalView)
+            }
         }
     }
 

@@ -308,7 +308,7 @@ struct DocumentTabBar: View {
     }
 
     private func closeTerminal(_ terminal: Terminal) {
-        if terminal.hasChildProcess {
+        if appState.paneTerminals(for: terminal).contains(where: { $0.hasChildProcess }) {
             appState.terminalPendingClose = terminal
             return
         }
@@ -328,6 +328,7 @@ struct DocumentTabBar: View {
                 }
             }
         }
+        appState.tearDownPanes(for: terminal)
         workspace.closeTerminal(terminal)
     }
 }

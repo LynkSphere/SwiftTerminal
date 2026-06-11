@@ -25,4 +25,15 @@ final class AppState {
     // Set when the user invokes Run on a command that's already running.
     // ContentView shows a confirmation alert that interrupts then re-runs.
     var pendingRunReplacement: Terminal?
+
+    // MARK: - Split panes
+
+    /// Per-tab split layout, keyed by the tab's representative `Terminal.id`.
+    /// Absent means an unsplit tab. Session-only; never persisted.
+    var paneTrees: [UUID: PaneNode] = [:]
+
+    var focusedPaneID: UUID?
+
+    /// A pane awaiting close confirmation because it has a running child process.
+    var panePendingClose: Terminal?
 }

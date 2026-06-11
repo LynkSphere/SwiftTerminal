@@ -39,8 +39,18 @@ struct AppCommands: Commands {
             CommandGroup(after: .newItem) {
                 Button {
                     guard let workspace = appState.selectedWorkspace,
-                          let terminal = appState.selectedTerminal,
-                          workspace.terminals.count > 1 else { return }
+                          let terminal = appState.selectedTerminal else { return }
+                    // In a split tab, Cmd+W closes the focused pane, not the tab.
+                    if appState.isTabSplit(terminal) {
+                        let pane = appState.resolvedFocusedPane(for: terminal)
+                        if pane.hasChildProcess {
+                            appState.panePendingClose = pane
+                        } else {
+                            appState.closePane(pane, in: terminal)
+                        }
+                        return
+                    }
+                    guard workspace.terminals.count > 1 else { return }
                     if terminal.hasChildProcess {
                         appState.terminalPendingClose = terminal
                     } else {
@@ -86,7 +96,7 @@ struct AppCommands: Commands {
                         editorPanel?.toggle()
                     }
                 } label: {
-                    Label("Toggle Editor Panel", systemImage: "rectangle.bottomhalf.inset.filled")
+                    Label("Toggle Bottom Panel", systemImage: "rectangle.bottomhalf.inset.filled")
                 }
                 .keyboardShortcut("j", modifiers: .command)
 
@@ -263,12 +273,64 @@ struct AppCommands: Commands {
                 Divider()
 
                 Button {
-                    appState.selectedTerminal?.clearTerminal()
+                    appState.actionTargetPane?.clearTerminal()
                 } label: {
                     Label("Clear Terminal", systemImage: "clear")
                 }
                 .keyboardShortcut("k", modifiers: .command)
-                .disabled(appState.selectedTerminal?.localProcessTerminalView == nil)
+                .disabled(appState.actionTargetPane?.localProcessTerminalView == nil)
+
+                Divider()
+
+                Button {
+                    appState.splitActivePane(.horizontal)
+                } label: {
+                    Label("Split Right", systemImage: "rectangle.split.2x1")
+                }
+                .keyboardShortcut("\\", modifiers: .command)
+                .disabled(appState.selectedTerminal == nil)
+
+                Button {
+                    appState.splitActivePane(.vertical)
+                } label: {
+                    Label("Split Down", systemImage: "rectangle.split.1x2")
+                }
+                .keyboardShortcut("\\", modifiers: [.command, .shift])
+                .disabled(appState.selectedTerminal == nil)
+
+                Divider()
+
+                Button {
+                    appState.movePaneFocus(.left)
+                } label: {
+                    Label("Focus Pane Left", systemImage: "arrow.left")
+                }
+                .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
+                .disabled(appState.selectedTerminal.map { !appState.isTabSplit($0) } ?? true)
+
+                Button {
+                    appState.movePaneFocus(.right)
+                } label: {
+                    Label("Focus Pane Right", systemImage: "arrow.right")
+                }
+                .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
+                .disabled(appState.selectedTerminal.map { !appState.isTabSplit($0) } ?? true)
+
+                Button {
+                    appState.movePaneFocus(.up)
+                } label: {
+                    Label("Focus Pane Up", systemImage: "arrow.up")
+                }
+                .keyboardShortcut(.upArrow, modifiers: [.command, .option])
+                .disabled(appState.selectedTerminal.map { !appState.isTabSplit($0) } ?? true)
+
+                Button {
+                    appState.movePaneFocus(.down)
+                } label: {
+                    Label("Focus Pane Down", systemImage: "arrow.down")
+                }
+                .keyboardShortcut(.downArrow, modifiers: [.command, .option])
+                .disabled(appState.selectedTerminal.map { !appState.isTabSplit($0) } ?? true)
             }
         }
     }
