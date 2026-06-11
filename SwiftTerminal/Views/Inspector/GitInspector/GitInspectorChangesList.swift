@@ -79,7 +79,7 @@ struct GitInspectorChangesList: View {
                             systemImage: "checkmark.circle",
                             isExpanded: $state.stagedExpanded
                         )
-                        .contextMenu { GitRepoContextMenu(snapshot: snapshot, onAction: handleAction) }
+                        .contextMenu { GitRepoContextMenu(staged: true, snapshot: snapshot, onAction: handleAction) }
                     }
                     .listRowSeparator(.hidden)
                 }
@@ -93,7 +93,7 @@ struct GitInspectorChangesList: View {
                             systemImage: "circle.dashed",
                             isExpanded: $state.unstagedExpanded
                         )
-                        .contextMenu { GitRepoContextMenu(snapshot: snapshot, onAction: handleAction) }
+                        .contextMenu { GitRepoContextMenu(staged: false, snapshot: snapshot, onAction: handleAction) }
                     }
                     .listRowSeparator(.hidden)
                 }
