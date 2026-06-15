@@ -14,9 +14,37 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
     var isActive: Bool = true
 
     func makeNSView(context: Context) -> NSView {
-        let container = NSView(frame: .zero)
+        let container = TerminalHostView(frame: .zero)
         container.wantsLayer = true
         return container
+    }
+
+    /// Hosts one terminal view. Closing a pane restructures the split tree, so
+    /// for a moment two hosts coexist — the new on-screen host and the dying
+    /// `SplitTreeView` pane host — and both call `addSubview` on the single
+    /// long-lived terminal view (it survives tab/split changes and is shared, so
+    /// `updateNSView` re-parents rather than recreates it). An NSView has one
+    /// superview, so whichever host updates *last* wins; when that's the dying
+    /// host, the on-screen host is left empty and the pane goes blank until a
+    /// later event (focus change) re-parents it back.
+    ///
+    /// Reclaiming `terminalView` here makes it self-healing: the on-screen host
+    /// always gets a layout pass once the transition settles (the survivor
+    /// resizes to fill the freed space), while the dying host is removed from
+    /// the hierarchy and never lays out again — so the on-screen host always
+    /// wins the final tug-of-war.
+    final class TerminalHostView: NSView {
+        weak var terminalView: NSView?
+
+        override func layout() {
+            super.layout()
+            guard let terminalView else { return }
+            if terminalView.superview !== self {
+                terminalView.removeFromSuperview()
+                addSubview(terminalView)
+            }
+            terminalView.frame = bounds
+        }
     }
 
     func updateNSView(_ container: NSView, context: Context) {
@@ -32,19 +60,18 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
 
         terminalView.processDelegate = coordinator
 
+        (container as? TerminalHostView)?.terminalView = terminalView
+
         for subview in container.subviews where subview !== terminalView {
             subview.removeFromSuperview()
         }
 
         if terminalView.superview !== container {
-            terminalView.translatesAutoresizingMaskIntoConstraints = false
+            terminalView.translatesAutoresizingMaskIntoConstraints = true
+            terminalView.autoresizingMask = [.width, .height]
+            terminalView.frame = container.bounds
             container.addSubview(terminalView)
-            NSLayoutConstraint.activate([
-                terminalView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-                terminalView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-                terminalView.topAnchor.constraint(equalTo: container.topAnchor),
-                terminalView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-            ])
+            container.needsLayout = true
         }
 
         if isActive {
