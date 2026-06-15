@@ -195,6 +195,47 @@ final class EditorTextView: NSTextView {
         needsDisplay = true
     }
 
+    /// A folded region is atomic for selection: any non-empty selection that
+    /// touches one is expanded to cover the region's full text (start line
+    /// through closing line). The visible `••• }` badge is drawn, not real
+    /// text, so without this a drag/triple-click on a folded line would copy
+    /// only the visible prefix. Expanding the range means the copied text is
+    /// the real, complete source block. A zero-length range (plain cursor
+    /// placement) is left untouched so clicking onto a folded line still just
+    /// places the caret.
+    override func selectionRange(forProposedRange proposedCharRange: NSRange, granularity: NSSelectionGranularity) -> NSRange {
+        let base = super.selectionRange(forProposedRange: proposedCharRange, granularity: granularity)
+        guard base.length > 0, !foldingManager.foldedStartLines.isEmpty else { return base }
+        return expandedForFoldedRegions(base)
+    }
+
+    /// Unions `range` with the full character extent of every folded region it
+    /// intersects, iterating to a fixpoint so nested folds also pull in fully.
+    private func expandedForFoldedRegions(_ range: NSRange) -> NSRange {
+        let text = string as NSString
+        let lineStarts = foldingManager.lineStarts
+        var lower = range.location
+        var upper = NSMaxRange(range)
+
+        var changed = true
+        while changed {
+            changed = false
+            for startLine in foldingManager.foldedStartLines {
+                guard let region = foldingManager.region(startingAt: startLine),
+                      region.startLine - 1 < lineStarts.count else { continue }
+                let regionStart = lineStarts[region.startLine - 1] // start of the start line
+                let regionEnd = region.endLine < lineStarts.count
+                    ? lineStarts[region.endLine]                   // char after the closing line
+                    : text.length
+                // Does the selection touch this region at all?
+                guard lower < regionEnd, upper > regionStart else { continue }
+                if lower > regionStart { lower = regionStart; changed = true }
+                if upper < regionEnd { upper = regionEnd; changed = true }
+            }
+        }
+        return NSRange(location: lower, length: upper - lower)
+    }
+
     /// Applies hidden text attributes to all currently-folded regions.
     /// Call after syntax highlighting to layer fold hiding on top.
     func applyFoldAttributes() {
