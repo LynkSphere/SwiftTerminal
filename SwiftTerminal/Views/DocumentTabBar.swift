@@ -100,7 +100,7 @@ struct DocumentTabBar: View {
             HStack(spacing: 0) {
                 Color.clear.frame(width: 10, height: 10)
 
-                Text(terminal.foregroundProcessName.map { "\(terminal.title) \u{2014} \($0)" } ?? terminal.title)
+                Text(terminal.displayTitle)
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundStyle(isSelected ? .primary : .secondary)

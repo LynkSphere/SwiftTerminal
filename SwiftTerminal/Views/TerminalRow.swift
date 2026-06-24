@@ -24,7 +24,7 @@ struct TerminalRow: View {
                         isNameFieldFocused = true
                     }
             } else {
-                Text(terminal.title)
+                Text(terminal.displayTitle)
                     .lineLimit(1)
             }
         }

@@ -14,6 +14,10 @@ enum TerminalProgressState: Int {
 @Observable
 final class Terminal: Identifiable, Hashable, Codable {
     var id: UUID
+
+    /// User-assigned name for this tab. Empty means "unnamed" — the user has not
+    /// set a custom name, so the display falls back to the running process or
+    /// the generic "Terminal" label. See `displayTitle`.
     var title: String
     var currentDirectory: String?
 
@@ -59,7 +63,7 @@ final class Terminal: Identifiable, Hashable, Codable {
         }
     }
 
-    init(workspace: Workspace, title: String = "Terminal", currentDirectory: String? = nil, runScript: String? = nil) {
+    init(workspace: Workspace, title: String = "", currentDirectory: String? = nil, runScript: String? = nil) {
         self.id = UUID()
         self.workspace = workspace
         self.title = title
@@ -83,7 +87,7 @@ final class Terminal: Identifiable, Hashable, Codable {
         } else if let name = try c.decodeIfPresent(String.self, forKey: .name) {
             self.title = name
         } else {
-            self.title = "Terminal"
+            self.title = ""
         }
         self.currentDirectory = try c.decodeIfPresent(String.self, forKey: .currentDirectory)
         if let script = try c.decodeIfPresent(String.self, forKey: .runScript) {
@@ -113,6 +117,16 @@ final class Terminal: Identifiable, Hashable, Codable {
 
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
+    }
+
+    /// Label shown in the tab bar / sidebar. Priority: a user-set name wins;
+    /// otherwise the running foreground process name; otherwise the generic
+    /// "Terminal" when the tab is idle and unnamed.
+    var displayTitle: String {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { return trimmed }
+        if let foregroundProcessName, !foregroundProcessName.isEmpty { return foregroundProcessName }
+        return "Terminal"
     }
 
     var displayDirectory: String {
