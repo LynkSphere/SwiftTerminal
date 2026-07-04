@@ -88,7 +88,7 @@ struct AppCommands: Commands {
                 } label: {
                     Label("Actual Size", systemImage: "1.magnifyingglass")
                 }
-                .keyboardShortcut("0", modifiers: .command)
+                .keyboardShortcut("O", modifiers: .command)
 
                 Divider()
 
