@@ -32,6 +32,7 @@ actor GitRepository {
                     }
 
                     async let localBranches = (try? self.executor.execute(GitLocalBranchesCommand(), at: repositoryRootURL)) ?? []
+                    async let worktrees = (try? self.worktrees(at: repositoryRootURL)) ?? []
                     async let unpushedCommits = self.fetchUnpushedCommits(
                         at: repositoryRootURL,
                         hasTrackingBranch: status.hasUpstream,
@@ -58,6 +59,7 @@ actor GitRepository {
                         repositoryRootURL: repositoryRootURL,
                         branchName: status.branchName,
                         localBranches: await localBranches,
+                        worktrees: await worktrees,
                         stagedFiles: stagedFiles,
                         unstagedFiles: unstagedFiles,
                         unpushedCommits: await unpushedCommits,
@@ -431,6 +433,20 @@ actor GitRepository {
         try await self.executor.execute(GitDeleteBranchCommand(name: name, force: force), at: repositoryRootURL)
     }
 
+    // MARK: - Worktrees
+
+    /// Lists every worktree of the repository, flagging the one whose root matches
+    /// `repositoryRootURL` as `isCurrent` so callers can tell "here" from "elsewhere".
+    func worktrees(at repositoryRootURL: URL) async throws -> [GitWorktreeInfo] {
+        let list = try await self.executor.execute(GitWorktreeListCommand(), at: repositoryRootURL)
+        let resolvedRoot = repositoryRootURL.standardizedFileURL.resolvingSymlinksInPath()
+        return list.map { info in
+            var info = info
+            info.isCurrent = info.path.standardizedFileURL.resolvingSymlinksInPath() == resolvedRoot
+            return info
+        }
+    }
+
     // MARK: - Stash Management
 
     func stashList(at repositoryRootURL: URL) async throws -> [GitStashEntry] {
@@ -591,6 +607,7 @@ struct GitRepositoryStatusSnapshot: Equatable {
     var repositoryRootURL: URL
     var branchName: String?
     var localBranches: [String]
+    var worktrees: [GitWorktreeInfo] = []
     var stagedFiles: [GitChangedFile]
     var unstagedFiles: [GitChangedFile]
     var unpushedCommits: [GitUnpushedCommit]
@@ -600,6 +617,25 @@ struct GitRepositoryStatusSnapshot: Equatable {
     var isDirty: Bool {
         !stagedFiles.isEmpty || !unstagedFiles.isEmpty
     }
+}
+
+struct GitWorktreeInfo: Equatable, Hashable, Identifiable, Sendable {
+    var path: URL
+    /// Short branch name (e.g. "feature"), or nil when detached or bare.
+    var branch: String?
+    /// Checked-out commit hash, or nil for a bare entry.
+    var head: String?
+    var isBare: Bool = false
+    var isDetached: Bool = false
+    var isLocked: Bool = false
+    /// True for the primary worktree (the original clone). `git worktree list` always
+    /// reports it first. Its branch belongs with normal branches, not the linked set.
+    var isMain: Bool = false
+    /// True for the worktree whose root the enclosing snapshot represents.
+    var isCurrent: Bool = false
+
+    var id: String { path.path }
+    var displayName: String { path.lastPathComponent }
 }
 
 struct GitUnpushedCommit: Equatable, Identifiable {
@@ -1133,6 +1169,57 @@ private struct GitDeleteBranchCommand: GitCommand {
         ["branch", force ? "-D" : "-d", name]
     }
     func parse(output: String) throws { }
+}
+
+private struct GitWorktreeListCommand: GitCommand {
+    var arguments: [String] { ["worktree", "list", "--porcelain"] }
+    func parse(output: String) throws -> [GitWorktreeInfo] {
+        GitWorktreeParser.parse(output)
+    }
+}
+
+/// Parses `git worktree list --porcelain`. Records are separated by a blank line;
+/// each attribute is its own line — `worktree <path>` (always first), `HEAD <sha>`,
+/// `branch refs/heads/<name>`, and the valueless flags `bare`, `detached`, `locked`.
+enum GitWorktreeParser {
+    static func parse(_ output: String) -> [GitWorktreeInfo] {
+        var result: [GitWorktreeInfo] = []
+        for block in output.components(separatedBy: "\n\n") {
+            var path: URL?
+            var branch: String?
+            var head: String?
+            var isBare = false, isDetached = false, isLocked = false
+
+            for rawLine in block.split(separator: "\n", omittingEmptySubsequences: true) {
+                let line = String(rawLine)
+                if let value = value(of: "worktree", in: line) {
+                    path = URL(filePath: value, directoryHint: .isDirectory)
+                } else if let value = value(of: "HEAD", in: line) {
+                    head = value
+                } else if let value = value(of: "branch", in: line) {
+                    branch = value.hasPrefix("refs/heads/") ? String(value.dropFirst("refs/heads/".count)) : value
+                } else if line == "bare" {
+                    isBare = true
+                } else if line == "detached" {
+                    isDetached = true
+                } else if line == "locked" || line.hasPrefix("locked ") {
+                    isLocked = true
+                }
+            }
+
+            guard let path else { continue }
+            result.append(GitWorktreeInfo(path: path, branch: branch, head: head, isBare: isBare, isDetached: isDetached, isLocked: isLocked))
+        }
+        // git lists the primary worktree first.
+        if !result.isEmpty { result[0].isMain = true }
+        return result
+    }
+
+    private static func value(of key: String, in line: String) -> String? {
+        let prefix = key + " "
+        guard line.hasPrefix(prefix) else { return nil }
+        return String(line.dropFirst(prefix.count))
+    }
 }
 
 private struct GitStashListCommand: GitCommand {

@@ -103,12 +103,12 @@ struct InspectorView: View {
     private var tabContent: some View {
         switch state.selectedTab {
         case .files:
-            FileTreeView(directoryURL: workspace.url, state: state.fileTree)
+            FileTreeView(directoryURL: workspace.effectiveURL, state: state.fileTree)
         case .search:
-            SearchInspectorView(directoryURL: workspace.url, state: state.search)
+            SearchInspectorView(directoryURL: workspace.effectiveURL, state: state.search)
         case .git:
-            GitInspectorView(directoryURL: workspace.url, state: state.git) { url in
-                state.revealInFileTree(url, relativeTo: workspace.url)
+            GitInspectorView(directoryURL: workspace.effectiveURL, state: state.git) { url in
+                state.revealInFileTree(url, relativeTo: workspace.effectiveURL)
             }
         case .commands:
             CommandsInspectorView(workspace: workspace)

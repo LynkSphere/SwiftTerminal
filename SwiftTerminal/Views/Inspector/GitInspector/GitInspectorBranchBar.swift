@@ -4,6 +4,7 @@ import SwiftUI
 struct GitInspectorBranchBar: View {
     let directoryURL: URL
     @Bindable var state: GitInspectorState
+    @Environment(AppState.self) private var appState
 
     private var snapshot: GitRepositoryStatusSnapshot? { state.currentSnapshot }
 
@@ -22,19 +23,28 @@ struct GitInspectorBranchBar: View {
     private var branchPicker: some View {
         Menu {
             if let snapshot {
-                ForEach(snapshot.localBranches, id: \.self) { branch in
-                    Button {
-                        state.switchBranch(to: branch, directoryURL: directoryURL, snapshot: snapshot)
-                    } label: {
-                        HStack {
-                            Text(branch)
-                            if branch == snapshot.branchName {
-                                Image(systemName: "checkmark")
+                // One picker across both sections so the checkmark can land in either.
+                // The section contents are a pure function of the repo — they don't
+                // change with which branch/worktree is currently in view.
+                Picker(selection: contextSelection(snapshot)) {
+                    Section("Branches") {
+                        ForEach(branchNames(in: snapshot), id: \.self) { branch in
+                            Text(branch).tag(GitContextItem.branch(branch))
+                        }
+                    }
+                    let worktrees = linkedWorktrees(in: snapshot)
+                    if !worktrees.isEmpty {
+                        Section("Worktrees") {
+                            ForEach(worktrees) { worktree in
+                                Text(worktree.branch ?? "(detached)")
+                                    .tag(GitContextItem.worktree(worktree.path))
                             }
                         }
                     }
-                    .disabled(branch == snapshot.branchName)
+                } label: {
+                    EmptyView()
                 }
+                .pickerStyle(.inline)
             }
         } label: {
             Label {
@@ -138,6 +148,58 @@ struct GitInspectorBranchBar: View {
         .fixedSize()
     }
 
+    /// Branches listed under "Branches": all local branches except those checked out
+    /// in a linked worktree (each of those is represented by its worktree entry). Pure
+    /// function of the branch/worktree lists — identical no matter which is in view.
+    private func branchNames(in snapshot: GitRepositoryStatusSnapshot) -> [String] {
+        let linked = linkedWorktrees(in: snapshot)
+        return snapshot.localBranches.filter { branch in
+            !linked.contains { $0.branch == branch }
+        }
+    }
+
+    /// The linked worktrees (everything that isn't the primary or a bare entry). Does
+    /// not depend on the current selection, so the list stays stable across switches.
+    private func linkedWorktrees(in snapshot: GitRepositoryStatusSnapshot) -> [GitWorktreeInfo] {
+        snapshot.worktrees.filter { !$0.isMain && !$0.isBare }
+    }
+
+    /// Where the checkmark sits and what a selection does. Only this — not the list —
+    /// reflects the current context: a linked worktree checkmarks in Worktrees, any
+    /// other branch (including the main worktree's) checkmarks in Branches.
+    private func contextSelection(_ snapshot: GitRepositoryStatusSnapshot) -> Binding<GitContextItem> {
+        Binding(
+            get: {
+                if let current = snapshot.worktrees.first(where: { $0.isCurrent }), !current.isMain {
+                    return .worktree(current.path)
+                }
+                return .branch(snapshot.branchName ?? "")
+            },
+            set: { item in
+                switch item {
+                case .branch(let branch):
+                    guard branch != snapshot.branchName else { return }
+                    if let worktree = snapshot.worktrees.first(where: { $0.branch == branch }) {
+                        switchContext(to: worktree)
+                    } else {
+                        state.switchBranch(to: branch, directoryURL: directoryURL, snapshot: snapshot)
+                    }
+                case .worktree(let path):
+                    guard let worktree = snapshot.worktrees.first(where: { $0.path == path }),
+                          !worktree.isCurrent else { return }
+                    switchContext(to: worktree)
+                }
+            }
+        )
+    }
+
+    /// Points the whole workspace inspector at `worktree`. Clearing `selectedRepoURL`
+    /// lets the directory-change refresh re-pick the worktree's repository.
+    private func switchContext(to worktree: GitWorktreeInfo) {
+        appState.selectedWorkspace?.activeWorktreeURL = worktree.path
+        state.selectedRepoURL = nil
+    }
+
     private func openPullRequestPage() {
         guard let snapshot, let branch = snapshot.branchName else { return }
         Task {
@@ -149,6 +211,13 @@ struct GitInspectorBranchBar: View {
             NSWorkspace.shared.open(url)
         }
     }
+}
+
+/// A selectable entry in the branch picker: a plain branch, or a linked worktree
+/// (keyed by path so detached worktrees, which have no branch, still work).
+private enum GitContextItem: Hashable {
+    case branch(String)
+    case worktree(URL)
 }
 
 // MARK: - Pull Request URL

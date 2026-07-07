@@ -23,8 +23,22 @@ final class Workspace: Identifiable, Hashable, Codable {
     @ObservationIgnored
     var editorPanel = EditorPanel()
 
+    /// Session-only override that points the workspace's inspector (git, files,
+    /// search) at a linked git worktree instead of `directory`. Not persisted;
+    /// cleared whenever the target no longer exists on disk. `nil` means "home".
+    var activeWorktreeURL: URL?
+
     var url: URL {
         URL(fileURLWithPath: directory)
+    }
+
+    /// The directory the inspector should reflect: the active worktree when set and
+    /// still present, otherwise the workspace's own `directory`.
+    var effectiveURL: URL {
+        if let activeWorktreeURL, FileManager.default.fileExists(atPath: activeWorktreeURL.path) {
+            return activeWorktreeURL
+        }
+        return url
     }
 
     var projectType: ProjectType {
