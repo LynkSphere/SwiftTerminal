@@ -25,6 +25,18 @@
         
         
         <item>
+            <title>Version 1.2.27</title>
+            <pubDate>Tue, 07 Jul 2026 16:15:01 +0000</pubDate>
+            <sparkle:version>55</sparkle:version>
+            <sparkle:shortVersionString>1.2.27</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <enclosure
+                url="https://github.com/LynkSphere/SwiftTerminal/releases/download/v1.2.27/SwiftTerminal.dmg"
+                length="7286884"
+                type="application/x-apple-diskimage"
+                sparkle:edSignature="SlJ2BmipSRbFDGziDsbMsVUjzFuWdZhLEJ3pOEimBP7g8N/pU4yKEpPaWRUj2KtJ/9Ji36/9NZPSi4KD2uc5Dg==" />
+        </item>
+        <item>
             <title>Version 1.2.26</title>
             <pubDate>Sat, 04 Jul 2026 04:41:09 +0000</pubDate>
             <sparkle:version>54</sparkle:version>
