@@ -5,6 +5,7 @@ import SwiftUI
 enum FileTreeAction {
     case openFile(URL)
     case revealInFinder(URL)
+    case openInTerminal(URL)
     case rename(FileItem)
     case commitRename(FileItem, String)
     case moveToTrash(URL)
@@ -38,6 +39,10 @@ struct FileTreeContextMenu: View {
 
         Button { currentAction(.revealInFinder(item.url)) } label: {
             Label("Reveal in Finder", systemImage: "folder")
+        }
+
+        Button { currentAction(.openInTerminal(parentURL)) } label: {
+            Label("Open in Tab", systemImage: "terminal")
         }
 
         Divider()

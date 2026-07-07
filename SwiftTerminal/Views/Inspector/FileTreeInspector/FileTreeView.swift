@@ -5,6 +5,7 @@ struct FileTreeView: View {
     @Bindable var state: FileTreeInspectorState
 
     @Environment(EditorPanel.self) private var editorPanel
+    @Environment(AppState.self) private var appState
     @AppStorage("showHiddenFiles") private var showHiddenFiles = false
     @State private var pendingTrashURL: URL?
 
@@ -154,6 +155,11 @@ struct FileTreeView: View {
 
         case .revealInFinder(let url):
             NSWorkspace.shared.activateFileViewerSelecting([url])
+
+        case .openInTerminal(let url):
+            guard let workspace = appState.selectedWorkspace else { return }
+            let tab = workspace.addTerminal(currentDirectory: url.path, after: appState.selectedTerminal)
+            appState.selectedTerminal = tab
 
         case .rename(let item):
             state.renamingID = item.id
