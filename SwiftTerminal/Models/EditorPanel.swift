@@ -17,7 +17,13 @@ struct HighlightRequest: Equatable {
 final class EditorPanel {
     var content: EditorPanelContent?
     var isDirty = false
-    var isOpen = false
+    private(set) var isOpen = false
+
+    /// Set when the user explicitly collapses the panel (⌘J, the header
+    /// toggle, or dragging it shut). While set, selection-driven navigation
+    /// updates content without re-opening the panel; any explicit expand
+    /// clears it.
+    private var isUserCollapsed = false
 
     /// Toggled by the header save button; observed by file editor content.
     var saveRequested = false
@@ -42,7 +48,17 @@ final class EditorPanel {
     var canGoForward: Bool { !forwardStack.isEmpty }
 
     func toggle() {
-        isOpen.toggle()
+        isOpen ? collapse() : expand()
+    }
+
+    func expand() {
+        isOpen = true
+        isUserCollapsed = false
+    }
+
+    func collapse() {
+        isOpen = false
+        isUserCollapsed = true
     }
 
     func openFile(_ url: URL, scrollToLine line: Int? = nil) {
@@ -130,6 +146,7 @@ final class EditorPanel {
         backStack.removeAll()
         forwardStack.removeAll()
         content = nil
+        isUserCollapsed = false
     }
 
     // MARK: - Private
@@ -142,7 +159,7 @@ final class EditorPanel {
     private var pendingNavigation: PendingNavigation?
 
     private func navigate(to newContent: EditorPanelContent) {
-        isOpen = true
+        if !isUserCollapsed { isOpen = true }
         guard newContent != content else { return }
         if isDirty {
             pendingContent = newContent
@@ -162,7 +179,7 @@ final class EditorPanel {
             forwardStack.append(current)
         }
         content = previous
-        isOpen = true
+        expand()
     }
 
     private func performForward() {
@@ -171,6 +188,6 @@ final class EditorPanel {
             backStack.append(current)
         }
         content = next
-        isOpen = true
+        expand()
     }
 }

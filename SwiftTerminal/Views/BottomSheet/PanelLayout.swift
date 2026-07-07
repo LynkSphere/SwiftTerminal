@@ -130,13 +130,13 @@ struct PanelLayout<Title: View, Actions: View, Content: View>: View {
                 let target = startHeight + delta
                 let collapseThreshold: Double = 40
                 if target >= 100 {
-                    if !panel.isOpen { panel.isOpen = true }
+                    if !panel.isOpen { panel.expand() }
                     panelHeight = min(target, 800)
                 } else if target < collapseThreshold {
-                    if panel.isOpen { panel.isOpen = false }
+                    if panel.isOpen { panel.collapse() }
                 } else {
                     // Between collapseThreshold and 100: keep panel open, clamped at min.
-                    if !panel.isOpen { panel.isOpen = true }
+                    if !panel.isOpen { panel.expand() }
                     panelHeight = 100
                 }
             }
