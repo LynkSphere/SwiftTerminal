@@ -72,10 +72,12 @@ struct WorkspaceDetailView: View {
             workspace.inspectorState.revealInFileTree(url, relativeTo: workspace.url)
         }
         .task(id: workspace) {
-            appState.selectedTerminal = workspace.terminals.first ?? workspace.addTerminal()
+            appState.selectedTerminal = workspace.terminals.first { $0.id == workspace.selectedTerminalID }
+                ?? workspace.terminals.first ?? workspace.addTerminal()
         }
         .onChange(of: appState.selectedTerminal) {
             appState.selectedTerminal?.hasBellNotification = false
+            workspace.selectedTerminalID = appState.selectedTerminal?.id
         }
         .alert(
             "Close Tab?",

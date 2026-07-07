@@ -14,6 +14,10 @@ final class Workspace: Identifiable, Hashable, Codable {
     private(set) var terminals: [Terminal]
     private(set) var commands: [Terminal]
 
+    /// The tab that was active when this workspace was last displayed, so it can
+    /// be restored on the next switch back instead of resetting to the first tab.
+    var selectedTerminalID: UUID?
+
     @ObservationIgnored
     weak var store: WorkspaceStore?
 
