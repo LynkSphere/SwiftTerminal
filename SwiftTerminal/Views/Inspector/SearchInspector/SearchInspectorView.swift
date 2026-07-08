@@ -72,8 +72,8 @@ struct SearchInspectorView: View {
         .onChange(of: state.model.results) {
             state.expandedIDs = Set(state.model.results.map(\.id))
         }
-        .onChange(of: state.selectedID) { _, newID in
-            guard let id = newID else { return }
+        .onChange(of: InspectorSelection(state, state.selectedID)) { old, new in
+            guard old.owner == new.owner, let id = new.selection else { return }
             for fileResult in state.model.results {
                 if let match = fileResult.matches.first(where: { $0.id == id }) {
                     editorPanel.openFileAndHighlight(

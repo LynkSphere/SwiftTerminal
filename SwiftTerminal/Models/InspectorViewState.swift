@@ -23,6 +23,23 @@ final class InspectorViewState {
     }
 }
 
+/// A selection value paired with the identity of the per-workspace state
+/// object that owns it. Inspector views keep a stable SwiftUI identity across
+/// workspace switches (re-keying them with .id flickers the toolbar), so a
+/// plain `.onChange(of: state.selectedID)` also fires when the whole state
+/// object is swapped for another workspace's. Handlers compare `owner` to tell
+/// an explicit selection change (same owner → open the bottom panel) from a
+/// workspace switch (different owner → leave the panel as that workspace left it).
+struct InspectorSelection<Value: Equatable>: Equatable {
+    let owner: ObjectIdentifier
+    let selection: Value
+
+    init(_ owner: AnyObject, _ selection: Value) {
+        self.owner = ObjectIdentifier(owner)
+        self.selection = selection
+    }
+}
+
 @Observable
 final class FileTreeInspectorState {
     var model = FileTreeModel()

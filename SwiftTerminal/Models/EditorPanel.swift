@@ -19,12 +19,6 @@ final class EditorPanel {
     var isDirty = false
     private(set) var isOpen = false
 
-    /// Set when the user explicitly collapses the panel (⌘J, the header
-    /// toggle, or dragging it shut). While set, selection-driven navigation
-    /// updates content without re-opening the panel; any explicit expand
-    /// clears it.
-    private var isUserCollapsed = false
-
     /// Toggled by the header save button; observed by file editor content.
     var saveRequested = false
 
@@ -48,17 +42,15 @@ final class EditorPanel {
     var canGoForward: Bool { !forwardStack.isEmpty }
 
     func toggle() {
-        isOpen ? collapse() : expand()
+        isOpen.toggle()
     }
 
     func expand() {
         isOpen = true
-        isUserCollapsed = false
     }
 
     func collapse() {
         isOpen = false
-        isUserCollapsed = true
     }
 
     func openFile(_ url: URL, scrollToLine line: Int? = nil) {
@@ -146,7 +138,6 @@ final class EditorPanel {
         backStack.removeAll()
         forwardStack.removeAll()
         content = nil
-        isUserCollapsed = false
     }
 
     // MARK: - Private
@@ -159,7 +150,7 @@ final class EditorPanel {
     private var pendingNavigation: PendingNavigation?
 
     private func navigate(to newContent: EditorPanelContent) {
-        if !isUserCollapsed { isOpen = true }
+        expand()
         guard newContent != content else { return }
         if isDirty {
             pendingContent = newContent

@@ -108,8 +108,9 @@ struct FileTreeView: View {
             state.model.showHiddenFiles = showHiddenFiles
             state.model.load(directoryURL: directoryURL)
         }
-        .onChange(of: state.selectedID) { _, newID in
-            guard let id = newID,
+        .onChange(of: InspectorSelection(state, state.selectedID)) { old, new in
+            guard old.owner == new.owner,
+                  let id = new.selection,
                   let item = state.model.findItem(id: id),
                   !item.isDirectory
             else { return }

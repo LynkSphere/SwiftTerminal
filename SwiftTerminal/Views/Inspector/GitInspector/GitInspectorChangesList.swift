@@ -112,8 +112,9 @@ struct GitInspectorChangesList: View {
             }
         }
         .scrollContentBackground(.hidden)
-        .onChange(of: state.selectedFileID) { _, newID in
-            guard let id = newID,
+        .onChange(of: InspectorSelection(state, state.selectedFileID)) { old, new in
+            guard old.owner == new.owner,
+                  let id = new.selection,
                   let (file, stage, snap) = resolveFile(id: id) else { return }
             editorPanel.openDiff(file.fileURL, in: snap.repositoryRootURL, stage: stage, kind: file.kind)
         }
