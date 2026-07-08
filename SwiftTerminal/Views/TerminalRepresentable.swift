@@ -297,6 +297,71 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
             }
         }
 
+        /// SwiftTerm reposts link activation (click on an OSC 8 hyperlink or an
+        /// implicitly detected URL/path) here. A link that resolves to a file
+        /// inside the tab's workspace opens in the bottom editor panel — same
+        /// as clicking it in the file tree; everything else keeps SwiftTerm's
+        /// default NSWorkspace behavior.
+        func requestOpenLink(source: SwiftTerm.TerminalView, link: String, params: [String: String]) {
+            let tab = (source as? LocalProcessTerminalView)
+                .flatMap { viewMap[ObjectIdentifier($0)]?.tab }
+            DispatchQueue.main.async { [weak self] in
+                if let self, let tab, let target = self.workspaceFileTarget(for: link, tab: tab) {
+                    tab.workspace?.editorPanel.openFile(target.url, scrollToLine: target.line)
+                    return
+                }
+                if let url = URL(string: link) {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+        }
+
+        /// Resolves a clicked link to a file inside the tab's workspace, or nil
+        /// if it isn't one. Handles `file:` URLs, absolute, `~/`, and relative
+        /// paths (resolved against the tab's cwd, then the workspace root, so
+        /// workspace-relative paths printed by tools resolve even when the
+        /// shell's cwd is elsewhere), plus a trailing `:line[:column]` suffix
+        /// from compiler-style output.
+        private func workspaceFileTarget(for link: String, tab: Terminal) -> (url: URL, line: Int?)? {
+            guard let workspace = tab.workspace else { return nil }
+
+            let rawPath: String
+            if link.hasPrefix("file:") {
+                guard let url = URL(string: link), url.isFileURL else { return nil }
+                rawPath = url.path(percentEncoded: false)
+            } else if link.contains("://") {
+                return nil
+            } else {
+                rawPath = link
+            }
+
+            var candidates: [(path: String, line: Int?)] = [(rawPath, nil)]
+            if let match = rawPath.wholeMatch(of: /(.+?):(\d+)(?::\d+)?/) {
+                candidates.append((String(match.1), Int(match.2)))
+            }
+
+            let roots = [workspace.effectiveURL, workspace.url].map { $0.standardizedFileURL.path }
+            let cwd = resolvedWorkingDirectoryPath(from: tab.currentDirectory) ?? workspace.directory
+            for (path, line) in candidates {
+                let resolved: [URL]
+                if path.hasPrefix("/") {
+                    resolved = [URL(fileURLWithPath: path)]
+                } else if path == "~" || path.hasPrefix("~/") {
+                    resolved = [URL(fileURLWithPath: (path as NSString).expandingTildeInPath)]
+                } else {
+                    resolved = ([cwd] + roots).map { URL(fileURLWithPath: $0).appending(path: path) }
+                }
+                for url in resolved.map(\.standardizedFileURL) {
+                    var isDirectory: ObjCBool = false
+                    guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
+                          !isDirectory.boolValue else { continue }
+                    guard roots.contains(where: { url.path == $0 || url.path.hasPrefix($0 + "/") }) else { continue }
+                    return (url, line)
+                }
+            }
+            return nil
+        }
+
         private func resolvedWorkingDirectoryPath(from directory: String?) -> String? {
             guard let directory, !directory.isEmpty else { return nil }
 
