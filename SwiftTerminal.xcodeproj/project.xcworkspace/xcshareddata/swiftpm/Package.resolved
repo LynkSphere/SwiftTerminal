@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/sparkle-project/Sparkle",
       "state" : {
-        "revision" : "6276ba2b404829d139c45ff98427cf90e2efc59b",
-        "version" : "2.9.2"
+        "revision" : "b6496a74a087257ef5e6da1c5b29a447a60f5bd7",
+        "version" : "2.9.4"
       }
     },
     {
@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-argument-parser",
       "state" : {
-        "revision" : "ca37474853a4b5f59a22c74bfdd449b1f6bc4cc2",
-        "version" : "1.8.1"
+        "revision" : "6a52f3251125d74daf04fcbd5e6f08a75d074382",
+        "version" : "1.8.2"
       }
     },
     {
@@ -34,7 +34,7 @@
       "location" : "https://github.com/SilverMarcs/SwiftTerm",
       "state" : {
         "branch" : "feature",
-        "revision" : "195f096d45bd8a0549a17746b5a99e68a30f2dd3"
+        "revision" : "ecc5c69847266cd81de2a15f047e27fae29d9b31"
       }
     }
   ],

@@ -8,6 +8,7 @@ struct GeneralSettingsView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage(TerminalProcessRegistry.fontSizeKey) private var terminalFontSize: Double = Double(TerminalProcessRegistry.defaultFontSize)
     @AppStorage(TerminalProcessRegistry.scrollbackKey) private var terminalScrollback: Int = TerminalProcessRegistry.defaultScrollback
+    @AppStorage(TerminalProcessRegistry.useMetalKey) private var terminalUseMetal: Bool = TerminalProcessRegistry.defaultUseMetal
     @AppStorage(EditorFontSize.key) private var editorFontSize: Double = EditorFontSize.default
 
     var body: some View {
@@ -44,6 +45,11 @@ struct GeneralSettingsView: View {
                     Text("Scrollback")
                     Text("How many lines of history each terminal keeps")
                 }
+                
+                Toggle(isOn: $terminalUseMetal) {
+                    Text("Use Metal rendering")
+                    Text("Only takes effect for new terminal tabs if changed mid-session")
+                }
             } header: {
                 Text("Terminal")
             }
@@ -73,8 +79,6 @@ struct GeneralSettingsView: View {
                 Toggle("Wrap long lines", isOn: $editorWrapLines)
             } header: {
                 Text("Editor")
-            } footer: {
-                Text("When enabled, lines that exceed the editor width wrap to the next line instead of scrolling horizontally.")
             }
 
             #if DEBUG

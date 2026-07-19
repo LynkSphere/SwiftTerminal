@@ -20,6 +20,9 @@ enum TerminalProcessRegistry {
     static let defaultScrollback: Int = 2000
     static let scrollbackOptions: [Int] = [1000, 2000, 3000, 4000]
 
+    static let useMetalKey = "terminalUseMetal"
+    static let defaultUseMetal: Bool = true
+
     static var fontSize: CGFloat {
         get {
             let stored = UserDefaults.standard.object(forKey: fontSizeKey) as? Double
@@ -35,6 +38,11 @@ enum TerminalProcessRegistry {
     static var scrollback: Int {
         let stored = UserDefaults.standard.object(forKey: scrollbackKey) as? Int
         return stored ?? defaultScrollback
+    }
+
+    static var useMetal: Bool {
+        let stored = UserDefaults.standard.object(forKey: useMetalKey) as? Bool
+        return stored ?? defaultUseMetal
     }
 
     static func applyFontSizeToAll(_ size: CGFloat) {
