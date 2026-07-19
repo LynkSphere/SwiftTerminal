@@ -195,14 +195,32 @@ struct GitInspectorView: View {
 
     private var repoPicker: some View {
         Picker(selection: $state.selectedRepoURL) {
-            ForEach(state.model.snapshots, id: \.repositoryRootURL) { snapshot in
-                Label {
-                    Text(snapshot.repositoryRootURL.lastPathComponent)
-                } icon: {
-                    Image(systemName: "arrow.right.arrow.left")
+            let snapshots = state.model.snapshots
+            let mainRepos = snapshots.filter { snapshot in
+                !snapshots.contains { other in
+                    other.repositoryRootURL != snapshot.repositoryRootURL &&
+                    other.repositoryRootURL.isAncestor(of: snapshot.repositoryRootURL)
                 }
-                .lineLimit(1)
-                .tag(Optional(snapshot.repositoryRootURL))
+            }
+            let submodules = snapshots.filter { snapshot in
+                snapshots.contains { other in
+                    other.repositoryRootURL != snapshot.repositoryRootURL &&
+                    other.repositoryRootURL.isAncestor(of: snapshot.repositoryRootURL)
+                }
+            }
+            
+            ForEach(mainRepos, id: \.repositoryRootURL) { snapshot in
+                repoLabel(for: snapshot)
+                    .tag(Optional(snapshot.repositoryRootURL))
+            }
+            
+            if !submodules.isEmpty {
+                Section("Submodules") {
+                    ForEach(submodules, id: \.repositoryRootURL) { snapshot in
+                        repoLabel(for: snapshot)
+                            .tag(Optional(snapshot.repositoryRootURL))
+                    }
+                }
             }
         } label: {
             EmptyView()
@@ -210,6 +228,15 @@ struct GitInspectorView: View {
         .pickerStyle(.menu)
         .controlSize(.large)
         .buttonSizing(.flexible)
+    }
+
+    private func repoLabel(for snapshot: GitRepositoryStatusSnapshot) -> some View {
+        Label {
+            Text(snapshot.repositoryRootURL.lastPathComponent)
+        } icon: {
+            Image(systemName: "arrow.right.arrow.left")
+        }
+        .lineLimit(1)
     }
 
     // MARK: - Banner
