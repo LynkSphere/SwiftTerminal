@@ -135,7 +135,12 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
                         AppDelegate.showBadge()
                     }
                     if let workspaceID = tab.workspace?.id {
-                        AppDelegate.sendNotification(workspaceID: workspaceID, terminalID: tab.id)
+                        AppDelegate.sendNotification(
+                            workspaceID: workspaceID,
+                            terminalID: tab.id,
+                            workspaceName: tab.workspace?.name,
+                            terminalName: tab.displayTitle
+                        )
                     }
                 }
             }
