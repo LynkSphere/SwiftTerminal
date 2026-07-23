@@ -4,7 +4,6 @@ import SwiftUI
 struct GitInspectorBranchBar: View {
     let directoryURL: URL
     @Bindable var state: GitInspectorState
-    @Environment(AppState.self) private var appState
 
     private var snapshot: GitRepositoryStatusSnapshot? { state.currentSnapshot }
 
@@ -180,24 +179,17 @@ struct GitInspectorBranchBar: View {
                 case .branch(let branch):
                     guard branch != snapshot.branchName else { return }
                     if let worktree = snapshot.worktrees.first(where: { $0.branch == branch }) {
-                        switchContext(to: worktree)
+                        state.activateWorktree(worktree, in: snapshot)
                     } else {
                         state.switchBranch(to: branch, directoryURL: directoryURL, snapshot: snapshot)
                     }
                 case .worktree(let path):
                     guard let worktree = snapshot.worktrees.first(where: { $0.path == path }),
                           !worktree.isCurrent else { return }
-                    switchContext(to: worktree)
+                    state.activateWorktree(worktree, in: snapshot)
                 }
             }
         )
-    }
-
-    /// Points the whole workspace inspector at `worktree`. Clearing `selectedRepoURL`
-    /// lets the directory-change refresh re-pick the worktree's repository.
-    private func switchContext(to worktree: GitWorktreeInfo) {
-        appState.selectedWorkspace?.activeWorktreeURL = worktree.path
-        state.selectedRepoURL = nil
     }
 
     private func openPullRequestPage() {

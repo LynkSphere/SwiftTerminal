@@ -9,9 +9,21 @@ actor GitRepository {
         await !self.repositoryRoots(in: directoryURL).isEmpty
     }
 
-    func statusSnapshots(in directoryURL: URL) async throws -> [GitRepositoryStatusSnapshot] {
+    /// `worktreeOverrides` maps a repository's main root to a linked worktree root;
+    /// an overridden repository is snapshotted at the worktree instead, so one repo
+    /// can be viewed through a worktree without affecting its siblings.
+    func statusSnapshots(in directoryURL: URL, worktreeOverrides: [URL: URL] = [:]) async throws -> [GitRepositoryStatusSnapshot] {
         let directoryURL = directoryURL.standardizedFileURL
+        // An overridden root can collide with a worktree that was also discovered
+        // directly (worktree folder inside the scanned directory) — dedupe.
+        var seenRootURLs = Set<URL>()
         let repositoryRootURLs = await self.repositoryRoots(in: directoryURL)
+            .map { rootURL in
+                guard let worktreeURL = worktreeOverrides[rootURL],
+                      FileManager.default.fileExists(atPath: worktreeURL.path) else { return rootURL }
+                return worktreeURL.standardizedFileURL.resolvingSymlinksInPath()
+            }
+            .filter { seenRootURLs.insert($0).inserted }
 
         return try await withThrowingTaskGroup(of: GitRepositoryStatusSnapshot.self) { group in
             for repositoryRootURL in repositoryRootURLs {
@@ -44,13 +56,18 @@ actor GitRepository {
                     var stagedFiles: [GitChangedFile] = []
                     var unstagedFiles: [GitChangedFile] = []
 
+                    // Scoping only narrows the view when the directory is a subfolder
+                    // of the repo; an overridden worktree lives outside the directory
+                    // entirely and must not be filtered against it.
+                    let scopeURL = repositoryRootURL.isAncestor(of: directoryURL) ? directoryURL : repositoryRootURL
+
                     for entry in status.entries {
                         if let stagedKind = entry.stagedKind,
-                           let fileURL = Self.fileURL(for: entry.path, in: repositoryRootURL, scopedTo: directoryURL) {
+                           let fileURL = Self.fileURL(for: entry.path, in: repositoryRootURL, scopedTo: scopeURL) {
                             stagedFiles.append(GitChangedFile(fileURL: fileURL, repositoryRelativePath: entry.path, kind: stagedKind))
                         }
                         if let unstagedKind = entry.unstagedKind,
-                           let fileURL = Self.fileURL(for: entry.path, in: repositoryRootURL, scopedTo: directoryURL) {
+                           let fileURL = Self.fileURL(for: entry.path, in: repositoryRootURL, scopedTo: scopeURL) {
                             unstagedFiles.append(GitChangedFile(fileURL: fileURL, repositoryRelativePath: entry.path, kind: unstagedKind))
                         }
                     }
@@ -378,6 +395,11 @@ actor GitRepository {
         try await self.executor.execute(GitSwitchCommand(branch: branch), at: repositoryRootURL)
     }
 
+    func hasUncommittedChanges(at repositoryRootURL: URL) async -> Bool {
+        let status = try? await self.executor.execute(GitStatusCommand(), at: repositoryRootURL)
+        return !(status?.entries.isEmpty ?? true)
+    }
+
     func createBranch(named name: String, at repositoryRootURL: URL) async throws {
         try await self.executor.execute(GitCreateBranchCommand(name: name), at: repositoryRootURL)
     }
@@ -616,6 +638,17 @@ struct GitRepositoryStatusSnapshot: Equatable {
 
     var isDirty: Bool {
         !stagedFiles.isEmpty || !unstagedFiles.isEmpty
+    }
+
+    /// Stable identity for a repository regardless of which worktree is in view:
+    /// the main worktree's root. Keeps repo selection intact across worktree switches.
+    var mainRepositoryURL: URL {
+        guard let main = worktrees.first(where: { $0.isMain }) else { return repositoryRootURL }
+        return main.path.standardizedFileURL.resolvingSymlinksInPath()
+    }
+
+    var isLinkedWorktree: Bool {
+        worktrees.contains { $0.isCurrent && !$0.isMain }
     }
 }
 

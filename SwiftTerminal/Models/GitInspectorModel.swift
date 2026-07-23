@@ -15,12 +15,15 @@ final class GitInspectorModel {
         snapshots.contains { !$0.stagedFiles.isEmpty || !$0.unstagedFiles.isEmpty }
     }
 
-    func refresh(directoryURL: URL) async {
+    func refresh(directoryURL: URL, worktreeOverrides: [URL: URL] = [:]) async {
         isLoading = snapshots.isEmpty
         errorMessage = nil
 
         do {
-            let newSnapshots = try await GitRepository.shared.statusSnapshots(in: directoryURL)
+            let newSnapshots = Self.collapseWorktreeSiblings(
+                try await GitRepository.shared.statusSnapshots(in: directoryURL, worktreeOverrides: worktreeOverrides),
+                overrides: worktreeOverrides
+            )
             if newSnapshots != snapshots {
                 snapshots = newSnapshots
             }
@@ -161,9 +164,9 @@ final class GitInspectorModel {
         }
     }
 
-    func switchBranch(to branch: String, snapshot: GitRepositoryStatusSnapshot) async {
+    func switchBranch(to branch: String, at repositoryRootURL: URL) async {
         await perform(successLabel: "Switched to \(branch)") {
-            try await GitRepository.shared.switchBranch(to: branch, at: snapshot.repositoryRootURL)
+            try await GitRepository.shared.switchBranch(to: branch, at: repositoryRootURL)
         }
     }
 
@@ -173,13 +176,13 @@ final class GitInspectorModel {
         }
     }
 
-    func stashAndSwitch(to branch: String, snapshot: GitRepositoryStatusSnapshot) async {
+    func stashAndSwitch(to branch: String, at repositoryRootURL: URL) async {
         let stashed = await perform {
-            try await GitRepository.shared.stashAll(at: snapshot.repositoryRootURL)
+            try await GitRepository.shared.stashAll(at: repositoryRootURL)
         }
         guard stashed else { return }
         await perform {
-            try await GitRepository.shared.switchBranch(to: branch, at: snapshot.repositoryRootURL)
+            try await GitRepository.shared.switchBranch(to: branch, at: repositoryRootURL)
         }
     }
 
@@ -291,6 +294,33 @@ final class GitInspectorModel {
     }
 
     // MARK: - Private
+
+    /// A linked worktree discovered alongside its repository's main checkout (e.g.
+    /// a worktree folder inside the workspace) is the same repository seen twice.
+    /// The inspector shows one entry per repository: the overridden context when
+    /// set, otherwise the main checkout — switching between them is the branch
+    /// picker's job, not the repo picker's.
+    private static func collapseWorktreeSiblings(
+        _ snapshots: [GitRepositoryStatusSnapshot],
+        overrides: [URL: URL]
+    ) -> [GitRepositoryStatusSnapshot] {
+        var byRepo: [URL: GitRepositoryStatusSnapshot] = [:]
+        for snapshot in snapshots {
+            let key = snapshot.mainRepositoryURL
+            guard let existing = byRepo[key] else {
+                byRepo[key] = snapshot
+                continue
+            }
+            if let overrideURL = overrides[key]?.standardizedFileURL.resolvingSymlinksInPath() {
+                if snapshot.repositoryRootURL == overrideURL {
+                    byRepo[key] = snapshot
+                }
+            } else if existing.isLinkedWorktree && !snapshot.isLinkedWorktree {
+                byRepo[key] = snapshot
+            }
+        }
+        return byRepo.values.sorted { $0.mainRepositoryURL.path < $1.mainRepositoryURL.path }
+    }
 
     @discardableResult
     private func perform(successLabel: String? = nil, _ operation: () async throws -> Void) async -> Bool {

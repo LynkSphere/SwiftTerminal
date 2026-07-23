@@ -77,10 +77,10 @@ struct GitInspectorView: View {
             .padding()
             .animation(.easeInOut(duration: 0.2), value: activeBanner)
         }
-        .task(id: directoryURL) {
+        .task(id: scanID) {
             await state.refresh(directoryURL: directoryURL)
             if state.selectedRepoURL == nil {
-                state.selectedRepoURL = state.model.snapshots.first?.repositoryRootURL
+                state.selectedRepoURL = state.model.snapshots.first?.mainRepositoryURL
             }
             guard let snapshot = state.currentSnapshot else { return }
             await state.model.fetch(snapshot: snapshot)
@@ -109,7 +109,7 @@ struct GitInspectorView: View {
             }
             Button("Cancel", role: .cancel) { state.pendingBranchSwitch = nil }
         } message: {
-            Text("You have uncommitted changes. Stash all changes (including staged and untracked) before switching branches?")
+            Text(stashAlertMessage)
         }
         .alert("Stash All Changes", isPresented: $state.showStashAlert) {
             TextField("Stash name", text: $state.stashMessage)
@@ -191,6 +191,20 @@ struct GitInspectorView: View {
         }
     }
 
+    // MARK: - Scan Identity
+
+    /// Re-runs the scan task when either the viewed directory or any repo's
+    /// worktree context changes — a worktree switch doesn't move `directoryURL`
+    /// in multi-repo workspaces.
+    private var scanID: ScanID {
+        ScanID(directoryURL: directoryURL, worktreeOverrides: state.worktreeOverrides)
+    }
+
+    private struct ScanID: Equatable {
+        var directoryURL: URL
+        var worktreeOverrides: [URL: URL]
+    }
+
     // MARK: - Repo Picker
 
     private var repoPicker: some View {
@@ -198,27 +212,27 @@ struct GitInspectorView: View {
             let snapshots = state.model.snapshots
             let mainRepos = snapshots.filter { snapshot in
                 !snapshots.contains { other in
-                    other.repositoryRootURL != snapshot.repositoryRootURL &&
-                    other.repositoryRootURL.isAncestor(of: snapshot.repositoryRootURL)
+                    other.mainRepositoryURL != snapshot.mainRepositoryURL &&
+                    other.mainRepositoryURL.isAncestor(of: snapshot.mainRepositoryURL)
                 }
             }
             let submodules = snapshots.filter { snapshot in
                 snapshots.contains { other in
-                    other.repositoryRootURL != snapshot.repositoryRootURL &&
-                    other.repositoryRootURL.isAncestor(of: snapshot.repositoryRootURL)
+                    other.mainRepositoryURL != snapshot.mainRepositoryURL &&
+                    other.mainRepositoryURL.isAncestor(of: snapshot.mainRepositoryURL)
                 }
             }
-            
-            ForEach(mainRepos, id: \.repositoryRootURL) { snapshot in
+
+            ForEach(mainRepos, id: \.mainRepositoryURL) { snapshot in
                 repoLabel(for: snapshot)
-                    .tag(Optional(snapshot.repositoryRootURL))
+                    .tag(Optional(snapshot.mainRepositoryURL))
             }
-            
+
             if !submodules.isEmpty {
                 Section("Submodules") {
-                    ForEach(submodules, id: \.repositoryRootURL) { snapshot in
+                    ForEach(submodules, id: \.mainRepositoryURL) { snapshot in
                         repoLabel(for: snapshot)
-                            .tag(Optional(snapshot.repositoryRootURL))
+                            .tag(Optional(snapshot.mainRepositoryURL))
                     }
                 }
             }
@@ -231,10 +245,15 @@ struct GitInspectorView: View {
     }
 
     private func repoLabel(for snapshot: GitRepositoryStatusSnapshot) -> some View {
-        Label {
-            Text(snapshot.repositoryRootURL.lastPathComponent)
+        let repoName = snapshot.mainRepositoryURL.lastPathComponent
+        return Label {
+            if snapshot.isLinkedWorktree {
+                Text("\(repoName) (\(snapshot.repositoryRootURL.lastPathComponent))")
+            } else {
+                Text(repoName)
+            }
         } icon: {
-            Image(systemName: "arrow.right.arrow.left")
+            Image(systemName: snapshot.isLinkedWorktree ? "arrow.triangle.branch" : "arrow.right.arrow.left")
         }
         .lineLimit(1)
     }
@@ -306,6 +325,14 @@ struct GitInspectorView: View {
             get: { state.model.errorMessage != nil },
             set: { if !$0 { state.model.errorMessage = nil } }
         )
+    }
+
+    private var stashAlertMessage: String {
+        if let pending = state.pendingBranchSwitch, let snapshot,
+           pending.repositoryRootURL != snapshot.repositoryRootURL {
+            return "The main worktree has uncommitted changes. Stash them (including staged and untracked) before switching it to \"\(pending.branch)\"?"
+        }
+        return "You have uncommitted changes. Stash all changes (including staged and untracked) before switching branches?"
     }
 
     private var discardAlertMessage: String {

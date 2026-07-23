@@ -63,14 +63,22 @@ enum GitInspectorDiscardTarget {
     case all(GitRepositoryStatusSnapshot)
 }
 
+struct PendingBranchSwitch {
+    var branch: String
+    var repositoryRootURL: URL
+}
+
 @Observable
 final class GitInspectorState {
     var model = GitInspectorModel()
+    /// Per-repository worktree context: main repository root → linked worktree root.
+    /// Session-only; a repo with no entry is viewed through its main worktree.
+    var worktreeOverrides: [URL: URL] = [:]
     var selectedRepoURL: URL?
     var selectedFileID: String?
     var commitMessage = ""
     var discardTarget: GitInspectorDiscardTarget?
-    var pendingBranchSwitch: String?
+    var pendingBranchSwitch: PendingBranchSwitch?
     var showNewBranchSheet = false
     var newBranchName = ""
     var showStashAlert = false
