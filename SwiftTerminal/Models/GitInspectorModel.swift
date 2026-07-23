@@ -151,8 +151,14 @@ final class GitInspectorModel {
 
     func fetch(snapshot: GitRepositoryStatusSnapshot) async {
         await perform {
-            try await GitRepository.shared.fetch(at: snapshot.repositoryRootURL)
+            try await GitRepository.shared.fetch(at: snapshot.mainRepositoryURL)
         }
+    }
+
+    /// Throttled and silent — for automatic refreshes (workspace/tab switches,
+    /// branch changes). Explicit user refresh uses `fetch(snapshot:)`.
+    func fetchIfStale(snapshot: GitRepositoryStatusSnapshot) async {
+        try? await GitRepository.shared.fetchIfStale(at: snapshot.mainRepositoryURL)
     }
 
     func commitLog(snapshot: GitRepositoryStatusSnapshot, limit: Int = 200) async -> [GitLogEntry] {

@@ -4,6 +4,8 @@ actor GitRepository {
     static let shared = GitRepository()
 
     private let executor = GitExecutor()
+    private var repositoryRootsCache: [URL: (fingerprint: [String], roots: [URL])] = [:]
+    private var lastFetchAttempts: [URL: Date] = [:]
 
     func containsRepository(at directoryURL: URL) async -> Bool {
         await !self.repositoryRoots(in: directoryURL).isEmpty
@@ -318,7 +320,18 @@ actor GitRepository {
     }
 
     func fetch(at repositoryRootURL: URL) async throws {
+        lastFetchAttempts[repositoryRootURL.standardizedFileURL.resolvingSymlinksInPath()] = Date()
         try await self.executor.execute(GitFetchCommand(), at: repositoryRootURL)
+    }
+
+    /// Skips the network when a fetch was attempted within `maxAge` — automatic
+    /// refreshes (workspace/tab switches, branch changes) go through this so they
+    /// don't wake the radio on every switch; explicit user refresh calls `fetch`.
+    /// Attempts count, not successes, so an offline machine isn't retried per switch.
+    func fetchIfStale(at repositoryRootURL: URL, maxAge: TimeInterval = 300) async throws {
+        let key = repositoryRootURL.standardizedFileURL.resolvingSymlinksInPath()
+        if let last = lastFetchAttempts[key], Date().timeIntervalSince(last) < maxAge { return }
+        try await self.fetch(at: repositoryRootURL)
     }
 
     func syncBranchWithUpstream(localBranch: String, upstreamBranch: String, at repositoryRootURL: URL) async throws -> GitBranchSyncResult {
@@ -528,7 +541,39 @@ actor GitRepository {
         let directoryURL = directoryURL.standardizedFileURL.resolvingSymlinksInPath()
         let candidates = self.candidateDirectories(in: directoryURL)
 
-        return await withTaskGroup(of: URL?.self) { group in
+        let fingerprint = Self.repositoryLayoutFingerprint(directoryURL: directoryURL, candidates: candidates)
+        if let cached = repositoryRootsCache[directoryURL], cached.fingerprint == fingerprint {
+            return cached.roots
+        }
+
+        let roots = await self.discoverRepositoryRoots(in: directoryURL, candidates: candidates)
+        repositoryRootsCache[directoryURL] = (fingerprint, roots)
+        return roots
+    }
+
+    /// Cheap stat-based summary of everything root discovery depends on. Discovery
+    /// spawns a `git rev-parse` process per child directory and the FS watcher
+    /// re-triggers it up to once a second during active work, so it only re-runs
+    /// when this changes: a candidate folder or a `.git` entry (file or directory)
+    /// appears, disappears, or moves — including in the nearest ancestor.
+    private nonisolated static func repositoryLayoutFingerprint(directoryURL: URL, candidates: [URL]) -> [String] {
+        let fm = FileManager.default
+        var fingerprint = candidates
+            .map { "\($0.path)|\(fm.fileExists(atPath: $0.appendingPathComponent(".git").path))" }
+            .sorted()
+        var ancestor = directoryURL.deletingLastPathComponent()
+        while ancestor.pathComponents.count > 1 {
+            if fm.fileExists(atPath: ancestor.appendingPathComponent(".git").path) {
+                fingerprint.append("ancestor|\(ancestor.path)")
+                break
+            }
+            ancestor = ancestor.deletingLastPathComponent()
+        }
+        return fingerprint
+    }
+
+    private func discoverRepositoryRoots(in directoryURL: URL, candidates: [URL]) async -> [URL] {
+        await withTaskGroup(of: URL?.self) { group in
             for candidateDirectoryURL in candidates {
                 group.addTask {
                     guard let repositoryRootURL = try? await self.executor.execute(

@@ -88,7 +88,7 @@ extension GitInspectorState {
     private func finishBranchSwitch(at rootURL: URL, directoryURL: URL) async {
         if worktreeOverrides.removeValue(forKey: rootURL) == nil {
             await refresh(directoryURL: directoryURL)
-            try? await GitRepository.shared.fetch(at: rootURL)
+            try? await GitRepository.shared.fetchIfStale(at: rootURL)
             await refresh(directoryURL: directoryURL)
         }
     }
