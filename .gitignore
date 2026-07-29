@@ -3,3 +3,4 @@ build.sh
 release.sh
 build
 SwiftTerminal.dmg
+.codex/
