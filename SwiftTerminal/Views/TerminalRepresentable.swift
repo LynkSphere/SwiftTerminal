@@ -19,31 +19,112 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
         return container
     }
 
-    /// Hosts one terminal view. Closing a pane restructures the split tree, so
-    /// for a moment two hosts coexist — the new on-screen host and the dying
-    /// `SplitTreeView` pane host — and both call `addSubview` on the single
-    /// long-lived terminal view (it survives tab/split changes and is shared, so
-    /// `updateNSView` re-parents rather than recreates it). An NSView has one
-    /// superview, so whichever host updates *last* wins; when that's the dying
-    /// host, the on-screen host is left empty and the pane goes blank until a
-    /// later event (focus change) re-parents it back.
-    ///
-    /// Reclaiming `terminalView` here makes it self-healing: the on-screen host
-    /// always gets a layout pass once the transition settles (the survivor
-    /// resizes to fill the freed space), while the dying host is removed from
-    /// the hierarchy and never lays out again — so the on-screen host always
-    /// wins the final tug-of-war.
+    /// Owns the one AppKit host slot for a terminal view. SwiftUI may reuse this
+    /// container for another selected tab, or briefly keep outgoing and incoming
+    /// containers alive together while a tab becomes a split tree. Explicit
+    /// ownership prevents an outgoing container from retaining or reclaiming the
+    /// long-lived terminal view after its replacement is visible.
     final class TerminalHostView: NSView {
-        weak var terminalView: NSView?
+        private final class WeakHost {
+            weak var value: TerminalHostView?
+
+            init(_ value: TerminalHostView) {
+                self.value = value
+            }
+        }
+
+        private static var owners: [ObjectIdentifier: WeakHost] = [:]
+        private weak var terminalView: NSView?
+
+        func host(_ terminalView: NSView) {
+            let terminalChanged = self.terminalView !== terminalView
+            if terminalChanged {
+                releaseCurrentTerminalView()
+                self.terminalView = terminalView
+            }
+
+            terminalView.translatesAutoresizingMaskIntoConstraints = true
+            terminalView.autoresizingMask = [.width, .height]
+            if terminalChanged {
+                claimTerminalViewIfVisible()
+            } else {
+                reclaimTerminalViewIfOwned()
+            }
+            needsLayout = true
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+
+            guard window != nil else {
+                releaseOwnership()
+                return
+            }
+
+            claimTerminalViewIfVisible()
+            Task { @MainActor [weak self] in
+                await Task.yield()
+                self?.reclaimTerminalViewIfOwned()
+            }
+        }
 
         override func layout() {
             super.layout()
-            guard let terminalView else { return }
+            reclaimTerminalViewIfOwned()
+        }
+
+        private func claimTerminalViewIfVisible() {
+            guard window != nil, let terminalView else { return }
+
+            let identifier = ObjectIdentifier(terminalView)
+            Self.owners[identifier] = WeakHost(self)
+            attach(terminalView)
+        }
+
+        private func reclaimTerminalViewIfOwned() {
+            guard window != nil, let terminalView else { return }
+
+            let identifier = ObjectIdentifier(terminalView)
+            if let owner = Self.owners[identifier]?.value, owner !== self {
+                return
+            }
+            Self.owners[identifier] = WeakHost(self)
+            attach(terminalView)
+        }
+
+        private func attach(_ terminalView: NSView) {
+            for subview in subviews where subview !== terminalView {
+                subview.removeFromSuperview()
+            }
+
             if terminalView.superview !== self {
                 terminalView.removeFromSuperview()
                 addSubview(terminalView)
             }
             terminalView.frame = bounds
+        }
+
+        private func releaseCurrentTerminalView() {
+            guard let terminalView else { return }
+            releaseOwnership()
+            if terminalView.superview === self {
+                terminalView.removeFromSuperview()
+            }
+            self.terminalView = nil
+        }
+
+        private func releaseOwnership() {
+            guard let terminalView else { return }
+            let identifier = ObjectIdentifier(terminalView)
+            if Self.owners[identifier]?.value === self {
+                Self.owners.removeValue(forKey: identifier)
+            }
+        }
+
+        deinit {
+            MainActor.assumeIsolated {
+                releaseOwnership()
+            }
         }
     }
 
@@ -60,18 +141,20 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
 
         terminalView.processDelegate = coordinator
 
-        (container as? TerminalHostView)?.terminalView = terminalView
+        if let host = container as? TerminalHostView {
+            host.host(terminalView)
+        } else {
+            for subview in container.subviews where subview !== terminalView {
+                subview.removeFromSuperview()
+            }
 
-        for subview in container.subviews where subview !== terminalView {
-            subview.removeFromSuperview()
-        }
-
-        if terminalView.superview !== container {
-            terminalView.translatesAutoresizingMaskIntoConstraints = true
-            terminalView.autoresizingMask = [.width, .height]
-            terminalView.frame = container.bounds
-            container.addSubview(terminalView)
-            container.needsLayout = true
+            if terminalView.superview !== container {
+                terminalView.translatesAutoresizingMaskIntoConstraints = true
+                terminalView.autoresizingMask = [.width, .height]
+                terminalView.frame = container.bounds
+                container.addSubview(terminalView)
+                container.needsLayout = true
+            }
         }
 
         if isActive {

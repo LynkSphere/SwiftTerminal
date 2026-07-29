@@ -185,6 +185,30 @@ final class Workspace: Identifiable, Hashable, Codable {
         store?.scheduleSave()
     }
 
+    /// Removes a terminal from the tab bar without ending its shell. The
+    /// terminal remains alive as a leaf in a split layout.
+    @discardableResult
+    func removeTerminalFromTabBar(_ terminal: Terminal) -> Bool {
+        guard let index = terminals.firstIndex(where: { $0 === terminal }) else {
+            return false
+        }
+        terminals.remove(at: index)
+        store?.scheduleSave()
+        return true
+    }
+
+    /// Promotes an existing split-pane terminal into the tab bar without
+    /// creating or restarting its shell.
+    func insertTerminalAsTab(_ terminal: Terminal, after current: Terminal) {
+        guard !terminals.contains(where: { $0 === terminal }),
+              let currentIndex = terminals.firstIndex(where: { $0 === current }) else {
+            return
+        }
+        terminal.workspace = self
+        terminals.insert(terminal, at: currentIndex + 1)
+        store?.scheduleSave()
+    }
+
     /// A terminal that lives inside a split layout, not as a tab (not appended to
     /// `terminals`). Owned by the `AppState` pane tree.
     func makeDetachedPane(currentDirectory: String?) -> Terminal {

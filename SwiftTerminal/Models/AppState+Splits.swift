@@ -34,6 +34,17 @@ extension AppState {
         return resolvedFocusedPane(for: tab)
     }
 
+    /// Selects a terminal only while it is still a real tab in `workspace`.
+    /// This protects against delayed button actions from views whose tab was
+    /// removed earlier in the same event, such as the source of a drag merge.
+    func selectTabIfPresent(_ tab: Terminal, in workspace: Workspace) {
+        guard tab.workspace === workspace,
+              workspace.terminals.contains(where: { $0 === tab }) else {
+            return
+        }
+        selectedTerminal = tab
+    }
+
     // MARK: - Splitting
 
     func splitActivePane(_ axis: SplitAxis) {
@@ -51,6 +62,78 @@ extension AppState {
             )
         }
         focusedPaneID = newPane.id
+    }
+
+    // MARK: - Moving between tabs and panes
+
+    /// Moves an entire tab into another tab as a split group. Existing split
+    /// layouts on either tab are preserved as nested groups and live terminal
+    /// processes are re-parented without restarting.
+    @discardableResult
+    func moveTab(_ source: Terminal, into destination: Terminal, axis: SplitAxis) -> Bool {
+        guard source !== destination,
+              let workspace = source.workspace,
+              destination.workspace === workspace,
+              workspace.terminals.contains(where: { $0 === source }),
+              workspace.terminals.contains(where: { $0 === destination }) else {
+            return false
+        }
+
+        let sourceTree = paneTrees.removeValue(forKey: source.id) ?? PaneNode(terminal: source)
+        let destinationTree = paneTrees[destination.id] ?? PaneNode(terminal: destination)
+        paneTrees[destination.id] = PaneNode(
+            axis: axis,
+            children: [destinationTree, sourceTree]
+        )
+
+        guard workspace.removeTerminalFromTabBar(source) else {
+            paneTrees[source.id] = sourceTree
+            paneTrees[destination.id] = destinationTree.isLeaf ? nil : destinationTree
+            return false
+        }
+
+        selectedWorkspace = workspace
+        selectedTerminal = destination
+        focusedPaneID = source.id
+        return true
+    }
+
+    /// Promotes one pane to a new tab while preserving the running shell.
+    /// When the pane represented the old tab, a surviving pane takes over that
+    /// tab's position before the detached pane is inserted beside it.
+    @discardableResult
+    func detachPaneToTab(_ pane: Terminal, from tab: Terminal) -> Bool {
+        guard let workspace = tab.workspace,
+              pane.workspace === workspace,
+              let tree = paneTrees[tab.id],
+              tree.leafTerminals.count > 1,
+              tree.leafTerminals.contains(where: { $0 === pane }),
+              tree.removeLeaf(targetID: pane.id),
+              let survivor = tree.leafTerminals.first else {
+            return false
+        }
+
+        let detachedRepresentative = pane === tab
+        let remainingLeaves = tree.leafTerminals
+
+        if detachedRepresentative {
+            paneTrees[tab.id] = nil
+            workspace.replaceTerminal(tab, with: survivor)
+            if remainingLeaves.count > 1 {
+                paneTrees[survivor.id] = tree
+            }
+            workspace.insertTerminalAsTab(pane, after: survivor)
+        } else {
+            if remainingLeaves.count <= 1 {
+                paneTrees[tab.id] = nil
+            }
+            workspace.insertTerminalAsTab(pane, after: tab)
+        }
+
+        selectedWorkspace = workspace
+        selectedTerminal = pane
+        focusedPaneID = pane.id
+        return true
     }
 
     // MARK: - Closing

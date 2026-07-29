@@ -6,11 +6,7 @@ struct DocumentTabBar: View {
     @AppStorage("hideTabBarWithSingleTab") private var hideTabBarWithSingleTab = false
     let workspace: Workspace
     @State private var hoveredTabID: UUID?
-    @State private var draggedTabID: UUID?
-    @State private var dragOriginalIndex: Int?
-    @State private var dragCurrentIndex: Int?
-    @State private var dragOffset: CGFloat = 0
-    @State private var lastDragTranslation: CGFloat = 0
+    @State private var dragModel = TabDragViewModel()
     @State private var renamingTab: Terminal?
     @State private var hoveredCloseTabID: UUID?
 
@@ -21,23 +17,20 @@ struct DocumentTabBar: View {
             .frame(height: isVisible ? nil : 0)
             .opacity(isVisible ? 1 : 0)
             .allowsHitTesting(isVisible)
-            .clipped()
     }
 
     @ViewBuilder
     private func tabContent(terminals: [Terminal]) -> some View {
         HStack(spacing: 5) {
             tabStrip(terminals: terminals)
-            Button {
+            Button("New Tab", systemImage: "plus") {
                 let terminal = workspace.addTerminal(
                     currentDirectory: appState.selectedTerminal?.currentDirectory,
                     after: appState.selectedTerminal
                 )
                 appState.selectedTerminal = terminal
-            } label: {
-                Image(systemName: "plus")
-                    .padding(2)
             }
+            .labelStyle(.iconOnly)
             .help("New Tab")
             .controlSize(.large)
             .buttonStyle(.glass)
@@ -63,9 +56,9 @@ struct DocumentTabBar: View {
             let contentWidth = CGFloat(tabCount) * tabWidth + totalSeparators
             let tabStride = tabWidth + separatorWidth
 
-            ScrollView(.horizontal, showsIndicators: false) {
+            ScrollView(.horizontal) {
                 HStack(spacing: 0) {
-                    ForEach(Array(terminals.enumerated()), id: \.element.id) { index, terminal in
+                    ForEach(terminals.enumerated(), id: \.element.id) { index, terminal in
                         if index > 0 {
                             separator(before: index, in: terminals)
                         }
@@ -73,9 +66,12 @@ struct DocumentTabBar: View {
                     }
                 }
                 .frame(minWidth: contentWidth, alignment: .leading)
+                .coordinateSpace(name: "tabStrip")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+            .scrollIndicators(.hidden)
+            .scrollClipDisabled()
         }
         .frame(height: 26)
         .padding(.top, 2)
@@ -91,11 +87,18 @@ struct DocumentTabBar: View {
     private func tabItem(_ terminal: Terminal, index: Int, width: CGFloat, tabStride: CGFloat, in terminals: [Terminal]) -> some View {
         let isSelected = appState.selectedTerminal === terminal
         let isHovered = hoveredTabID == terminal.id
-        let isDragging = draggedTabID == terminal.id
-        let computedOffset = computedDragOffset(for: terminal, at: index, tabStride: tabStride)
+        let isDragging = dragModel.draggedTabID == terminal.id
+        let isFloating = isDragging && dragModel.isDetached
+        let isMergeTarget = dragModel.mergeTargetID == terminal.id
+        let computedOffset = dragModel.offset(
+            for: terminal,
+            at: index,
+            tabStride: tabStride,
+            tabCount: terminals.count
+        )
 
         Button {
-            appState.selectedTerminal = terminal
+            appState.selectTabIfPresent(terminal, in: workspace)
         } label: {
             HStack(spacing: 0) {
                 Color.clear.frame(width: 10, height: 10)
@@ -115,29 +118,45 @@ struct DocumentTabBar: View {
             .frame(width: width)
             .background(
                 Capsule()
-                    .fill(isSelected ? (colorScheme == .dark ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.background.secondary)) : isHovered ? AnyShapeStyle(.quinary) : AnyShapeStyle(.clear))
-                    .strokeBorder(isSelected ? (colorScheme == .dark ? AnyShapeStyle(.separator) : AnyShapeStyle(.background)) : AnyShapeStyle(.clear))
+                    .fill(tabBackground(isSelected: isSelected, isHovered: isHovered, isMergeTarget: isMergeTarget))
+                    .strokeBorder(
+                        isMergeTarget
+                            ? AnyShapeStyle(.clear)
+                            : isSelected
+                                ? (colorScheme == .dark ? AnyShapeStyle(.separator) : AnyShapeStyle(.background))
+                                : AnyShapeStyle(.clear),
+                        lineWidth: 1
+                    )
             )
             .contentShape(.capsule)
         }
-        .offset(x: computedOffset)
-        .zIndex(isDragging ? 1 : 0)
+        .offset(x: computedOffset.width, y: computedOffset.height)
+        .scaleEffect(isFloating ? (dragModel.mergeTargetID == nil ? 0.98 : 0.92) : 1)
+        .opacity(isFloating && dragModel.mergeTargetID != nil ? 0.78 : 1)
+        .shadow(
+            color: isFloating ? Color.black.opacity(0.18) : .clear,
+            radius: isFloating ? 8 : 0,
+            y: isFloating ? 4 : 0
+        )
+        .zIndex(isDragging ? 2 : isMergeTarget ? 1 : 0)
         .animation(.default, value: terminals.count)
+        .animation(.snappy(duration: 0.18), value: dragModel.isDetached)
+        .animation(.snappy(duration: 0.18), value: dragModel.mergeTargetID)
+        .animation(.snappy(duration: 0.18), value: dragModel.currentIndex)
         .overlay(alignment: .leading) {
-            if isHovered && terminals.count > 1 && draggedTabID == nil {
-                Button {
+            if isHovered && terminals.count > 1 && dragModel.draggedTabID == nil {
+                Button("Close Tab", systemImage: "xmark") {
                     closeTerminal(terminal)
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 16, height: 16)
-                        .background(
-                            Circle()
-                                .fill(hoveredCloseTabID == terminal.id ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear))
-                        )
-                        .contentShape(.circle)
                 }
+                .labelStyle(.iconOnly)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .frame(width: 16, height: 16)
+                .background(
+                    Circle()
+                        .fill(hoveredCloseTabID == terminal.id ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear))
+                )
+                .contentShape(.circle)
                 .buttonStyle(.plain)
                 .onHover { isHovering in
                     hoveredCloseTabID = isHovering ? terminal.id : (hoveredCloseTabID == terminal.id ? nil : hoveredCloseTabID)
@@ -147,21 +166,27 @@ struct DocumentTabBar: View {
         }
         .buttonStyle(.plain)
         .contextMenu {
-            Button {
+            Button("Rename", systemImage: "pencil") {
                 renamingTab = terminal
-            } label: {
-                Label("Rename", systemImage: "pencil")
             }
         }
         .simultaneousGesture(
-            DragGesture(minimumDistance: 4)
+            DragGesture(minimumDistance: 4, coordinateSpace: .named("tabStrip"))
                 .onChanged { value in
-                    handleDragChanged(terminal: terminal, translation: value.translation.width, tabStride: tabStride)
+                    dragModel.update(
+                        terminal: terminal,
+                        translation: value.translation,
+                        location: value.location,
+                        tabWidth: width,
+                        tabStride: tabStride,
+                        terminals: terminals
+                    )
                 }
                 .onEnded { _ in
-                    handleDragEnded(tabStride: tabStride)
+                    dragModel.finish(in: workspace, using: appState)
                 }
         )
+        .help("Drag sideways to reorder. Pull down, then drop on another tab to merge.")
         .onHover { isHovering in
             hoveredTabID = isHovering ? terminal.id : (hoveredTabID == terminal.id ? nil : hoveredTabID)
         }
@@ -200,99 +225,14 @@ struct DocumentTabBar: View {
         .frame(width: 12, height: 12)
     }
 
-    private func computedDragOffset(for terminal: Terminal, at index: Int, tabStride: CGFloat) -> CGFloat {
-        if terminal.id == draggedTabID {
-            return dragOffset
+    private func tabBackground(isSelected: Bool, isHovered: Bool, isMergeTarget: Bool) -> AnyShapeStyle {
+        if isMergeTarget {
+            return AnyShapeStyle(Color.accentColor.opacity(colorScheme == .dark ? 0.24 : 0.12))
         }
-        guard let original = dragOriginalIndex, let current = dragCurrentIndex else {
-            return 0
+        if isSelected {
+            return colorScheme == .dark ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.background.secondary)
         }
-        if original < current {
-            // Dragged tab moved right; tabs in (original, current] shift left to make room
-            if index > original && index <= current {
-                return -tabStride
-            }
-        } else if original > current {
-            // Dragged tab moved left; tabs in [current, original) shift right
-            if index >= current && index < original {
-                return tabStride
-            }
-        }
-        return 0
-    }
-
-    private func handleDragChanged(terminal: Terminal, translation: CGFloat, tabStride: CGFloat) {
-        if draggedTabID != terminal.id {
-            let sorted = workspace.terminals
-            guard let originalIdx = sorted.firstIndex(where: { $0.id == terminal.id }) else { return }
-            draggedTabID = terminal.id
-            dragOriginalIndex = originalIdx
-            dragCurrentIndex = originalIdx
-            dragOffset = 0
-            lastDragTranslation = 0
-        }
-
-        guard let originalIdx = dragOriginalIndex else { return }
-        let count = workspace.terminals.count
-
-        let delta = translation - lastDragTranslation
-        lastDragTranslation = translation
-
-        // Update the dragged tab's offset instantly so it tracks the cursor.
-        // Clamp so the tab can never leave the bounds of the strip.
-        let minOffset = -CGFloat(originalIdx) * tabStride
-        let maxOffset = CGFloat(count - 1 - originalIdx) * tabStride
-        dragOffset = min(max(dragOffset + delta, minOffset), maxOffset)
-
-        // Compute which slot the dragged tab is currently sitting in. When this
-        // changes we animate the displacement of the other tabs only — the
-        // dragged tab itself stays glued to the cursor.
-        let stepsMoved = Int((dragOffset / tabStride).rounded())
-        let newCurrent = max(0, min(count - 1, originalIdx + stepsMoved))
-        if newCurrent != dragCurrentIndex {
-            withAnimation(.snappy(duration: 0.2)) {
-                dragCurrentIndex = newCurrent
-            }
-        }
-    }
-
-    private func handleDragEnded(tabStride: CGFloat) {
-        guard let draggedID = draggedTabID,
-              let originalIdx = dragOriginalIndex,
-              let currentIdx = dragCurrentIndex else {
-            resetDragState()
-            return
-        }
-
-        lastDragTranslation = 0
-
-        // Commit the reorder, compensate the offset for the layout shift, and
-        // animate the dragged tab into its final slot — all in one transaction
-        // so the dragged tab slides smoothly to rest instead of snapping.
-        withAnimation(.snappy(duration: 0.22)) {
-            if originalIdx != currentIdx {
-                let sorted = workspace.terminals
-                if let dragged = sorted.first(where: { $0.id == draggedID }) {
-                    var newOrder = sorted
-                    newOrder.remove(at: originalIdx)
-                    newOrder.insert(dragged, at: currentIdx)
-                    workspace.reorderTerminals(newOrder)
-                }
-            }
-            dragOriginalIndex = nil
-            dragCurrentIndex = nil
-            dragOffset = 0
-        } completion: {
-            draggedTabID = nil
-        }
-    }
-
-    private func resetDragState() {
-        draggedTabID = nil
-        dragOriginalIndex = nil
-        dragCurrentIndex = nil
-        dragOffset = 0
-        lastDragTranslation = 0
+        return isHovered ? AnyShapeStyle(.quinary) : AnyShapeStyle(.clear)
     }
 
     private func separator(before index: Int, in terminals: [Terminal]) -> some View {

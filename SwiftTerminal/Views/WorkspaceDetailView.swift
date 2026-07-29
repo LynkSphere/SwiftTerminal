@@ -7,7 +7,8 @@ struct WorkspaceDetailView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-           DocumentTabBar(workspace: workspace)
+            DocumentTabBar(workspace: workspace)
+                .zIndex(1)
                    
             if let terminal = appState.selectedTerminal {
                 Group {
@@ -19,6 +20,13 @@ struct WorkspaceDetailView: View {
                             tab: terminal,
                             appState: appState
                         )
+                        .contextMenu {
+                            TerminalContextMenu(
+                                terminal: terminal,
+                                tab: terminal,
+                                appState: appState
+                            )
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

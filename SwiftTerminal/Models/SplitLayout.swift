@@ -1,9 +1,11 @@
 import SwiftUI
 
 /// `horizontal`: children side by side. `vertical`: children stacked.
-enum SplitAxis: Equatable {
+enum SplitAxis: CaseIterable, Equatable, Hashable, Identifiable {
     case horizontal
     case vertical
+
+    var id: Self { self }
 }
 
 enum PaneFocusDirection {

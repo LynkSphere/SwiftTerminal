@@ -9,11 +9,17 @@ struct PaneView: View {
     var body: some View {
         let isActive = appState.isPaneActive(terminal, in: tab)
         TerminalContainerRepresentable(tab: terminal, appState: appState, isActive: isActive)
+            .contextMenu {
+                TerminalContextMenu(terminal: terminal, tab: tab, appState: appState)
+            }
             .overlay {
-                RoundedRectangle(cornerRadius: 4)
-                    .strokeBorder(isActive ? Color.accentColor.opacity(0.7) : Color.clear, lineWidth: 1.5)
+                Rectangle()
+                    .strokeBorder(isActive ? Color.accentColor.opacity(0.7) : Color.clear)
                     .allowsHitTesting(false)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .accessibilityAction(named: "Move Pane to New Tab") {
+                appState.detachPaneToTab(terminal, from: tab)
+            }
     }
 }
