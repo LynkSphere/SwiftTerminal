@@ -17,7 +17,8 @@ final class Terminal: Identifiable, Hashable, Codable {
 
     /// User-assigned name for this tab. Empty means "unnamed" — the user has not
     /// set a custom name, so the display falls back to the running process or
-    /// the generic "Terminal" label. See `displayTitle`.
+    /// the generic "Terminal" label. Older saves may contain "Terminal" as the
+    /// default rather than an empty string; `displayTitle` handles both forms.
     var title: String
     var currentDirectory: String?
 
@@ -33,6 +34,10 @@ final class Terminal: Identifiable, Hashable, Codable {
     /// shell-integration OSC 133 handler installed in `TerminalRepresentable`:
     /// set on `133;C` (preexec), cleared on `133;D` (precmd).
     var foregroundProcessName: String?
+
+    /// Most recent OSC 0/1/2 title reported by the foreground program. This is
+    /// session-only and is surfaced only while Claude Code or Codex is active.
+    var reportedTerminalTitle: String?
 
     /// Exit status of the most recently completed foreground command, surfaced
     /// by OSC 133;D. Nil before the first command finishes.
@@ -119,14 +124,21 @@ final class Terminal: Identifiable, Hashable, Codable {
         hasher.combine(id)
     }
 
-    /// Label shown in the tab bar / sidebar. Priority: a user-set name wins;
-    /// otherwise the running foreground process name; otherwise the generic
-    /// "Terminal" when the tab is idle and unnamed.
+    /// Label shown in the tab bar / sidebar. A user-set name wins, followed by
+    /// an active Claude/Codex chat title, the foreground process, and finally
+    /// the generic "Terminal" label.
     var displayTitle: String {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty { return trimmed }
+        let hasCustomTitle = !trimmed.isEmpty && trimmed != "Terminal"
+        if hasCustomTitle { return trimmed }
+        if let agentTitle = AgentTerminalTitle.displayTitle(
+            reportedTitle: reportedTerminalTitle,
+            foregroundCommand: foregroundProcessName
+        ) {
+            return agentTitle
+        }
         if let foregroundProcessName, !foregroundProcessName.isEmpty { return foregroundProcessName }
-        return "Terminal"
+        return trimmed.isEmpty ? "Terminal" : trimmed
     }
 
     var displayDirectory: String {
@@ -153,6 +165,7 @@ final class Terminal: Identifiable, Hashable, Codable {
         }
         localProcessTerminalView = nil
         foregroundProcessName = nil
+        reportedTerminalTitle = nil
     }
 
     func increaseFontSize() {

@@ -113,6 +113,15 @@ enum ShellIntegration {
         . "$HOME/.zshrc"
     fi
 
+    # Codex supports an event-driven OSC title containing the active thread
+    # name, but does not enable that title item by default. Scope the override
+    # to SwiftTerminal and preserve any user-defined codex alias/function.
+    if (( $+commands[codex] )) && (( ! $+functions[codex] )) && (( ! $+aliases[codex] )); then
+        codex() {
+            "${commands[codex]}" -c 'tui.terminal_title=["thread-title"]' "$@"
+        }
+    fi
+
     autoload -Uz add-zsh-hook 2>/dev/null
 
     __swiftterminal_preexec() {
@@ -151,6 +160,17 @@ enum ShellIntegration {
     fi
     if [ -f "$HOME/.bashrc" ]; then . "$HOME/.bashrc"; fi
 
+    # Ask Codex to publish the active thread name via OSC while leaving an
+    # existing user alias/function untouched.
+    __swiftterminal_codex_executable="$(type -P codex 2>/dev/null)"
+    if [ -n "$__swiftterminal_codex_executable" ] \
+       && ! declare -F codex >/dev/null 2>&1 \
+       && ! alias codex >/dev/null 2>&1; then
+        codex() {
+            "$__swiftterminal_codex_executable" -c 'tui.terminal_title=["thread-title"]' "$@"
+        }
+    fi
+
     __swiftterminal_preexec_invoke() {
         local ret=$?
         if [ "$__swiftterminal_preexec_ran" = "1" ]; then return $ret; fi
@@ -180,6 +200,12 @@ enum ShellIntegration {
     private static let fishInit = #"""
     # SwiftTerminal shell integration (OSC 133). fish_preexec/fish_postexec are
     # built-in events; no patching of prompt or traps required.
+    if not functions -q codex; and type -q codex
+        function codex
+            command codex -c 'tui.terminal_title=["thread-title"]' $argv
+        end
+    end
+
     function __swiftterminal_preexec --on-event fish_preexec
         printf '\e]133;C;%s\a' "$argv"
     end

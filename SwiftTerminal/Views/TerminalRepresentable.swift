@@ -281,18 +281,25 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
 
         func sizeChanged(source: LocalProcessTerminalView, newCols: Int, newRows: Int) {}
 
-        /// SwiftTerm calls this for OSC 0/1/2 (window/icon title). Programs like
-        /// vim, ssh, and tmux freely overwrite the title, so it is *not* a
-        /// reliable signal for whether a command is running — the OSC 133
-        /// delegate methods below own that state. We intentionally ignore the
-        /// title for state tracking.
-        func setTerminalTitle(source: LocalProcessTerminalView, title: String) {}
+        /// SwiftTerm calls this for OSC 0/1/2 (window/icon title). Claude Code
+        /// and Codex both use this event-driven channel for their session name.
+        /// The model only displays it while OSC 133 says one of those agents is
+        /// the foreground command, so titles from vim, ssh, or tmux stay local
+        /// to the terminal surface and do not rename the app tab.
+        func setTerminalTitle(source: LocalProcessTerminalView, title: String) {
+            guard let entry = viewMap[ObjectIdentifier(source)] else { return }
+            Task { @MainActor [weak tab = entry.tab] in
+                guard let tab, tab.reportedTerminalTitle != title else { return }
+                tab.reportedTerminalTitle = title
+            }
+        }
 
         func processTerminated(source: TerminalView, exitCode: Int32?) {
             guard let local = source as? LocalProcessTerminalView,
                   let entry = viewMap[ObjectIdentifier(local)] else { return }
             DispatchQueue.main.async {
                 entry.tab.foregroundProcessName = nil
+                entry.tab.reportedTerminalTitle = nil
                 entry.tab.progressState = nil
                 entry.tab.progressValue = nil
             }
@@ -327,6 +334,7 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
                     let value = name.isEmpty ? "(running)" : name
                     DispatchQueue.main.async {
                         guard let tab = weakTab.value else { return }
+                        tab.reportedTerminalTitle = nil
                         if tab.foregroundProcessName != value {
                             tab.foregroundProcessName = value
                         }
@@ -336,6 +344,7 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
                     DispatchQueue.main.async {
                         guard let tab = weakTab.value else { return }
                         tab.foregroundProcessName = nil
+                        tab.reportedTerminalTitle = nil
                         tab.lastExitCode = exit
                         tab.progressState = nil
                         tab.progressValue = nil
