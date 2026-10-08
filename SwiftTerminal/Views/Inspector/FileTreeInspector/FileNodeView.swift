@@ -21,6 +21,7 @@ struct FileNodeView: View {
             )) {
                 ForEach(item.children!) { child in
                     FileNodeView(item: child)
+                        .id(child.id)
                 }
             } label: {
                 FileRowView(item: item)
@@ -53,6 +54,14 @@ struct FileNodeView: View {
                 }
                 .contextMenu { FileTreeContextMenu(item: item, onAction: onAction) }
                 .listRowSeparator(.hidden)
+                .task(id: state.pendingRevealID) {
+                    guard state.pendingRevealID == item.id else { return }
+                    if state.selectedID == item.id {
+                        state.pendingRevealID = nil
+                    } else {
+                        state.selectedID = item.id
+                    }
+                }
         }
     }
 }

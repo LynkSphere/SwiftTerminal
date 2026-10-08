@@ -15,11 +15,8 @@ final class InspectorViewState {
             fileTree.expandedIDs.insert(parent.path)
             parent = parent.deletingLastPathComponent()
         }
+        fileTree.pendingRevealID = url.path
         selectedTab = .files
-        // Delay selection so the FileTreeView's List is rendered first
-        DispatchQueue.main.async { [self] in
-            fileTree.selectedID = url.path
-        }
     }
 }
 
@@ -44,6 +41,7 @@ struct InspectorSelection<Value: Equatable>: Equatable {
 final class FileTreeInspectorState {
     var model = FileTreeModel()
     var selectedID: FileItem.ID?
+    var pendingRevealID: FileItem.ID?
     var expandedIDs: Set<String> = []
     var savedExpandedIDs: Set<String>?
     var searchFocusTrigger = 0

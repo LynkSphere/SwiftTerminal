@@ -8,113 +8,154 @@ struct FileTreeView: View {
     @Environment(AppState.self) private var appState
     @AppStorage("showHiddenFiles") private var showHiddenFiles = false
     @State private var pendingTrashURL: URL?
+    @State private var revealScrollTask: Task<Void, Never>?
 
     var body: some View {
-        List(selection: $state.selectedID) {
-            ForEach(state.model.displayItems) { item in
-                FileNodeView(item: item)
-                    .tag(item.id)
-            }
-        }
-        .environment(state)
-        .environment(\.fileTreeAction, handleAction)
-        .scrollContentBackground(.hidden)
-        .contextMenu(forSelectionType: String.self) { selectedIDs in
-            if let id = selectedIDs.first,
-               let item = state.model.findItem(id: id) {
-                FileTreeContextMenu(item: item, onAction: handleAction)
-            }
-        } primaryAction: { selectedIDs in
-            for id in selectedIDs {
-                if let item = state.model.findItem(id: id), !item.isDirectory {
-                    editorPanel.openFile(item.url)
+        ScrollViewReader { proxy in
+            List(selection: $state.selectedID) {
+                ForEach(state.model.displayItems) { item in
+                    FileNodeView(item: item)
+                        .id(item.id)
+                        .tag(item.id)
                 }
             }
-        }
-        .contextMenu {
-            Button { handleAction(.newFile(directoryURL)) } label: {
-                Label("New File", systemImage: "doc.badge.plus")
-            }
-            Button { handleAction(.newFolder(directoryURL)) } label: {
-                Label("New Folder", systemImage: "folder.badge.plus")
-            }
-            Divider()
-            Toggle("Show Hidden Files", isOn: $showHiddenFiles)
-        }
-        .safeAreaBar(edge: .bottom) {
-            SearchBar(
-                text: $state.model.searchText,
-                placeholder: "Search for Files",
-                focusTrigger: state.searchFocusTrigger,
-                isLoading: state.model.isSearching,
-                onSubmit: submitSearch
-            ) {
-                Button(action: toggleChangedFilter) {
-                    Image(systemName: state.model.showChangedOnly ? "plusminus.circle.fill" : "plusminus.circle")
-                        .foregroundStyle(state.model.showChangedOnly ? Color.accentColor : .secondary)
-                }
-                .buttonStyle(.plain)
-                .help("Show only git-changed files")
-            }
-            .padding(11)
-        }
-        .task(id: directoryURL) {
-            state.model.showHiddenFiles = showHiddenFiles
-            state.model.load(directoryURL: directoryURL)
-            await state.model.refreshGit(directoryURL: directoryURL)
-        }
-        .watchFileSystem(at: directoryURL) {
-            state.model.load(directoryURL: directoryURL)
-            Task { await state.model.refreshGit(directoryURL: directoryURL) }
-        }
-        .alert(
-            "Move to Trash?",
-            isPresented: Binding(
-                get: { pendingTrashURL != nil },
-                set: { if !$0 { pendingTrashURL = nil } }
-            ),
-            presenting: pendingTrashURL
-        ) { url in
-            Button("Move to Trash", role: .confirm) {
-                state.model.moveToTrash(url: url, directoryURL: directoryURL)
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: { url in
-            Text("Are you sure you want to move \u{201C}\(url.lastPathComponent)\u{201D} to the Trash?")
-        }
-        .onChange(of: state.model.searchText) {
-            if state.model.searchText.isEmpty && !state.model.submittedSearchText.isEmpty {
-                state.model.clearSearch()
-            }
-        }
-        .onChange(of: state.model.submittedSearchText) { oldValue, newValue in
-            if !newValue.isEmpty && oldValue.isEmpty {
-                if state.savedExpandedIDs == nil {
-                    state.savedExpandedIDs = state.expandedIDs
-                }
-            } else if newValue.isEmpty && !oldValue.isEmpty && !state.model.showChangedOnly {
-                if let saved = state.savedExpandedIDs {
-                    state.expandedIDs = saved
-                    state.savedExpandedIDs = nil
+            .onChange(of: state.pendingRevealID, initial: true) { _, id in
+                if let id {
+                    scrollToFile(id, using: proxy)
                 }
             }
-        }
-        .onChange(of: state.model.filteredItems) {
-            if state.model.hasActiveFilter {
-                expandAllFolders(in: state.model.displayItems)
+            .onChange(of: state.model.displayItems) {
+                if let id = state.pendingRevealID {
+                    scrollToFile(id, using: proxy)
+                }
+            }
+            .onDisappear { revealScrollTask?.cancel() }
+            .onChange(of: directoryURL) { revealScrollTask?.cancel() }
+            .environment(state)
+            .environment(\.fileTreeAction, handleAction)
+            .scrollContentBackground(.hidden)
+            .contextMenu(forSelectionType: String.self) { selectedIDs in
+                if let id = selectedIDs.first,
+                   let item = state.model.findItem(id: id) {
+                    FileTreeContextMenu(item: item, onAction: handleAction)
+                }
+            } primaryAction: { selectedIDs in
+                for id in selectedIDs {
+                    if let item = state.model.findItem(id: id), !item.isDirectory {
+                        editorPanel.openFile(item.url)
+                    }
+                }
+            }
+            .contextMenu {
+                Button { handleAction(.newFile(directoryURL)) } label: {
+                    Label("New File", systemImage: "doc.badge.plus")
+                }
+                Button { handleAction(.newFolder(directoryURL)) } label: {
+                    Label("New Folder", systemImage: "folder.badge.plus")
+                }
+                Divider()
+                Toggle("Show Hidden Files", isOn: $showHiddenFiles)
+            }
+            .safeAreaBar(edge: .bottom) {
+                SearchBar(
+                    text: $state.model.searchText,
+                    placeholder: "Search for Files",
+                    focusTrigger: state.searchFocusTrigger,
+                    isLoading: state.model.isSearching,
+                    onSubmit: submitSearch
+                ) {
+                    Button(action: toggleChangedFilter) {
+                        Image(systemName: state.model.showChangedOnly ? "plusminus.circle.fill" : "plusminus.circle")
+                            .foregroundStyle(state.model.showChangedOnly ? Color.accentColor : .secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Show only git-changed files")
+                }
+                .padding(11)
+            }
+            .task(id: directoryURL) {
+                state.model.showHiddenFiles = showHiddenFiles
+                state.model.load(directoryURL: directoryURL)
+                await state.model.refreshGit(directoryURL: directoryURL)
+            }
+            .watchFileSystem(at: directoryURL) {
+                state.model.load(directoryURL: directoryURL)
+                Task { await state.model.refreshGit(directoryURL: directoryURL) }
+            }
+            .alert(
+                "Move to Trash?",
+                isPresented: Binding(
+                    get: { pendingTrashURL != nil },
+                    set: { if !$0 { pendingTrashURL = nil } }
+                ),
+                presenting: pendingTrashURL
+            ) { url in
+                Button("Move to Trash", role: .confirm) {
+                    state.model.moveToTrash(url: url, directoryURL: directoryURL)
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: { url in
+                Text("Are you sure you want to move \u{201C}\(url.lastPathComponent)\u{201D} to the Trash?")
+            }
+            .onChange(of: state.model.searchText) {
+                if state.model.searchText.isEmpty && !state.model.submittedSearchText.isEmpty {
+                    state.model.clearSearch()
+                }
+            }
+            .onChange(of: state.model.submittedSearchText) { oldValue, newValue in
+                if !newValue.isEmpty && oldValue.isEmpty {
+                    if state.savedExpandedIDs == nil {
+                        state.savedExpandedIDs = state.expandedIDs
+                    }
+                } else if newValue.isEmpty && !oldValue.isEmpty && !state.model.showChangedOnly {
+                    if let saved = state.savedExpandedIDs {
+                        state.expandedIDs = saved
+                        state.savedExpandedIDs = nil
+                    }
+                }
+            }
+            .onChange(of: state.model.filteredItems) {
+                if state.model.hasActiveFilter {
+                    expandAllFolders(in: state.model.displayItems)
+                }
+            }
+            .onChange(of: showHiddenFiles) {
+                state.model.showHiddenFiles = showHiddenFiles
+                state.model.load(directoryURL: directoryURL)
+            }
+            .onChange(of: InspectorSelection(state, state.selectedID)) { old, new in
+                guard old.owner == new.owner,
+                      let id = new.selection,
+                      let item = state.model.findItem(id: id),
+                      !item.isDirectory
+                else { return }
+                if state.pendingRevealID == id {
+                    state.pendingRevealID = nil
+                    return
+                }
+                editorPanel.openFile(item.url)
             }
         }
-        .onChange(of: showHiddenFiles) {
-            state.model.showHiddenFiles = showHiddenFiles
-            state.model.load(directoryURL: directoryURL)
+    }
+
+    private func scrollToFile(_ id: String, using proxy: ScrollViewProxy) {
+        revealScrollTask?.cancel()
+        var targets = [id]
+        var parent = URL(fileURLWithPath: id).deletingLastPathComponent()
+        while parent.path.hasPrefix(directoryURL.path + "/") {
+            targets.append(parent.path)
+            parent = parent.deletingLastPathComponent()
         }
-        .onChange(of: InspectorSelection(state, state.selectedID)) { old, new in
-            guard old.owner == new.owner,
-                  let id = new.selection,
-                  let item = state.model.findItem(id: id),
-                  !item.isDirectory
-            else { return }
-            editorPanel.openFile(item.url)
+        revealScrollTask = Task { @MainActor in
+            // Offscreen disclosure groups create their child rows only after scrolling into view.
+            for target in targets.reversed() {
+                do {
+                    try await Task.sleep(for: .milliseconds(5))
+                } catch {
+                    return
+                }
+                proxy.scrollTo(target, anchor: .center)
+            }
         }
     }
 
