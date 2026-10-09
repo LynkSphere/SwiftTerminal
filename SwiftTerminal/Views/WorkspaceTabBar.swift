@@ -1,37 +1,32 @@
 import SwiftUI
 
-struct DocumentTabBar: View {
+struct WorkspaceTabBar: View {
     @Environment(AppState.self) private var appState
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("hideTabBarWithSingleTab") private var hideTabBarWithSingleTab = false
     let workspace: Workspace
     @State private var hoveredTabID: UUID?
     @State private var dragModel = TabDragViewModel()
-    @State private var renamingTab: Terminal?
+    @State private var renamingTab: WorkspaceTab?
     @State private var hoveredCloseTabID: UUID?
 
     var body: some View {
-        let terminals = workspace.terminals
-        let isVisible = terminals.count > 1 || (terminals.count == 1 && !hideTabBarWithSingleTab)
-        tabContent(terminals: terminals)
+        let tabs = workspace.tabs
+        let isVisible = tabs.count > 1 || (tabs.count == 1 && !hideTabBarWithSingleTab)
+        tabContent(tabs: tabs)
             .frame(height: isVisible ? nil : 0)
             .opacity(isVisible ? 1 : 0)
             .allowsHitTesting(isVisible)
     }
 
     @ViewBuilder
-    private func tabContent(terminals: [Terminal]) -> some View {
+    private func tabContent(tabs: [WorkspaceTab]) -> some View {
         HStack(spacing: 5) {
-            tabStrip(terminals: terminals)
-            Button("New Tab", systemImage: "plus") {
-                let terminal = workspace.addTerminal(
-                    currentDirectory: appState.selectedTerminal?.currentDirectory,
-                    after: appState.selectedTerminal
-                )
-                appState.selectedTerminal = terminal
-            }
+            tabStrip(tabs: tabs)
+
+            Button("New Tab", systemImage: "plus", action: newTerminal)
             .labelStyle(.iconOnly)
-            .help("New Tab")
+            .help("New terminal tab")
             .controlSize(.large)
             .buttonStyle(.glass)
             .buttonBorderShape(.circle)
@@ -43,13 +38,21 @@ struct DocumentTabBar: View {
             Button("Cancel", role: .cancel) { renamingTab = nil }
             Button("Done", role: .confirm) { renamingTab = nil }
         } message: { _ in
-            Text("Set a custom name for this terminal tab.")
+            Text("Set a custom name for this tab.")
         }
     }
 
-    private func tabStrip(terminals: [Terminal]) -> some View {
+    private func newTerminal() {
+        let tab = workspace.addTerminal(
+            currentDirectory: appState.selectedPane?.terminal?.currentDirectory,
+            after: appState.selectedTab
+        )
+        appState.selectedTab = tab
+    }
+
+    private func tabStrip(tabs: [WorkspaceTab]) -> some View {
         GeometryReader { proxy in
-            let tabCount = max(terminals.count, 1)
+            let tabCount = max(tabs.count, 1)
             let separatorWidth: CGFloat = 5
             let totalSeparators = CGFloat(max(tabCount - 1, 0)) * separatorWidth
             let tabWidth = max((proxy.size.width - totalSeparators) / CGFloat(tabCount), 90)
@@ -58,11 +61,11 @@ struct DocumentTabBar: View {
 
             ScrollView(.horizontal) {
                 HStack(spacing: 0) {
-                    ForEach(terminals.enumerated(), id: \.element.id) { index, terminal in
+                    ForEach(tabs.enumerated(), id: \.element.id) { index, tab in
                         if index > 0 {
-                            separator(before: index, in: terminals)
+                            separator(before: index, in: tabs)
                         }
-                        tabItem(terminal, index: index, width: tabWidth, tabStride: tabStride, in: terminals)
+                        tabItem(tab, index: index, width: tabWidth, tabStride: tabStride, in: tabs)
                     }
                 }
                 .frame(minWidth: contentWidth, alignment: .leading)
@@ -84,26 +87,26 @@ struct DocumentTabBar: View {
     }
 
     @ViewBuilder
-    private func tabItem(_ terminal: Terminal, index: Int, width: CGFloat, tabStride: CGFloat, in terminals: [Terminal]) -> some View {
-        let isSelected = appState.selectedTerminal === terminal
-        let isHovered = hoveredTabID == terminal.id
-        let isDragging = dragModel.draggedTabID == terminal.id
+    private func tabItem(_ tab: WorkspaceTab, index: Int, width: CGFloat, tabStride: CGFloat, in tabs: [WorkspaceTab]) -> some View {
+        let isSelected = appState.selectedTab === tab
+        let isHovered = hoveredTabID == tab.id
+        let isDragging = dragModel.draggedTabID == tab.id
         let isFloating = isDragging && dragModel.isDetached
-        let isMergeTarget = dragModel.mergeTargetID == terminal.id
+        let isMergeTarget = dragModel.mergeTargetID == tab.id
         let computedOffset = dragModel.offset(
-            for: terminal,
+            for: tab,
             at: index,
             tabStride: tabStride,
-            tabCount: terminals.count
+            tabCount: tabs.count
         )
 
         Button {
-            appState.selectTabIfPresent(terminal, in: workspace)
+            appState.selectTabIfPresent(tab, in: workspace)
         } label: {
             HStack(spacing: 0) {
                 Color.clear.frame(width: 10, height: 10)
 
-                Text(terminal.displayTitle)
+                Text(tab.displayTitle)
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundStyle(isSelected ? .primary : .secondary)
@@ -111,7 +114,7 @@ struct DocumentTabBar: View {
                     .truncationMode(.middle)
                     .frame(maxWidth: .infinity, alignment: .center)
 
-                trailingIndicator(for: terminal)
+                trailingIndicator(for: tab)
             }
             .padding(.vertical, 5)
             .padding(.horizontal, 10)
@@ -139,14 +142,14 @@ struct DocumentTabBar: View {
             y: isFloating ? 4 : 0
         )
         .zIndex(isDragging ? 2 : isMergeTarget ? 1 : 0)
-        .animation(.default, value: terminals.count)
+        .animation(.default, value: tabs.count)
         .animation(.snappy(duration: 0.18), value: dragModel.isDetached)
         .animation(.snappy(duration: 0.18), value: dragModel.mergeTargetID)
         .animation(.snappy(duration: 0.18), value: dragModel.currentIndex)
         .overlay(alignment: .leading) {
-            if isHovered && terminals.count > 1 && dragModel.draggedTabID == nil {
+            if isHovered && tabs.count > 1 && dragModel.draggedTabID == nil {
                 Button("Close Tab", systemImage: "xmark") {
-                    closeTerminal(terminal)
+                    appState.requestCloseTab(tab)
                 }
                 .labelStyle(.iconOnly)
                 .font(.caption2)
@@ -154,12 +157,12 @@ struct DocumentTabBar: View {
                 .frame(width: 16, height: 16)
                 .background(
                     Circle()
-                        .fill(hoveredCloseTabID == terminal.id ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear))
+                        .fill(hoveredCloseTabID == tab.id ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear))
                 )
                 .contentShape(.circle)
                 .buttonStyle(.plain)
                 .onHover { isHovering in
-                    hoveredCloseTabID = isHovering ? terminal.id : (hoveredCloseTabID == terminal.id ? nil : hoveredCloseTabID)
+                    hoveredCloseTabID = isHovering ? tab.id : (hoveredCloseTabID == tab.id ? nil : hoveredCloseTabID)
                 }
                 .padding(.leading, 6)
             }
@@ -167,19 +170,19 @@ struct DocumentTabBar: View {
         .buttonStyle(.plain)
         .contextMenu {
             Button("Rename", systemImage: "pencil") {
-                renamingTab = terminal
+                renamingTab = tab
             }
         }
         .simultaneousGesture(
             DragGesture(minimumDistance: 4, coordinateSpace: .named("tabStrip"))
                 .onChanged { value in
                     dragModel.update(
-                        terminal: terminal,
+                        tab: tab,
                         translation: value.translation,
                         location: value.location,
                         tabWidth: width,
                         tabStride: tabStride,
-                        terminals: terminals
+                        tabs: tabs
                     )
                 }
                 .onEnded { _ in
@@ -188,7 +191,7 @@ struct DocumentTabBar: View {
         )
         .help("Drag sideways to reorder. Pull down, then drop on another tab to merge.")
         .onHover { isHovering in
-            hoveredTabID = isHovering ? terminal.id : (hoveredTabID == terminal.id ? nil : hoveredTabID)
+            hoveredTabID = isHovering ? tab.id : (hoveredTabID == tab.id ? nil : hoveredTabID)
         }
     }
 
@@ -198,13 +201,13 @@ struct DocumentTabBar: View {
     /// so the spinner stays out of interactive sessions. The bell dot
     /// overlays the progress circle so both can show simultaneously.
     @ViewBuilder
-    private func trailingIndicator(for terminal: Terminal) -> some View {
+    private func trailingIndicator(for tab: WorkspaceTab) -> some View {
         Group {
-            if terminal.hasBellNotification {
+            if tab.focusedPane.terminal?.hasBellNotification == true {
                 Circle()
                     .fill(.orange)
                     .frame(width: 6, height: 6)
-            } else if let value = terminal.progressValue, terminal.progressState != .indeterminate {
+            } else if let value = tab.focusedPane.terminal?.progressValue, tab.focusedPane.terminal?.progressState != .indeterminate {
                 if value >= 100 {
                     Circle()
                         .fill(.secondary)
@@ -213,9 +216,9 @@ struct DocumentTabBar: View {
                     ProgressView(value: Double(value), total: 100)
                         .progressViewStyle(.circular)
                         .controlSize(.mini)
-                        .tint(terminal.progressState == .error ? .red : nil)
+                        .tint(tab.focusedPane.terminal?.progressState == .error ? .red : nil)
                 }
-            } else if terminal.progressState == .indeterminate {
+            } else if tab.focusedPane.terminal?.progressState == .indeterminate {
                 ProgressView()
                     .controlSize(.mini)
             } else {
@@ -235,10 +238,10 @@ struct DocumentTabBar: View {
         return isHovered ? AnyShapeStyle(.quinary) : AnyShapeStyle(.clear)
     }
 
-    private func separator(before index: Int, in terminals: [Terminal]) -> some View {
-        let show = index > 0 && index < terminals.count
-            && appState.selectedTerminal !== terminals[index - 1]
-            && appState.selectedTerminal !== terminals[index]
+    private func separator(before index: Int, in tabs: [WorkspaceTab]) -> some View {
+        let show = index > 0 && index < tabs.count
+            && appState.selectedTab !== tabs[index - 1]
+            && appState.selectedTab !== tabs[index]
 
         return Rectangle()
             .fill(.separator)
@@ -247,28 +250,4 @@ struct DocumentTabBar: View {
             .opacity(show ? 1 : 0)
     }
 
-    private func closeTerminal(_ terminal: Terminal) {
-        if appState.paneTerminals(for: terminal).contains(where: { $0.hasChildProcess }) {
-            appState.terminalPendingClose = terminal
-            return
-        }
-        performClose(terminal)
-    }
-
-    private func performClose(_ terminal: Terminal) {
-        if appState.selectedTerminal === terminal {
-            let terminals = workspace.terminals
-            if let idx = terminals.firstIndex(where: { $0 === terminal }) {
-                if idx + 1 < terminals.count {
-                    appState.selectedTerminal = terminals[idx + 1]
-                } else if idx > 0 {
-                    appState.selectedTerminal = terminals[idx - 1]
-                } else {
-                    appState.selectedTerminal = nil
-                }
-            }
-        }
-        appState.tearDownPanes(for: terminal)
-        workspace.closeTerminal(terminal)
-    }
 }

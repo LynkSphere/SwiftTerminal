@@ -200,8 +200,8 @@ struct FileTreeView: View {
 
         case .openInTerminal(let url):
             guard let workspace = appState.selectedWorkspace else { return }
-            let tab = workspace.addTerminal(currentDirectory: url.path, after: appState.selectedTerminal)
-            appState.selectedTerminal = tab
+            let tab = workspace.addTerminal(currentDirectory: url.path, after: appState.selectedTab)
+            appState.selectedTab = tab
 
         case .rename(let item):
             state.renamingID = item.id

@@ -33,32 +33,22 @@ struct AppCommands: Commands {
 
         if mainWindowActive {
             SidebarCommands()
-            
+
             InspectorCommands()
-            
+
             // Override the system's File > Close (Cmd+W) to close the active tab instead of the window
             CommandGroup(after: .newItem) {
                 Button {
                     guard let workspace = appState.selectedWorkspace,
-                          let terminal = appState.selectedTerminal else { return }
+                          let terminal = appState.selectedTab else { return }
                     // In a split tab, Cmd+W closes the focused pane, not the tab.
-                    if appState.isTabSplit(terminal) {
-                        let pane = appState.resolvedFocusedPane(for: terminal)
-                        if pane.hasChildProcess {
-                            appState.panePendingClose = pane
-                        } else {
-                            appState.closePane(pane, in: terminal)
-                        }
+                    if terminal.isSplit {
+                        let pane = terminal.focusedPane
+                        appState.requestClosePane(pane, in: terminal)
                         return
                     }
-                    guard workspace.terminals.count > 1 else { return }
-                    if terminal.hasChildProcess {
-                        appState.terminalPendingClose = terminal
-                    } else {
-                        let next = workspace.terminalAfter(terminal) ?? workspace.terminalBefore(terminal)
-                        workspace.closeTerminal(terminal)
-                        appState.selectedTerminal = next
-                    }
+                    guard workspace.tabs.count > 1 else { return }
+                    appState.requestCloseTab(terminal)
                 } label: {
                     Label("Close Tab", systemImage: "xmark.square")
                 }
@@ -67,7 +57,7 @@ struct AppCommands: Commands {
 
             CommandGroup(replacing: .toolbar) {
                 Button {
-                    appState.selectedTerminal?.increaseFontSize()
+                    appState.selectedPane?.terminal?.increaseFontSize()
                     editorFontSize = min(editorFontSize + 0.5, EditorFontSize.max)
                 } label: {
                     Label("Zoom In", systemImage: "plus.magnifyingglass")
@@ -75,7 +65,7 @@ struct AppCommands: Commands {
                 .keyboardShortcut("+", modifiers: .command)
 
                 Button {
-                    appState.selectedTerminal?.decreaseFontSize()
+                    appState.selectedPane?.terminal?.decreaseFontSize()
                     editorFontSize = max(editorFontSize - 0.5, EditorFontSize.min)
                 } label: {
                     Label("Zoom Out", systemImage: "minus.magnifyingglass")
@@ -83,7 +73,7 @@ struct AppCommands: Commands {
                 .keyboardShortcut("-", modifiers: .command)
 
                 Button {
-                    appState.selectedTerminal?.resetFontSize()
+                    appState.selectedPane?.terminal?.resetFontSize()
                     editorFontSize = EditorFontSize.default
                 } label: {
                     Label("Actual Size", systemImage: "1.magnifyingglass")
@@ -224,10 +214,10 @@ struct AppCommands: Commands {
                 Button {
                     guard let workspace = appState.selectedWorkspace else { return }
                     let terminal = workspace.addTerminal(
-                        currentDirectory: appState.selectedTerminal?.currentDirectory,
-                        after: appState.selectedTerminal
+                        currentDirectory: appState.selectedPane?.terminal?.currentDirectory,
+                        after: appState.selectedTab
                     )
-                    appState.selectedTerminal = terminal
+                    appState.selectedTab = terminal
                 } label: {
                     Label("New Tab", systemImage: "plus.square")
                 }
@@ -238,9 +228,9 @@ struct AppCommands: Commands {
                     guard let workspace = appState.selectedWorkspace else { return }
                     let terminal = workspace.addTerminal(
                         currentDirectory: workspace.directory,
-                        after: appState.selectedTerminal
+                        after: appState.selectedTab
                     )
-                    appState.selectedTerminal = terminal
+                    appState.selectedTab = terminal
                 } label: {
                     Label("New Tab in Workspace", systemImage: "plus.square.on.square")
                 }
@@ -251,35 +241,35 @@ struct AppCommands: Commands {
 
                 Button {
                     guard let workspace = appState.selectedWorkspace,
-                          let current = appState.selectedTerminal,
-                          let prev = workspace.terminalBefore(current) else { return }
-                    appState.selectedTerminal = prev
+                          let current = appState.selectedTab,
+                          let prev = workspace.tabBefore(current) else { return }
+                    appState.selectedTab = prev
                 } label: {
                     Label("Select Previous Tab", systemImage: "chevron.left.square")
                 }
                 .keyboardShortcut("[", modifiers: [.command, .shift])
-                .disabled((appState.selectedWorkspace?.terminals.count ?? 0) < 2)
+                .disabled((appState.selectedWorkspace?.tabs.count ?? 0) < 2)
 
                 Button {
                     guard let workspace = appState.selectedWorkspace,
-                          let current = appState.selectedTerminal,
-                          let next = workspace.terminalAfter(current) else { return }
-                    appState.selectedTerminal = next
+                          let current = appState.selectedTab,
+                          let next = workspace.tabAfter(current) else { return }
+                    appState.selectedTab = next
                 } label: {
                     Label("Select Next Tab", systemImage: "chevron.right.square")
                 }
                 .keyboardShortcut("]", modifiers: [.command, .shift])
-                .disabled((appState.selectedWorkspace?.terminals.count ?? 0) < 2)
+                .disabled((appState.selectedWorkspace?.tabs.count ?? 0) < 2)
 
                 Divider()
 
                 Button {
-                    appState.actionTargetPane?.clearTerminal()
+                    appState.selectedPane?.terminal?.clearTerminal()
                 } label: {
                     Label("Clear Terminal", systemImage: "clear")
                 }
                 .keyboardShortcut("k", modifiers: .command)
-                .disabled(appState.actionTargetPane?.localProcessTerminalView == nil)
+                .disabled(appState.selectedPane?.terminal?.localProcessTerminalView == nil)
 
                 Divider()
 
@@ -289,7 +279,7 @@ struct AppCommands: Commands {
                     Label("Split Right", systemImage: "rectangle.split.2x1")
                 }
                 .keyboardShortcut("\\", modifiers: .command)
-                .disabled(appState.selectedTerminal == nil)
+                .disabled(appState.selectedTab == nil)
 
                 Button {
                     appState.splitActivePane(.vertical)
@@ -297,7 +287,7 @@ struct AppCommands: Commands {
                     Label("Split Down", systemImage: "rectangle.split.1x2")
                 }
                 .keyboardShortcut("\\", modifiers: [.command, .shift])
-                .disabled(appState.selectedTerminal == nil)
+                .disabled(appState.selectedTab == nil)
 
                 Divider()
 
@@ -307,7 +297,7 @@ struct AppCommands: Commands {
                     Label("Focus Pane Left", systemImage: "arrow.left")
                 }
                 .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
-                .disabled(appState.selectedTerminal.map { !appState.isTabSplit($0) } ?? true)
+                .disabled(appState.selectedTab.map { !$0.isSplit } ?? true)
 
                 Button {
                     appState.movePaneFocus(.right)
@@ -315,7 +305,7 @@ struct AppCommands: Commands {
                     Label("Focus Pane Right", systemImage: "arrow.right")
                 }
                 .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
-                .disabled(appState.selectedTerminal.map { !appState.isTabSplit($0) } ?? true)
+                .disabled(appState.selectedTab.map { !$0.isSplit } ?? true)
 
                 Button {
                     appState.movePaneFocus(.up)
@@ -323,7 +313,7 @@ struct AppCommands: Commands {
                     Label("Focus Pane Up", systemImage: "arrow.up")
                 }
                 .keyboardShortcut(.upArrow, modifiers: [.command, .option])
-                .disabled(appState.selectedTerminal.map { !appState.isTabSplit($0) } ?? true)
+                .disabled(appState.selectedTab.map { !$0.isSplit } ?? true)
 
                 Button {
                     appState.movePaneFocus(.down)
@@ -331,7 +321,7 @@ struct AppCommands: Commands {
                     Label("Focus Pane Down", systemImage: "arrow.down")
                 }
                 .keyboardShortcut(.downArrow, modifiers: [.command, .option])
-                .disabled(appState.selectedTerminal.map { !appState.isTabSplit($0) } ?? true)
+                .disabled(appState.selectedTab.map { !$0.isSplit } ?? true)
             }
         }
     }

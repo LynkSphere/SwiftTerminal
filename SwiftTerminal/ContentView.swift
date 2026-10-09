@@ -15,7 +15,6 @@ struct ContentView: View {
         } detail: {
             if let workspace = appState.selectedWorkspace {
                 WorkspaceDetailView(workspace: workspace)
-                    // .id(workspace.id)
             } else {
                 ContentUnavailableView(
                     "No Workspace Selected",
@@ -75,8 +74,10 @@ struct ContentView: View {
 
             if let workspace = store.workspaces.first(where: { $0.id.uuidString == workspaceID }) {
                 appState.selectedWorkspace = workspace
-                if let terminal = workspace.terminals.first(where: { $0.id.uuidString == terminalID }) {
-                    appState.selectedTerminal = terminal
+                if let tab = workspace.tabs.first(where: { $0.panes.contains { $0.terminal?.id.uuidString == terminalID } }),
+                   let pane = tab.panes.first(where: { $0.terminal?.id.uuidString == terminalID }) {
+                    appState.selectedTab = tab
+                    tab.focus(pane)
                 }
             }
         }

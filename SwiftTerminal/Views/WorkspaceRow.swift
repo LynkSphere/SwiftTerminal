@@ -174,7 +174,7 @@ struct WorkspaceRow: View {
             Button(role: .destructive) {
                 if appState.selectedWorkspace === workspace {
                     appState.selectedWorkspace = nil
-                    appState.selectedTerminal = nil
+                    appState.selectedTab = nil
                 }
                 store.deleteWorkspace(workspace)
             } label: {
@@ -211,7 +211,7 @@ struct WorkspaceRow: View {
         if !workspace.isArchived {
             if appState.selectedWorkspace === workspace {
                 appState.selectedWorkspace = nil
-                appState.selectedTerminal = nil
+                appState.selectedTab = nil
             }
             workspace.killAllRunningTerminals()
         }

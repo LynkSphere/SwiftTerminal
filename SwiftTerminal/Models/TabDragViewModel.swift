@@ -16,15 +16,15 @@ final class TabDragViewModel {
     private(set) var mergeTargetID: UUID?
 
     func update(
-        terminal: Terminal,
+        tab: WorkspaceTab,
         translation: CGSize,
         location: CGPoint,
         tabWidth: CGFloat,
         tabStride: CGFloat,
-        terminals: [Terminal]
+        tabs: [WorkspaceTab]
     ) {
-        beginIfNeeded(terminal: terminal, terminals: terminals)
-        guard draggedTabID == terminal.id, let originalIndex else { return }
+        beginIfNeeded(tab: tab, tabs: tabs)
+        guard draggedTabID == tab.id, let originalIndex else { return }
 
         self.translation = translation
 
@@ -36,22 +36,22 @@ final class TabDragViewModel {
         if isDetached {
             mergeTargetID = mergeTarget(
                 at: location,
-                sourceID: terminal.id,
+                sourceID: tab.id,
                 tabWidth: tabWidth,
                 tabStride: tabStride,
-                terminals: terminals
+                tabs: tabs
             )?.id
             return
         }
 
-        let maximumIndex = max(terminals.count - 1, 0)
-        let stepsMoved = Int((clampedHorizontalOffset(tabStride: tabStride, count: terminals.count) / tabStride).rounded())
+        let maximumIndex = max(tabs.count - 1, 0)
+        let stepsMoved = Int((clampedHorizontalOffset(tabStride: tabStride, count: tabs.count) / tabStride).rounded())
         currentIndex = max(0, min(maximumIndex, originalIndex + stepsMoved))
         mergeTargetID = nil
     }
 
-    func offset(for terminal: Terminal, at index: Int, tabStride: CGFloat, tabCount: Int) -> CGSize {
-        if terminal.id == draggedTabID {
+    func offset(for tab: WorkspaceTab, at index: Int, tabStride: CGFloat, tabCount: Int) -> CGSize {
+        if tab.id == draggedTabID {
             if isDetached {
                 return translation
             }
@@ -80,13 +80,13 @@ final class TabDragViewModel {
         defer { reset() }
 
         guard let draggedTabID,
-              let source = workspace.terminals.first(where: { $0.id == draggedTabID }) else {
+              let source = workspace.tabs.first(where: { $0.id == draggedTabID }) else {
             return
         }
 
         if isDetached {
             guard let mergeTargetID,
-                  let destination = workspace.terminals.first(where: { $0.id == mergeTargetID }) else {
+                  let destination = workspace.tabs.first(where: { $0.id == mergeTargetID }) else {
                 return
             }
             appState.moveTab(source, into: destination, axis: .horizontal)
@@ -99,10 +99,10 @@ final class TabDragViewModel {
             return
         }
 
-        var reordered = workspace.terminals
+        var reordered = workspace.tabs
         reordered.remove(at: originalIndex)
         reordered.insert(source, at: currentIndex)
-        workspace.reorderTerminals(reordered)
+        workspace.reorderTabs(reordered)
     }
 
     func reset() {
@@ -114,13 +114,13 @@ final class TabDragViewModel {
         mergeTargetID = nil
     }
 
-    private func beginIfNeeded(terminal: Terminal, terminals: [Terminal]) {
-        guard draggedTabID != terminal.id,
-              let index = terminals.firstIndex(where: { $0.id == terminal.id }) else {
+    private func beginIfNeeded(tab: WorkspaceTab, tabs: [WorkspaceTab]) {
+        guard draggedTabID != tab.id,
+              let index = tabs.firstIndex(where: { $0.id == tab.id }) else {
             return
         }
 
-        draggedTabID = terminal.id
+        draggedTabID = tab.id
         originalIndex = index
         currentIndex = index
         translation = .zero
@@ -140,19 +140,19 @@ final class TabDragViewModel {
         sourceID: UUID,
         tabWidth: CGFloat,
         tabStride: CGFloat,
-        terminals: [Terminal]
-    ) -> Terminal? {
+        tabs: [WorkspaceTab]
+    ) -> WorkspaceTab? {
         guard Self.tabBarTargetRange.contains(location.y), location.x >= 0 else {
             return nil
         }
 
         let targetIndex = Int(location.x / tabStride)
-        guard terminals.indices.contains(targetIndex) else { return nil }
+        guard tabs.indices.contains(targetIndex) else { return nil }
 
         let positionWithinSlot = location.x - CGFloat(targetIndex) * tabStride
         guard positionWithinSlot <= tabWidth else { return nil }
 
-        let target = terminals[targetIndex]
+        let target = tabs[targetIndex]
         return target.id == sourceID ? nil : target
     }
 }

@@ -1,6 +1,6 @@
 import SwiftUI
 
-@Observable
+@MainActor @Observable
 final class Workspace: Identifiable, Hashable, Codable {
     var id: UUID
     var name: String
@@ -11,12 +11,13 @@ final class Workspace: Identifiable, Hashable, Codable {
     var isArchived: Bool = false
     private(set) var customIconFilename: String?
 
-    private(set) var terminals: [Terminal]
+    private(set) var tabs: [WorkspaceTab]
+    var terminals: [Terminal] { tabs.flatMap(\.panes).compactMap(\.terminal) }
     private(set) var commands: [Terminal]
 
     /// The tab that was active when this workspace was last displayed, so it can
     /// be restored on the next switch back instead of resetting to the first tab.
-    var selectedTerminalID: UUID?
+    var selectedTabID: UUID?
 
     @ObservationIgnored
     weak var store: WorkspaceStore?
@@ -112,7 +113,7 @@ final class Workspace: Identifiable, Hashable, Codable {
         self.directory = directory
         self.projectTypeRaw = ProjectType.unknown.rawValue
         self.scratchPad = ""
-        self.terminals = []
+        self.tabs = []
         self.commands = []
     }
 
@@ -121,7 +122,7 @@ final class Workspace: Identifiable, Hashable, Codable {
     private enum CodingKeys: String, CodingKey {
         case id, name, directory, projectTypeRaw, scratchPad, isArchived
         case customIconFilename
-        case terminals, commands
+        case tabs, terminals, commands
     }
 
     init(from decoder: Decoder) throws {
@@ -136,9 +137,14 @@ final class Workspace: Identifiable, Hashable, Codable {
         self.scratchPad = try c.decodeIfPresent(String.self, forKey: .scratchPad) ?? ""
         self.isArchived = try c.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
         self.customIconFilename = try c.decodeIfPresent(String.self, forKey: .customIconFilename)
-        self.terminals = try c.decodeIfPresent([Terminal].self, forKey: .terminals) ?? []
+        self.tabs = []
         self.commands = try c.decodeIfPresent([Terminal].self, forKey: .commands) ?? []
-        for t in terminals { t.workspace = self }
+        if let savedTabs = try c.decodeIfPresent([TabSnapshot].self, forKey: .tabs) {
+            self.tabs = try savedTabs.map { try WorkspaceTab(snapshot: $0, workspace: self) }
+        } else {
+            let terminals = try c.decodeIfPresent([Terminal].self, forKey: .terminals) ?? []
+            self.tabs = terminals.map { WorkspaceTab(pane: Pane(content: .terminal($0), workspace: self), workspace: self) }
+        }
         for cmd in commands { cmd.workspace = self }
     }
 
@@ -151,7 +157,7 @@ final class Workspace: Identifiable, Hashable, Codable {
         try c.encode(scratchPad, forKey: .scratchPad)
         try c.encode(isArchived, forKey: .isArchived)
         try c.encodeIfPresent(customIconFilename, forKey: .customIconFilename)
-        try c.encode(terminals, forKey: .terminals)
+        try c.encode(tabs.compactMap(\.snapshot), forKey: .tabs)
         try c.encode(commands, forKey: .commands)
     }
 
@@ -165,78 +171,59 @@ final class Workspace: Identifiable, Hashable, Codable {
         hasher.combine(id)
     }
 
-    // MARK: - Terminal Management
+    // MARK: - Tabs
 
     @discardableResult
-    func addTerminal(currentDirectory: String? = nil, after current: Terminal? = nil) -> Terminal {
-        let tab = Terminal(workspace: self, currentDirectory: currentDirectory ?? directory)
-        if let current, let idx = terminals.firstIndex(where: { $0 === current }) {
-            terminals.insert(tab, at: idx + 1)
+    func addTerminal(currentDirectory: String? = nil, after current: WorkspaceTab? = nil) -> WorkspaceTab {
+        addTab(pane: makeTerminalPane(currentDirectory: currentDirectory), after: current)
+    }
+
+    @discardableResult
+    func addTab(pane: Pane, after current: WorkspaceTab? = nil) -> WorkspaceTab {
+        let tab = WorkspaceTab(pane: pane, workspace: self)
+        if let current, let index = tabs.firstIndex(where: { $0 === current }) {
+            tabs.insert(tab, at: index + 1)
         } else {
-            terminals.append(tab)
+            tabs.append(tab)
         }
         store?.scheduleSave()
         return tab
     }
 
-    func closeTerminal(_ tab: Terminal) {
-        tab.terminate()
-        terminals.removeAll { $0.id == tab.id }
-        store?.scheduleSave()
+    func closeTab(_ tab: WorkspaceTab) {
+        guard removeTab(tab) else { return }
+        tab.close()
     }
 
-    /// Removes a terminal from the tab bar without ending its shell. The
-    /// terminal remains alive as a leaf in a split layout.
     @discardableResult
-    func removeTerminalFromTabBar(_ terminal: Terminal) -> Bool {
-        guard let index = terminals.firstIndex(where: { $0 === terminal }) else {
-            return false
-        }
-        terminals.remove(at: index)
+    func removeTab(_ tab: WorkspaceTab) -> Bool {
+        guard let index = tabs.firstIndex(where: { $0 === tab }) else { return false }
+        tabs.remove(at: index)
         store?.scheduleSave()
         return true
     }
 
-    /// Promotes an existing split-pane terminal into the tab bar without
-    /// creating or restarting its shell.
-    func insertTerminalAsTab(_ terminal: Terminal, after current: Terminal) {
-        guard !terminals.contains(where: { $0 === terminal }),
-              let currentIndex = terminals.firstIndex(where: { $0 === current }) else {
-            return
-        }
-        terminal.workspace = self
-        terminals.insert(terminal, at: currentIndex + 1)
+    func makeTerminalPane(currentDirectory: String? = nil) -> Pane {
+        Pane(content: .terminal(Terminal(workspace: self, currentDirectory: currentDirectory ?? directory)), workspace: self)
+    }
+
+    func tab(containing pane: Pane) -> WorkspaceTab? {
+        tabs.first { $0.panes.contains { $0 === pane } }
+    }
+
+    func reorderTabs(_ newOrder: [WorkspaceTab]) {
+        tabs = newOrder
         store?.scheduleSave()
     }
 
-    /// A terminal that lives inside a split layout, not as a tab (not appended to
-    /// `terminals`). Owned by the `AppState` pane tree.
-    func makeDetachedPane(currentDirectory: String?) -> Terminal {
-        Terminal(workspace: self, currentDirectory: currentDirectory ?? directory)
+    func tabBefore(_ tab: WorkspaceTab) -> WorkspaceTab? {
+        guard let index = tabs.firstIndex(where: { $0 === tab }), index > 0 else { return nil }
+        return tabs[index - 1]
     }
 
-    /// Swaps a tab's representative terminal in place, preserving its position,
-    /// when a surviving split pane is promoted to be the tab.
-    func replaceTerminal(_ old: Terminal, with new: Terminal) {
-        guard let idx = terminals.firstIndex(where: { $0 === old }) else { return }
-        new.workspace = self
-        terminals[idx] = new
-        store?.scheduleSave()
-    }
-
-    func reorderTerminals(_ newOrder: [Terminal]) {
-        terminals = newOrder
-        store?.scheduleSave()
-    }
-
-    func terminalBefore(_ terminal: Terminal) -> Terminal? {
-        guard let idx = terminals.firstIndex(where: { $0 === terminal }), idx > 0 else { return nil }
-        return terminals[idx - 1]
-    }
-
-    func terminalAfter(_ terminal: Terminal) -> Terminal? {
-        guard let idx = terminals.firstIndex(where: { $0 === terminal }), idx + 1 < terminals.count else { return nil }
-        return terminals[idx + 1]
+    func tabAfter(_ tab: WorkspaceTab) -> WorkspaceTab? {
+        guard let index = tabs.firstIndex(where: { $0 === tab }), index + 1 < tabs.count else { return nil }
+        return tabs[index + 1]
     }
 
     // MARK: - Command Management
@@ -269,7 +256,7 @@ final class Workspace: Identifiable, Hashable, Codable {
         if inspectorState.selectedCommand?.id == entry.id {
             inspectorState.selectedCommand = nil
         }
-        entry.terminate()
+        entry.close()
         commands.removeAll { $0.id == entry.id }
         store?.scheduleSave()
     }

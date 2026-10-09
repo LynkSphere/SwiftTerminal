@@ -67,7 +67,7 @@ final class WorkspaceStore {
     func save() {
         guard didLoad else { return }
         do {
-            let payload = StorePayload(version: 1, workspaces: workspaces)
+            let payload = StorePayload(version: 2, workspaces: workspaces)
             let data = try JSONEncoder().encode(payload)
             try data.write(to: fileURL, options: [.atomic])
         } catch {
@@ -100,6 +100,9 @@ final class WorkspaceStore {
                 _ = ws.scratchPad
                 _ = ws.isArchived
                 _ = ws.customIconFilename
+                for tab in ws.tabs {
+                    _ = tab.snapshot
+                }
                 for t in ws.terminals {
                     _ = t.title
                     _ = t.currentDirectory
@@ -129,10 +132,10 @@ final class WorkspaceStore {
 
     func deleteWorkspace(_ workspace: Workspace) {
         for cmd in workspace.commands {
-            cmd.terminate()
+            cmd.close()
         }
-        for terminal in workspace.terminals {
-            terminal.terminate()
+        for tab in workspace.tabs {
+            tab.close()
         }
         workspace.clearCustomIcon()
         workspaces.removeAll { $0.id == workspace.id }

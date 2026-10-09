@@ -129,6 +129,7 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
     }
 
     func updateNSView(_ container: NSView, context: Context) {
+        guard !tab.isClosed else { return }
         let coordinator = context.coordinator
         let terminalView: LocalProcessTerminalView
 
@@ -208,7 +209,8 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
             tv.onBell = { [weak tab, weak tv, weak appState] in
                 Task { @MainActor in
                     guard let tab else { return }
-                    let isSelected = appState?.selectedTerminal === tab
+                    let visiblePanes = appState?.selectedTab?.panes ?? []
+                    let isSelected = visiblePanes.contains { $0.terminal === tab }
                     let isVisible = isSelected && (tv?.window != nil)
                     if !isVisible {
                         tab.hasBellNotification = true

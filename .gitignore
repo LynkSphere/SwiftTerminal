@@ -2,5 +2,7 @@ run.sh
 build.sh
 release.sh
 build
+.build/
+.DS_Store
 SwiftTerminal.dmg
 .codex/

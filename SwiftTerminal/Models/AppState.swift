@@ -1,9 +1,9 @@
 import SwiftUI
 
-@Observable
+@MainActor @Observable
 final class AppState {
     var selectedWorkspace: Workspace?
-    var selectedTerminal: Terminal?
+    var selectedTab: WorkspaceTab?
 
     // Drives NavigationSplitView column visibility so we can toggle the
     // sidebar programmatically (e.g. when the bottom editor panel expands).
@@ -13,7 +13,7 @@ final class AppState {
     var showingInspector = true
 
     // Close tab confirmation
-    var terminalPendingClose: Terminal?
+    var tabPendingClose: WorkspaceTab?
 
     // Whether archived workspaces are temporarily revealed in the sidebar.
     var showArchivedWorkspaces = false
@@ -28,12 +28,6 @@ final class AppState {
 
     // MARK: - Split panes
 
-    /// Per-tab split layout, keyed by the tab's representative `Terminal.id`.
-    /// Absent means an unsplit tab. Session-only; never persisted.
-    var paneTrees: [UUID: PaneNode] = [:]
-
-    var focusedPaneID: UUID?
-
     /// A pane awaiting close confirmation because it has a running child process.
-    var panePendingClose: Terminal?
+    var panePendingClose: Pane?
 }

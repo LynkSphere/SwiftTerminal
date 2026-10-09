@@ -1,17 +1,17 @@
 import SwiftUI
 
-/// Recursively lays out a tab's `PaneNode` tree: leaves render a terminal,
+/// Recursively lays out a tab's `PaneNode` tree: leaves render a pane,
 /// branches split their space among children with draggable dividers.
 struct SplitTreeView: View {
     let node: PaneNode
-    let tab: Terminal
+    let tab: WorkspaceTab
     let appState: AppState
 
     private let dividerThickness: CGFloat = 8
 
     var body: some View {
-        if let terminal = node.terminal {
-            PaneView(terminal: terminal, tab: tab, appState: appState)
+        if let pane = node.pane {
+            PaneView(pane: pane, tab: tab, appState: appState)
         } else {
             branchBody
         }

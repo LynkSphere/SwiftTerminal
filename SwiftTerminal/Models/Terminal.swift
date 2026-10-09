@@ -11,7 +11,7 @@ enum TerminalProgressState: Int {
     case pause = 4
 }
 
-@Observable
+@MainActor @Observable
 final class Terminal: Identifiable, Hashable, Codable {
     var id: UUID
 
@@ -21,6 +21,7 @@ final class Terminal: Identifiable, Hashable, Codable {
     /// default rather than an empty string; `displayTitle` handles both forms.
     var title: String
     var currentDirectory: String?
+    private(set) var isClosed = false
 
     /// When set, this terminal represents a saved "command" the user can run on demand.
     /// Sending the script appends a newline so the shell executes it.
@@ -151,6 +152,11 @@ final class Terminal: Identifiable, Hashable, Codable {
 
     var hasChildProcess: Bool {
         foregroundProcessName != nil
+    }
+
+    func close() {
+        isClosed = true
+        terminate()
     }
 
     func terminate() {

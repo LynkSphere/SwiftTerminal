@@ -1,41 +1,26 @@
 import SwiftUI
 
-/// `horizontal`: children side by side. `vertical`: children stacked.
-enum SplitAxis: CaseIterable, Equatable, Hashable, Identifiable {
-    case horizontal
-    case vertical
-
-    var id: Self { self }
-}
-
-enum PaneFocusDirection {
-    case left, right, up, down
-}
-
-/// A node in a tab's split layout: either a *leaf* (one `Terminal`) or a *branch*
-/// (laying out `children` along `axis`). The tab's representative `Terminal` is
-/// always one of the leaves. Session-only; never encoded.
-@Observable
+@MainActor @Observable
 final class PaneNode: Identifiable {
     let id = UUID()
 
     /// Non-nil iff this node is a leaf.
-    var terminal: Terminal?
+    var pane: Pane?
 
     var axis: SplitAxis
     var children: [PaneNode]
     /// Each child's fraction of the branch's length along `axis`; sums to ~1.
     var fractions: [Double]
 
-    init(terminal: Terminal) {
-        self.terminal = terminal
+    init(pane: Pane) {
+        self.pane = pane
         self.axis = .horizontal
         self.children = []
         self.fractions = []
     }
 
     init(axis: SplitAxis, children: [PaneNode], fractions: [Double]? = nil) {
-        self.terminal = nil
+        self.pane = nil
         self.axis = axis
         self.children = children
         if let fractions, fractions.count == children.count {
@@ -46,19 +31,19 @@ final class PaneNode: Identifiable {
         }
     }
 
-    var isLeaf: Bool { terminal != nil }
+    var isLeaf: Bool { pane != nil }
 
-    /// All terminals at the leaves, left-to-right / top-to-bottom.
-    var leafTerminals: [Terminal] {
-        if let terminal { return [terminal] }
-        return children.flatMap { $0.leafTerminals }
+    /// All panes at the leaves, left-to-right / top-to-bottom.
+    var leafPanes: [Pane] {
+        if let pane { return [pane] }
+        return children.flatMap { $0.leafPanes }
     }
 
-    /// The branch directly containing `terminalID`'s leaf and its child index.
-    func parent(of terminalID: UUID) -> (branch: PaneNode, index: Int)? {
+    /// The branch directly containing `paneID`'s leaf and its child index.
+    func parent(of paneID: UUID) -> (branch: PaneNode, index: Int)? {
         for (i, child) in children.enumerated() {
-            if child.terminal?.id == terminalID { return (self, i) }
-            if let found = child.parent(of: terminalID) { return found }
+            if child.pane?.id == paneID { return (self, i) }
+            if let found = child.parent(of: paneID) { return found }
         }
         return nil
     }
@@ -81,7 +66,7 @@ final class PaneNode: Identifiable {
             }
             return true
         }
-        if terminal?.id == targetID {
+        if pane?.id == targetID {
             convertLeafToBranch(self, adding: newLeaf, axis: axis)
             return true
         }
@@ -89,9 +74,9 @@ final class PaneNode: Identifiable {
     }
 
     private func convertLeafToBranch(_ leaf: PaneNode, adding newLeaf: PaneNode, axis: SplitAxis) {
-        guard let term = leaf.terminal else { return }
-        let moved = PaneNode(terminal: term)
-        leaf.terminal = nil
+        guard let term = leaf.pane else { return }
+        let moved = PaneNode(pane: term)
+        leaf.pane = nil
         leaf.axis = axis
         leaf.children = [moved, newLeaf]
         leaf.fractions = [0.5, 0.5]
@@ -118,25 +103,22 @@ final class PaneNode: Identifiable {
         guard !isLeaf else { return }
         for child in children { child.collapse() }
 
-        var newChildren: [PaneNode] = []
-        var newFractions: [Double] = []
-        for (i, child) in children.enumerated() {
-            if !child.isLeaf, child.children.count == 1 {
-                newChildren.append(child.children[0])
-            } else {
-                newChildren.append(child)
-            }
-            newFractions.append(fractions[i])
-        }
-        children = newChildren
-        fractions = newFractions
-
-        // Absorb a lone branch child; a lone leaf child means the tab is unsplit
-        // again and the caller dissolves the tree.
-        if children.count == 1, let only = children.first, !only.isLeaf {
+        if children.count == 1, let only = children.first {
+            pane = only.pane
             axis = only.axis
             fractions = only.fractions
             children = only.children
         }
+    }
+
+    var snapshot: PaneLayoutSnapshot? {
+        if let pane { return pane.terminal.map(PaneLayoutSnapshot.terminal) }
+        let saved = children.enumerated().compactMap { index, child in
+            child.snapshot.map { (layout: $0, fraction: fractions[index]) }
+        }
+        if saved.count == 1 { return saved[0].layout }
+        guard !saved.isEmpty else { return nil }
+        let total = saved.reduce(0) { $0 + $1.fraction }
+        return .split(axis: axis, children: saved.map(\.layout), fractions: saved.map { $0.fraction / total })
     }
 }
