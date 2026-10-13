@@ -127,10 +127,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         completionHandler()
     }
 
-    static func sendNotification(workspaceID: UUID, terminalID: UUID, workspaceName: String? = nil, terminalName: String? = nil) {
+    static func sendNotification(
+        workspaceID: UUID,
+        terminalID: UUID,
+        workspaceName: String? = nil,
+        terminalName: String? = nil,
+        notification: TerminalNotification = .bell
+    ) {
         let content = UNMutableNotificationContent()
         content.title = workspaceName ?? "Terminal"
-        content.body = terminalName ?? "Terminal needs attention"
+        content.subtitle = notification.title ?? ""
+        content.body = notification.body ?? terminalName ?? "Terminal needs attention"
         content.sound = .default
         content.userInfo = [
             "terminalID": terminalID.uuidString,

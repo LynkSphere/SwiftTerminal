@@ -2,5 +2,6 @@ run.sh
 build.sh
 release.sh
 build
+.build/
 SwiftTerminal.dmg
 .codex/

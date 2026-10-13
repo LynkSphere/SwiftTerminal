@@ -205,7 +205,7 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
 
         func createTerminalView(for tab: Terminal, appState: AppState) -> LocalProcessTerminalView {
             let tv = LocalProcessTerminalView(frame: .zero)
-            tv.onBell = { [weak tab, weak tv, weak appState] in
+            TerminalNotificationHandler.install(on: tv) { [weak tab, weak tv, weak appState] notification in
                 Task { @MainActor in
                     guard let tab else { return }
                     let isSelected = appState?.selectedTerminal === tab
@@ -222,10 +222,13 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
                             workspaceID: workspaceID,
                             terminalID: tab.id,
                             workspaceName: tab.workspace?.name,
-                            terminalName: tab.displayTitle
+                            terminalName: tab.displayTitle,
+                            notification: notification
                         )
                     }
                 }
+            } progress: { [weak tab] payload in
+                Self.handleProgressReport(payload, for: tab)
             }
 
             tv.configureNativeColors()
@@ -264,7 +267,6 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
             tv.processDelegate = self
 
             installSemanticPromptHandler(on: tv, for: tab)
-            installProgressReportHandler(on: tv, for: tab)
 
             tv.startProcess(
                 executable: shell,
@@ -355,43 +357,39 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
             }
         }
 
-        /// Registers an OSC 9;4 (ConEmu progress report) handler. Payload shape:
+        /// Handles OSC 9;4 (ConEmu progress reports), routed separately from notifications.
+        /// Payload shape:
         ///   `9;4;<state>[;<progress>]` where state is 0=remove, 1=set,
         ///   2=error, 3=indeterminate, 4=pause; progress is 0…100.
         /// Preempts SwiftTerm's built-in `oscProgressReport` (which would
         /// otherwise render a thin bar at the terminal's bottom edge); we want
         /// to surface progress in the tab UI instead.
-        func installProgressReportHandler(on view: LocalProcessTerminalView, for tab: Terminal) {
-            let weakTab = WeakTab(tab)
-            view.getTerminal().registerOscHandler(code: 9) { data in
-                let payload = String(bytes: data, encoding: .utf8) ?? ""
-                // Only `4;…` is a progress report; ignore other OSC 9 forms.
-                let parts = payload.split(separator: ";", omittingEmptySubsequences: false).map(String.init)
-                guard parts.first == "4", parts.count >= 2,
-                      let rawState = Int(parts[1]) else { return }
+        private static func handleProgressReport(_ payload: String, for tab: Terminal?) {
+            let parts = payload.split(separator: ";", omittingEmptySubsequences: false).map(String.init)
+            guard parts.first == "4", parts.count >= 2,
+                  let rawState = Int(parts[1]) else { return }
 
-                let progress: UInt8? = {
-                    guard parts.count >= 3, let raw = Int(parts[2]) else { return nil }
-                    return UInt8(max(0, min(raw, 100)))
-                }()
+            let progress: UInt8? = {
+                guard parts.count >= 3, let raw = Int(parts[2]) else { return nil }
+                return UInt8(max(0, min(raw, 100)))
+            }()
 
-                DispatchQueue.main.async {
-                    guard let tab = weakTab.value else { return }
-                    if rawState == 0 {  // remove
-                        tab.progressState = nil
-                        tab.progressValue = nil
-                        return
-                    }
-                    guard let state = TerminalProgressState(rawValue: rawState) else { return }
-                    tab.progressState = state
-                    switch state {
-                    case .set, .error:
-                        tab.progressValue = progress ?? tab.progressValue ?? 0
-                    case .indeterminate:
-                        tab.progressValue = nil
-                    case .pause:
-                        tab.progressValue = progress ?? tab.progressValue
-                    }
+            Task { @MainActor [weak tab] in
+                guard let tab else { return }
+                if rawState == 0 {  // remove
+                    tab.progressState = nil
+                    tab.progressValue = nil
+                    return
+                }
+                guard let state = TerminalProgressState(rawValue: rawState) else { return }
+                tab.progressState = state
+                switch state {
+                case .set, .error:
+                    tab.progressValue = progress ?? tab.progressValue ?? 0
+                case .indeterminate:
+                    tab.progressValue = nil
+                case .pause:
+                    tab.progressValue = progress ?? tab.progressValue
                 }
             }
         }
