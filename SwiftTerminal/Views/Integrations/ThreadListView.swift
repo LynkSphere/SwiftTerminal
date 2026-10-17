@@ -79,7 +79,7 @@ struct ThreadListView: View {
                 Spacer()
             }
             .buttonStyle(.plain)
-            .padding(12.5)
+            .padding(13)
         }
         .sheet(isPresented: Bindable(appState).showingCompose) { ComposeThreadView() }
         .alert("Couldn’t Update Thread", isPresented: Binding(

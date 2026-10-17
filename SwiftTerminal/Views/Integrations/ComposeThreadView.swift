@@ -10,46 +10,48 @@ struct ComposeThreadView: View {
     @State private var provider = AgentProvider.codex
     @State private var workspaceID: UUID?
     @State private var showingProjectPicker = false
+    @State private var projectPicker = ComposeProjectPickerModel()
 
     var body: some View {
-        VStack(alignment: .leading) {
-            Text("New Task").font(.title2).bold()
-            Form {
-                Picker("Open with", selection: $provider) {
-                    ForEach(integrations.enabledProviders) { provider in
-                        Text(provider.name).tag(provider)
+        NavigationStack {
+            VStack(alignment: .leading) {
+                HStack {
+                    Picker("Provider", selection: $provider) {
+                        ForEach(integrations.enabledProviders) { provider in
+                            Text(provider.name).tag(provider)
+                        }
                     }
+                    .pickerStyle(.menu)
+                    .controlSize(.large)
+                    .fixedSize()
+                    Spacer()
+                    if sessions.isOpening { ProgressView().controlSize(.small) }
+                    Button("Add Project…", systemImage: "folder.badge.plus") { showingProjectPicker = true }
                 }
-                Picker("Project", selection: $workspaceID) {
-                    Text("Choose a project").tag(UUID?.none)
-                    ForEach(store.workspaces) { workspace in
-                        Text(workspace.name).tag(Optional(workspace.id))
-                    }
-                }
-                if let workspace = store.workspaces.first(where: { $0.id == workspaceID }) {
-                    Text(workspace.directory).font(.caption).foregroundStyle(.secondary)
-                }
-                Button("Add Project…", systemImage: "folder.badge.plus") { showingProjectPicker = true }
+                .padding(10)
+
+                ComposeProjectPickerView(
+                    workspaces: store.workspaces,
+                    workspaceID: $workspaceID,
+                    model: projectPicker,
+                    onSubmit: openTask
+                )
             }
             .disabled(sessions.isOpening)
-            HStack {
-                Button("Cancel", role: .cancel) { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                    .disabled(sessions.isOpening)
-                Spacer()
-                if sessions.isOpening { ProgressView().controlSize(.small) }
-                Button("Open Task") {
-                    guard let workspace = store.workspaces.first(where: { $0.id == workspaceID }) else { return }
-                    Task {
-                        if await sessions.compose(provider: provider, workspace: workspace) { dismiss() }
-                    }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close", role: .close) { dismiss() }
+                        .keyboardShortcut(.cancelAction)
+                        .disabled(sessions.isOpening)
                 }
-                .keyboardShortcut(.defaultAction)
-                .disabled(workspaceID == nil || sessions.isOpening || !integrations.enabledProviders.contains(provider))
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("New Task", role: .confirm, action: openTask)
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(workspaceID == nil || sessions.isOpening || !integrations.enabledProviders.contains(provider))
+                }
             }
         }
-        .padding()
-        .frame(width: 420)
+        .frame(width: 420, height: 460)
         .interactiveDismissDisabled(sessions.isOpening)
         .alert("Couldn’t Open Thread", isPresented: Binding(
             get: { integrations.actionError != nil },
@@ -63,12 +65,22 @@ struct ComposeThreadView: View {
             if case .success(let url) = result { addProject(url) }
         }
         .onAppear {
-            provider = integrations.enabledProviders.first ?? .codex
+            let currentProvider = appState.selectedSession?.thread.provider
+            provider = integrations.enabledProviders.first(where: { $0 == currentProvider })
+                ?? integrations.enabledProviders.first ?? .codex
             workspaceID = appState.selectedWorkspace?.id ?? store.workspaces.first?.id
         }
     }
 
+    private func openTask() {
+        guard let workspace = store.workspaces.first(where: { $0.id == workspaceID }) else { return }
+        Task {
+            if await sessions.compose(provider: provider, workspace: workspace) { dismiss() }
+        }
+    }
+
     private func addProject(_ url: URL) {
+        projectPicker.searchText = ""
         if let existing = store.workspaces.first(where: { $0.url.standardizedFileURL == url.standardizedFileURL }) {
             workspaceID = existing.id
             return

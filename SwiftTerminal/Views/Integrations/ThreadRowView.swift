@@ -59,5 +59,6 @@ struct ThreadRowView: View {
             .foregroundStyle(.secondary)
         }
         .padding(.vertical, 2)
+        .padding(.horizontal, 1)
     }
 }
