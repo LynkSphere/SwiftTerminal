@@ -9,13 +9,13 @@ struct AgentThread: Identifiable, Sendable, Equatable {
     var status: AgentThreadStatus
     /// A saved provider name takes precedence over a terminal title or prompt preview.
     var hasProviderTitle = false
-    var readState: CodexReadState?
+    var readState: AgentReadState?
     var hasUnreadResult = false
 
-    var id: String { "\(provider.rawValue):\(sessionID)" }
+    nonisolated var id: String { "\(provider.rawValue):\(sessionID)" }
     var projectName: String { URL(fileURLWithPath: directory).lastPathComponent }
 
-    static func newestFirst(_ lhs: AgentThread, _ rhs: AgentThread) -> Bool {
+    nonisolated static func newestFirst(_ lhs: AgentThread, _ rhs: AgentThread) -> Bool {
         lhs.updatedAt == rhs.updatedAt ? lhs.id < rhs.id : lhs.updatedAt > rhs.updatedAt
     }
 

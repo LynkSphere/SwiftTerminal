@@ -30,5 +30,5 @@ struct SettingsView: View {
 #Preview {
     SettingsView()
         .environment(UpdaterManager())
-        .environment(AgentIntegrationStore())
+        .environment(AgentIntegrationStore(adapters: []))
 }

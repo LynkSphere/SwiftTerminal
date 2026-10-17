@@ -6,7 +6,18 @@ try {
     process.stdout.write(await prepareSDK(process.argv[3]));
     process.exit(0);
   }
-  const { getSessionInfo, listSessions } = await import(pathToFileURL(process.argv[2]).href);
+  const { deleteSession, getSessionInfo, listSessions } = await import(pathToFileURL(process.argv[2]).href);
+  if (process.argv[3] === '--delete') {
+    const sessionId = process.argv[4];
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId ?? '')) {
+      throw new Error('Invalid Claude session identifier.');
+    }
+    const options = { dir: process.argv[5] };
+    // An unsaved draft (or a session already deleted elsewhere) has no transcript to remove.
+    if (await getSessionInfo(sessionId, options)) await deleteSession(sessionId, options);
+    process.stdout.write('{}');
+    process.exit(0);
+  }
   const sessionId = process.argv[3];
   const session = sessionId ? await getSessionInfo(sessionId) : undefined;
   const sessions = sessionId ? (session ? [session] : []) : await listSessions({ limit: 25, offset: 0 });

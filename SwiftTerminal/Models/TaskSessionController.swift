@@ -26,11 +26,11 @@ final class TaskSessionController {
             let thread = try await integrations.createThread(provider: provider, directory: workspace.directory)
             try Task.checkCancellation()
             guard canOpen(thread) else { return false }
-            let command = try await integrations.prepareCommand(for: thread, isNew: provider == .claude)
+            let launch = try await integrations.prepareLaunch(for: thread, isNew: true)
             try Task.checkCancellation()
             guard canOpen(thread) else { return false }
             integrations.registerDraft(thread)
-            launch(thread, command: command, workspace: workspace)
+            launchSession(thread, configuration: launch, workspace: workspace)
             return true
         } catch is CancellationError {
             return false
@@ -52,17 +52,17 @@ final class TaskSessionController {
         }
         do {
             try validateDirectory(thread.directory)
-            let command = try await integrations.prepareCommand(for: thread)
+            let launch = try await integrations.prepareLaunch(for: thread)
             try Task.checkCancellation()
             guard canOpen(thread) else { return }
             let workspace = workspace(for: thread.directory)
             if let session = appState.sessions[thread.id] {
                 session.thread = thread
-                session.restart(command: command)
+                session.restart(launch: launch)
                 observeTerminal(of: session)
                 appState.show(session)
             } else {
-                launch(thread, command: command, workspace: workspace)
+                launchSession(thread, configuration: launch, workspace: workspace)
             }
         } catch is CancellationError {
         } catch {
@@ -71,7 +71,8 @@ final class TaskSessionController {
     }
 
     func settle(_ thread: AgentThread, undoManager: UndoManager? = nil) {
-        guard !integrations.settledThreadIDs.contains(thread.id) else { return }
+        guard !integrations.settledThreadIDs.contains(thread.id),
+              !integrations.deletingThreadIDs.contains(thread.id), !integrations.deletedThreadIDs.contains(thread.id) else { return }
         let draft = integrations.settle(thread)
         appState.closeSession(thread.id)
         undoManager?.registerUndo(withTarget: self) { [weak undoManager] controller in
@@ -83,7 +84,8 @@ final class TaskSessionController {
     }
 
     func restore(_ thread: AgentThread, draft: AgentThread? = nil, undoManager: UndoManager? = nil) {
-        guard integrations.settledThreadIDs.contains(thread.id) else { return }
+        guard integrations.settledThreadIDs.contains(thread.id),
+              !integrations.deletingThreadIDs.contains(thread.id), !integrations.deletedThreadIDs.contains(thread.id) else { return }
         integrations.restore(thread, draft: draft)
         undoManager?.registerUndo(withTarget: self) { [weak undoManager] controller in
             controller.settle(thread, undoManager: undoManager)
@@ -95,10 +97,23 @@ final class TaskSessionController {
 
     private func canOpen(_ thread: AgentThread) -> Bool {
         integrations.enabledProviders.contains(thread.provider) && !integrations.settledThreadIDs.contains(thread.id)
+            && !integrations.deletingThreadIDs.contains(thread.id) && !integrations.deletedThreadIDs.contains(thread.id)
     }
 
-    private func launch(_ thread: AgentThread, command: String, workspace: Workspace) {
-        let session = TaskSession(thread: thread, workspace: workspace, command: command)
+    func delete(_ thread: AgentThread) async {
+        guard !isOpening, integrations.canDelete(thread) else { return }
+        // A live CLI can rewrite its transcript. Stop our writer before deleting it.
+        appState.closeSession(thread.id)
+        await integrations.deleteThread(thread)
+        closeDeletedSessions()
+    }
+
+    func closeDeletedSessions() {
+        for id in integrations.deletedThreadIDs { appState.closeSession(id) }
+    }
+
+    private func launchSession(_ thread: AgentThread, configuration: AgentLaunch, workspace: Workspace) {
+        let session = TaskSession(thread: thread, workspace: workspace, launch: configuration)
         observeTerminal(of: session)
         appState.show(session)
     }

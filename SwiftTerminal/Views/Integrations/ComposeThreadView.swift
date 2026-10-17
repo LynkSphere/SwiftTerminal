@@ -7,7 +7,7 @@ struct ComposeThreadView: View {
     @Environment(AppState.self) private var appState
     @Environment(TaskSessionController.self) private var sessions
     @Environment(\.dismiss) private var dismiss
-    @State private var provider = AgentProvider.codex
+    @State private var provider: AgentProvider?
     @State private var workspaceID: UUID?
     @State private var showingProjectPicker = false
     @State private var projectPicker = ComposeProjectPickerModel()
@@ -18,7 +18,7 @@ struct ComposeThreadView: View {
                 HStack {
                     Picker("Provider", selection: $provider) {
                         ForEach(integrations.enabledProviders) { provider in
-                            Text(provider.name).tag(provider)
+                            Text(provider.name).tag(Optional(provider))
                         }
                     }
                     .pickerStyle(.menu)
@@ -28,7 +28,8 @@ struct ComposeThreadView: View {
                     if sessions.isOpening { ProgressView().controlSize(.small) }
                     Button("Add Project…", systemImage: "folder.badge.plus") { showingProjectPicker = true }
                 }
-                .padding(10)
+                .padding(.horizontal, 10)
+                .padding(.top, 10)
 
                 ComposeProjectPickerView(
                     workspaces: store.workspaces,
@@ -47,7 +48,7 @@ struct ComposeThreadView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("New Task", role: .confirm, action: openTask)
                         .keyboardShortcut(.defaultAction)
-                        .disabled(workspaceID == nil || sessions.isOpening || !integrations.enabledProviders.contains(provider))
+                        .disabled(workspaceID == nil || sessions.isOpening || !integrations.enabledProviders.contains(where: { $0 == provider }))
                 }
             }
         }
@@ -67,13 +68,13 @@ struct ComposeThreadView: View {
         .onAppear {
             let currentProvider = appState.selectedSession?.thread.provider
             provider = integrations.enabledProviders.first(where: { $0 == currentProvider })
-                ?? integrations.enabledProviders.first ?? .codex
+                ?? integrations.enabledProviders.first
             workspaceID = appState.selectedWorkspace?.id ?? store.workspaces.first?.id
         }
     }
 
     private func openTask() {
-        guard let workspace = store.workspaces.first(where: { $0.id == workspaceID }) else { return }
+        guard let provider, let workspace = store.workspaces.first(where: { $0.id == workspaceID }) else { return }
         Task {
             if await sessions.compose(provider: provider, workspace: workspace) { dismiss() }
         }

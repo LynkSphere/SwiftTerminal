@@ -22,7 +22,8 @@ final class Terminal: Identifiable, Hashable, Codable {
     /// Sending the script appends a newline so the shell executes it.
     var runScript: String?
 
-    var pendingStartupCommand: String?
+    /// Passed as process arguments, never typed into an interactive shell's input buffer.
+    var pendingLaunch: AgentLaunch?
     var hasExited = false
 
     @ObservationIgnored
@@ -183,7 +184,7 @@ final class Terminal: Identifiable, Hashable, Codable {
             tv.removeFromSuperview()
         }
         localProcessTerminalView = nil
-        pendingStartupCommand = nil
+        pendingLaunch = nil
         processDelegate = nil
         hasExited = true
         foregroundProcessName = nil

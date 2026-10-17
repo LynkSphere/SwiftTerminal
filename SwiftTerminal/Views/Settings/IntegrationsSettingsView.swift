@@ -7,20 +7,14 @@ struct IntegrationsSettingsView: View {
         @Bindable var integrations = integrations
         Form {
             Section {
-                Toggle(isOn: $integrations.codexEnabled) {
-                    Label {
-                        Text("Codex")
-                    } icon: {
-                        Image(AgentProvider.codex.symbolName)
-                            .foregroundStyle(AgentProvider.codex.color)
-                    }
-                }
-                Toggle(isOn: $integrations.claudeEnabled) {
-                    Label {
-                        Text("Claude")
-                    } icon: {
-                        Image(AgentProvider.claude.symbolName)
-                            .foregroundStyle(AgentProvider.claude.color)
+                ForEach(integrations.providers) { provider in
+                    Toggle(isOn: $integrations[isEnabled: provider]) {
+                        Label {
+                            Text(provider.name)
+                        } icon: {
+                            Image(provider.symbolName)
+                                .foregroundStyle(provider.color)
+                        }
                     }
                 }
             } header: {

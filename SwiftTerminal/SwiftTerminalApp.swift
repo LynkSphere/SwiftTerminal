@@ -13,7 +13,7 @@ struct SwiftTerminalApp: App {
     init() {
         let workspaceStore = WorkspaceStore()
         let appState = AppState()
-        let integrations = AgentIntegrationStore()
+        let integrations = AgentIntegrationStore(adapters: [CodexAgentAdapter(), ClaudeAgentAdapter()])
         _workspaceStore = State(initialValue: workspaceStore)
         _appState = State(initialValue: appState)
         _integrations = State(initialValue: integrations)

@@ -5,6 +5,8 @@ struct ThreadListView: View {
     @Environment(TaskSessionController.self) private var sessions
     @Environment(AppState.self) private var appState
     let searchText: String
+    @State private var threadToDelete: AgentThread?
+    @State private var showingDeleteConfirmation = false
 
     private var threads: [AgentThread] {
         integrations.visibleThreads.filter {
@@ -29,19 +31,23 @@ struct ThreadListView: View {
                     .tag(thread.id)
                     .contextMenu {
                         SettleThreadButton(thread: thread)
-                        if thread.provider == .codex && thread.readState != nil {
+                        if integrations.canMarkUnread(thread) {
                             MarkThreadUnreadButton(thread: thread)
+                        }
+                        if integrations.supportsDeletion(thread) {
+                            Divider()
+                            DeleteThreadButton(thread: thread) { requestDeletion(thread) }
                         }
                     }
                     .swipeActions(edge: .leading) {
                         SettleThreadButton(thread: thread)
                             .labelStyle(.iconOnly)
                     }
-                    .swipeActions(edge: .trailing) {
-                        if thread.provider == .codex && thread.readState != nil {
-                            MarkThreadUnreadButton(thread: thread)
-                                .labelStyle(.iconOnly)
-                        }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        // Keep the row visible until confirmation; a destructive swipe role
+                        // would optimistically animate it away before the alert is answered.
+                        DeleteThreadButton(thread: thread, role: nil) { requestDeletion(thread) }
+                            .labelStyle(.iconOnly)
                     }
             }
         }
@@ -82,6 +88,13 @@ struct ThreadListView: View {
             .padding(13)
         }
         .sheet(isPresented: Bindable(appState).showingCompose) { ComposeThreadView() }
+        .alert("Delete Thread?", isPresented: $showingDeleteConfirmation, presenting: threadToDelete) { thread in
+            Button("Delete", role: .destructive) {
+                Task { await sessions.delete(thread) }
+                threadToDelete = nil
+            }
+            Button("Cancel", role: .cancel) { threadToDelete = nil }
+        }
         .alert("Couldn’t Update Thread", isPresented: Binding(
             get: { integrations.actionError != nil && !appState.showingCompose },
             set: { if !$0 { integrations.actionError = nil } }
@@ -90,5 +103,11 @@ struct ThreadListView: View {
         } message: {
             Text(integrations.actionError ?? "")
         }
+    }
+
+    private func requestDeletion(_ thread: AgentThread) {
+        guard !sessions.isOpening, integrations.canDelete(thread) else { return }
+        threadToDelete = thread
+        showingDeleteConfirmation = true
     }
 }

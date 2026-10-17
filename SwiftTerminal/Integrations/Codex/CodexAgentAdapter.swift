@@ -1,25 +1,23 @@
 import Foundation
 
 @MainActor
-final class CodexIntegration {
+final class CodexAgentAdapter: AgentProviderAdapter {
+    let provider = AgentProvider.codex
+    let capabilities: AgentCapabilities = [.markUnread, .deleteThread, .deleteDescendants]
+    var onEvent: ((AgentEvent) -> Void)?
     private let socket = CodexSocket()
     private var connected = false
     private var connectionTask: Task<Void, Error>?
     private var nextID = 0
     private var pending: [Int: CheckedContinuation<Data, Error>] = [:]
-    private(set) var socketPath: String?
-    var onReadStateChange: ((String, CodexReadState) -> Void)?
-    var onStatusChange: ((String, AgentThreadStatus) -> Void)?
-    var onThreadChange: ((String) -> Void)?
-    var onListChange: (() -> Void)?
-    var onDisconnect: (() -> Void)?
+    private var socketPath: String?
 
     init() {
         socket.onMessage = { [weak self] in self?.receive($0) }
         socket.onClose = { [weak self] in self?.disconnect(error: $0) }
     }
 
-    func connect() async throws {
+    private func connect() async throws {
         guard !connected else { return }
         if let connectionTask { return try await connectionTask.value }
         let task = Task { try await establishConnection() }
@@ -60,35 +58,38 @@ final class CodexIntegration {
         let readStates = result["readStates"] as? [String: [String: Any]] ?? [:]
         return AgentThread.unique(rows.compactMap { row in
             guard var thread = Self.thread(row) else { return nil }
-            thread.readState = CodexReadState(readStates[thread.sessionID])
+            thread.readState = Self.readState(readStates[thread.sessionID])
             return thread
         })
     }
 
-    func readThread(_ id: String) async throws -> AgentThread {
+    func readThread(_ id: String) async throws -> AgentThread? {
         try await connect()
         let data = try await request("thread/read", params: ["threadId": id, "includeTurns": false])
         guard let result = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let row = result["thread"] as? [String: Any], var thread = Self.thread(row) else {
             throw IntegrationError(message: "Codex returned an invalid thread.")
         }
-        thread.readState = CodexReadState(result["readState"] as? [String: Any])
+        thread.readState = Self.readState(result["readState"] as? [String: Any])
         return thread
     }
 
-    func markUnread(threadID: String, revision: String) async throws -> CodexReadState {
+    func markUnread(_ thread: AgentThread) async throws -> AgentReadState {
+        guard let revision = thread.readState?.revision else {
+            throw IntegrationError(message: "This thread does not have a read state yet.")
+        }
         try await connect()
         let data = try await request("thread/readState/update", params: [
-            "threadId": threadID, "expectedRevision": revision, "operation": ["type": "unread"]
+            "threadId": thread.sessionID, "expectedRevision": revision, "operation": ["type": "unread"]
         ])
         guard let result = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let state = CodexReadState(result["readState"] as? [String: Any]) else {
+              let state = Self.readState(result["readState"] as? [String: Any]) else {
             throw IntegrationError(message: "Codex returned an invalid read state.")
         }
         return state
     }
 
-    func startThread(directory: String) async throws -> AgentThread {
+    func createThread(directory: String) async throws -> AgentThread {
         try await connect()
         let data = try await request("thread/start", params: ["cwd": directory])
         guard let result = try JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -101,7 +102,26 @@ final class CodexIntegration {
         return thread
     }
 
-    func close() {
+    func deleteThread(_ thread: AgentThread) async throws {
+        try await connect()
+        _ = try await request("thread/delete", params: ["threadId": thread.sessionID])
+        onEvent?(.threadDeleted(sessionID: thread.sessionID))
+        onEvent?(.listInvalidated)
+    }
+
+    func prepareLaunch(for thread: AgentThread, intent: AgentLaunchIntent) async throws -> AgentLaunch {
+        guard UUID(uuidString: thread.sessionID) != nil else {
+            throw IntegrationError(message: "Invalid Codex session identifier.")
+        }
+        try await connect()
+        guard let socketPath else {
+            throw IntegrationError(message: "Codex is disconnected. Try again.")
+        }
+        return AgentLaunch(executable: "codex", arguments: ["--remote", "unix://" + socketPath, "resume", thread.sessionID])
+    }
+
+    func setEnabled(_ isEnabled: Bool) {
+        guard !isEnabled else { return }
         connectionTask?.cancel()
         disconnect(error: CancellationError())
     }
@@ -139,27 +159,32 @@ final class CodexIntegration {
             }
         } else if let method = message["method"] as? String,
                   let params = message["params"] as? [String: Any] {
-            if ["thread/started", "thread/archived", "thread/unarchived", "thread/deleted"].contains(method) {
-                onListChange?()
+            if method == "thread/deleted", let id = params["threadId"] as? String {
+                onEvent?(.threadDeleted(sessionID: id))
+                onEvent?(.listInvalidated)
+                return
+            }
+            if ["thread/started", "thread/archived", "thread/unarchived"].contains(method) {
+                onEvent?(.listInvalidated)
                 return
             }
             guard let id = params["threadId"] as? String else { return }
             if method == "thread/status/changed" {
-                onStatusChange?(id, .codex(params["status"] as? [String: Any]))
-                onThreadChange?(id)
+                onEvent?(.threadUpdated(sessionID: id, update: AgentThreadUpdate(status: Self.status(params["status"] as? [String: Any]))))
+                onEvent?(.threadInvalidated(sessionID: id))
             } else if method == "thread/name/updated" {
-                onThreadChange?(id)
-            } else if method == "thread/readState/changed", let state = CodexReadState(params["readState"] as? [String: Any]) {
-                onReadStateChange?(id, state)
+                onEvent?(.threadInvalidated(sessionID: id))
+            } else if method == "thread/readState/changed", let state = Self.readState(params["readState"] as? [String: Any]) {
+                onEvent?(.threadUpdated(sessionID: id, update: AgentThreadUpdate(readState: state)))
             } else if method == "turn/completed" {
                 let turn = params["turn"] as? [String: Any]
                 switch turn?["status"] as? String {
-                case "completed": onStatusChange?(id, .done)
-                case "failed": onStatusChange?(id, .failed)
-                case "interrupted": onStatusChange?(id, .stopped)
+                case "completed": onEvent?(.threadUpdated(sessionID: id, update: AgentThreadUpdate(status: .done)))
+                case "failed": onEvent?(.threadUpdated(sessionID: id, update: AgentThreadUpdate(status: .failed)))
+                case "interrupted": onEvent?(.threadUpdated(sessionID: id, update: AgentThreadUpdate(status: .stopped)))
                 default: break
                 }
-                onThreadChange?(id)
+                onEvent?(.threadInvalidated(sessionID: id))
             }
         }
     }
@@ -172,10 +197,26 @@ final class CodexIntegration {
         let requests = pending.values
         pending.removeAll()
         for continuation in requests { continuation.resume(throwing: error) }
-        if wasConnected { onDisconnect?() }
+        if wasConnected { onEvent?(.listInvalidated) }
     }
 
-    static func thread(_ row: [String: Any]) -> AgentThread? {
+    private static func readState(_ value: [String: Any]?) -> AgentReadState? {
+        guard let value, let revision = value["revision"] as? String else { return nil }
+        return AgentReadState(revision: revision, isUnread: value["firstUnread"] as? [String: Any] != nil)
+    }
+
+    private static func status(_ value: [String: Any]?) -> AgentThreadStatus {
+        switch value?["type"] as? String {
+        case "active":
+            let flags = value?["activeFlags"] as? [String] ?? []
+            return flags.contains("waitingOnApproval") || flags.contains("waitingOnUserInput") ? .waiting : .processing
+        case "idle": return .idle
+        case "systemError": return .failed
+        default: return .unknown
+        }
+    }
+
+    private static func thread(_ row: [String: Any]) -> AgentThread? {
         guard let id = row["id"] as? String, let directory = row["cwd"] as? String else { return nil }
         let name = (row["name"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let preview = row["preview"] as? String ?? ""
@@ -184,7 +225,7 @@ final class CodexIntegration {
             sessionID: id, provider: .codex,
             title: hasProviderTitle ? name : (preview.isEmpty ? "New Codex thread" : String(preview.prefix(160))),
             directory: directory, updatedAt: Date(timeIntervalSince1970: row["recencyAt"] as? Double ?? row["updatedAt"] as? Double ?? 0),
-            status: .codex(row["status"] as? [String: Any]), hasProviderTitle: hasProviderTitle
+            status: status(row["status"] as? [String: Any]), hasProviderTitle: hasProviderTitle
         )
     }
 }

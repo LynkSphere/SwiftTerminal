@@ -105,16 +105,27 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
             terminal.hasExited = false
             register(tv, for: terminal)
 
-            let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+            let launch = terminal.pendingLaunch
+            let shell = launch == nil ? (ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh") : IntegrationProcess.shell
             let shellBasename = (shell as NSString).lastPathComponent
             let home = FileManager.default.homeDirectoryForCurrentUser.path
             let startingDirectory = resolvedWorkingDirectoryPath(from: terminal.currentDirectory)
                 ?? resolvedWorkingDirectoryPath(from: terminal.workspace?.directory)
                 ?? home
 
-            let plan = ShellIntegration.plan(forShellPath: shell)
+            let plan: ShellIntegration.Plan
+            if let launch {
+                // Use argv, not PTY input: long settings exceed the terminal's canonical
+                // input limit, and shell startup can consume input before its first prompt.
+                plan = ShellIntegration.Plan(
+                    args: IntegrationProcess.shellArguments(command: launch.executable, arguments: launch.arguments), env: [:]
+                )
+                terminal.foregroundProcessName = launch.executable
+            } else {
+                plan = ShellIntegration.plan(forShellPath: shell)
+            }
 
-            var env = ProcessInfo.processInfo.environment
+            var env = launch == nil ? ProcessInfo.processInfo.environment : IntegrationProcess.environment
             env["TERM"] = "xterm-256color"
             env["COLORTERM"] = "truecolor"
             for (k, v) in plan.env { env[k] = v }
@@ -122,7 +133,7 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
 
             // bash --rcfile only takes effect for non-login shells, so when our
             // plan injects rc args we must drop the leading-dash login convention.
-            let execName = plan.args.contains("--rcfile") ? shellBasename : "-" + shellBasename
+            let execName = launch != nil || plan.args.contains("--rcfile") ? shellBasename : "-" + shellBasename
 
             tv.processDelegate = self
 
@@ -137,10 +148,7 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
                 currentDirectory: startingDirectory
             )
 
-            if let command = terminal.pendingStartupCommand {
-                terminal.pendingStartupCommand = nil
-                tv.send(txt: command + "\n")
-            }
+            terminal.pendingLaunch = nil
 
             return tv
         }

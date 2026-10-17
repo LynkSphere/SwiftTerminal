@@ -23,7 +23,8 @@ async function npm(args, { cwd } = {}) {
 async function usableSDK(path) {
   try {
     const sdk = await import(pathToFileURL(path).href);
-    return typeof sdk.listSessions === 'function' && typeof sdk.getSessionInfo === 'function';
+    return typeof sdk.listSessions === 'function' && typeof sdk.getSessionInfo === 'function'
+      && typeof sdk.deleteSession === 'function';
   } catch {
     return false;
   }

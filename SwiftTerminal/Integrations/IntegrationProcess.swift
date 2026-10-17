@@ -2,13 +2,23 @@ import Foundation
 
 @MainActor
 enum IntegrationProcess {
+    static let shell = "/bin/zsh"
+
+    static func shellArguments(command: String, arguments: [String]) -> [String] {
+        ["-lc", "exec \"$@\"", "swiftterminal", command] + arguments
+    }
+
+    static var environment: [String: String] {
+        var values = ProcessInfo.processInfo.environment
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        values["PATH"] = [values["PATH"] ?? "", "\(home)/.local/bin", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"].joined(separator: ":")
+        return values
+    }
+
     static func make(_ command: String, arguments: [String]) -> Process {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/zsh")
-        process.arguments = ["-lc", "exec \"$@\"", "swiftterminal", command] + arguments
-        var environment = ProcessInfo.processInfo.environment
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        environment["PATH"] = [environment["PATH"] ?? "", "\(home)/.local/bin", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"].joined(separator: ":")
+        process.executableURL = URL(fileURLWithPath: shell)
+        process.arguments = shellArguments(command: command, arguments: arguments)
         process.environment = environment
         process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
         process.standardInput = FileHandle.nullDevice
@@ -47,9 +57,5 @@ enum IntegrationProcess {
         } onCancel: {
             if process.isRunning { process.terminate() }
         }
-    }
-
-    static func quote(_ argument: String) -> String {
-        "'" + argument.replacing("'", with: "'\\''") + "'"
     }
 }

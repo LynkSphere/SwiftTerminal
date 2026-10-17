@@ -9,17 +9,17 @@ final class TaskSession: Identifiable {
     let workspace: Workspace
     private(set) var terminal: Terminal
 
-    init(thread: AgentThread, workspace: Workspace, command: String) {
+    init(thread: AgentThread, workspace: Workspace, launch: AgentLaunch) {
         id = thread.id
         self.thread = thread
         self.workspace = workspace
         terminal = Terminal(workspace: workspace, title: thread.title, currentDirectory: thread.directory)
-        terminal.pendingStartupCommand = "exec " + command
+        terminal.pendingLaunch = launch
     }
 
-    func restart(command: String) {
+    func restart(launch: AgentLaunch) {
         terminal.terminate()
         terminal = Terminal(workspace: workspace, title: thread.title, currentDirectory: thread.directory)
-        terminal.pendingStartupCommand = "exec " + command
+        terminal.pendingLaunch = launch
     }
 }
