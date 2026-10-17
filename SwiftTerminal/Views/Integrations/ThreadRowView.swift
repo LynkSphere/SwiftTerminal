@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ThreadRowView: View {
+    @Environment(AgentIntegrationStore.self) private var integrations
     @Environment(WorkspaceStore.self) private var workspaces
     let thread: AgentThread
 
@@ -27,7 +28,12 @@ struct ThreadRowView: View {
 
                 Spacer()
 
-                if thread.status == .processing {
+                if integrations.settledThreadIDs.contains(thread.id) {
+                    Image(systemName: "checkmark")
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("Settled")
+                        .help("Settled")
+                } else if thread.status == .processing {
                     ProgressView()
                         .controlSize(.mini)
                         .accessibilityLabel("Processing")

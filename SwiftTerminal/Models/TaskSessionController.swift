@@ -70,9 +70,27 @@ final class TaskSessionController {
         }
     }
 
-    func settle(_ thread: AgentThread) {
-        integrations.settle(thread)
+    func settle(_ thread: AgentThread, undoManager: UndoManager? = nil) {
+        guard !integrations.settledThreadIDs.contains(thread.id) else { return }
+        let draft = integrations.settle(thread)
         appState.closeSession(thread.id)
+        undoManager?.registerUndo(withTarget: self) { [weak undoManager] controller in
+            controller.restore(thread, draft: draft, undoManager: undoManager)
+        }
+        if let undoManager, !undoManager.isUndoing, !undoManager.isRedoing {
+            undoManager.setActionName("Settle Thread")
+        }
+    }
+
+    func restore(_ thread: AgentThread, draft: AgentThread? = nil, undoManager: UndoManager? = nil) {
+        guard integrations.settledThreadIDs.contains(thread.id) else { return }
+        integrations.restore(thread, draft: draft)
+        undoManager?.registerUndo(withTarget: self) { [weak undoManager] controller in
+            controller.settle(thread, undoManager: undoManager)
+        }
+        if let undoManager, !undoManager.isUndoing, !undoManager.isRedoing {
+            undoManager.setActionName("Restore Thread")
+        }
     }
 
     private func canOpen(_ thread: AgentThread) -> Bool {

@@ -3,7 +3,7 @@ import SwiftUI
 struct AppCommands: Commands {
     @Bindable var appState: AppState
     let updater: UpdaterManager
-    let integrations: AgentIntegrationStore
+    @Bindable var integrations: AgentIntegrationStore
     let sessions: TaskSessionController
     @Environment(\.openWindow) private var openWindow
     @FocusedValue(\.editorPanel) private var editorPanel
@@ -47,6 +47,10 @@ struct AppCommands: Commands {
             }
 
             CommandGroup(replacing: .toolbar) {
+                Toggle("Show Settled Threads", isOn: $integrations.showSettledThreads)
+
+                Divider()
+
                 Button {
                     appState.activeTerminal?.increaseFontSize()
                     editorFontSize = min(editorFontSize + 0.5, EditorFontSize.max)

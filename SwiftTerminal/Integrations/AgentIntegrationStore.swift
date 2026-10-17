@@ -15,6 +15,7 @@ final class AgentIntegrationStore {
     private(set) var errors: [AgentProvider: String] = [:]
     private(set) var isRefreshing = false
     var actionError: String?
+    var showSettledThreads = false
     private(set) var settledThreadIDs: Set<String>
     private var activity: [String: ThreadActivity]
     @ObservationIgnored private var viewedThreadID: String?
@@ -36,7 +37,7 @@ final class AgentIntegrationStore {
     }
     var isEnabled: Bool { codexEnabled || claudeEnabled }
     var visibleThreads: [AgentThread] {
-        threads.filter { enabledProviders.contains($0.provider) && !settledThreadIDs.contains($0.id) }
+        threads.filter { enabledProviders.contains($0.provider) && (showSettledThreads || !settledThreadIDs.contains($0.id)) }
             .sorted(by: AgentThread.newestFirst)
     }
 
@@ -139,13 +140,24 @@ final class AgentIntegrationStore {
         }
     }
 
-    func settle(_ thread: AgentThread) {
+    @discardableResult
+    func settle(_ thread: AgentThread) -> AgentThread? {
         settledThreadIDs.insert(thread.id)
         defaults.set(settledThreadIDs.sorted(), forKey: "integration.settledThreadIDs")
-        drafts[thread.id] = nil
+        let draft = drafts.removeValue(forKey: thread.id)
         claudeStatuses[thread.id] = nil
         metadataRequests.remove(thread.id)
         if viewedThreadID == thread.id { viewedThreadID = nil }
+        return draft
+    }
+
+    func restore(_ thread: AgentThread, draft: AgentThread? = nil) {
+        settledThreadIDs.remove(thread.id)
+        defaults.set(settledThreadIDs.sorted(), forKey: "integration.settledThreadIDs")
+        if let draft { drafts[thread.id] = draft }
+        if !threads.contains(where: { $0.id == thread.id }) {
+            threads.append(reconcile(thread))
+        }
     }
 
     func markUnread(_ thread: AgentThread) async {
