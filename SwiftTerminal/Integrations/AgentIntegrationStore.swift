@@ -12,7 +12,6 @@ final class AgentIntegrationStore {
     private(set) var deletingThreadIDs: Set<String> = []
     private(set) var deletedThreadIDs: Set<String> = []
     var actionError: String?
-    var showSettledThreads = false
     private(set) var settledThreadIDs: Set<String>
     private var enabled: Set<AgentProvider>
     private var activity: [String: ThreadActivity]
@@ -33,7 +32,7 @@ final class AgentIntegrationStore {
     var enabledProviders: [AgentProvider] { providers.filter { enabled.contains($0) } }
     var isEnabled: Bool { !enabled.isEmpty }
     var visibleThreads: [AgentThread] {
-        threads.filter { enabled.contains($0.provider) && (showSettledThreads || !settledThreadIDs.contains($0.id)) }
+        threads.filter { enabled.contains($0.provider) }
             .sorted(by: AgentThread.newestFirst)
     }
 

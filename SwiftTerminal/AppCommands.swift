@@ -47,10 +47,6 @@ struct AppCommands: Commands {
             }
 
             CommandGroup(replacing: .toolbar) {
-                Toggle("Show Settled Threads", isOn: $integrations.showSettledThreads)
-
-                Divider()
-
                 Button {
                     appState.activeTerminal?.increaseFontSize()
                     editorFontSize = min(editorFontSize + 0.5, EditorFontSize.max)

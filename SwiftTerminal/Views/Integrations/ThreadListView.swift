@@ -7,6 +7,7 @@ struct ThreadListView: View {
     let searchText: String
     @State private var threadToDelete: AgentThread?
     @State private var showingDeleteConfirmation = false
+    @State private var isSettledExpanded = false
 
     private var threads: [AgentThread] {
         integrations.visibleThreads.filter {
@@ -22,35 +23,22 @@ struct ThreadListView: View {
     }
 
     var body: some View {
+        let regularThreads = threads.filter { !integrations.settledThreadIDs.contains($0.id) }
+        let settledThreads = threads.filter { integrations.settledThreadIDs.contains($0.id) }
+
         List(selection: Binding<String?>(get: { appState.selectedSession?.id }, set: { id in
             guard let thread = threads.first(where: { $0.id == id }) else { return }
             Task { await sessions.open(thread) }
         })) {
-            ForEach(threads) { thread in
-                ThreadRowView(thread: thread)
-                    .tag(thread.id)
-                    .contextMenu {
-                        SettleThreadButton(thread: thread)
-                        if integrations.canMarkUnread(thread) {
-                            MarkThreadUnreadButton(thread: thread)
-                        }
-                        if integrations.supportsDeletion(thread) {
-                            Divider()
-                            DeleteThreadButton(thread: thread) { requestDeletion(thread) }
-                        }
-                    }
-                    .swipeActions(edge: .leading) {
-                        SettleThreadButton(thread: thread)
-                            .labelStyle(.iconOnly)
-                    }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        // Keep the row visible until confirmation; a destructive swipe role
-                        // would optimistically animate it away before the alert is answered.
-                        DeleteThreadButton(thread: thread, role: nil) { requestDeletion(thread) }
-                            .labelStyle(.iconOnly)
-                    }
+            ThreadListRows(threads: regularThreads, requestDeletion: requestDeletion)
+
+            if !settledThreads.isEmpty {
+                Section("Settled", isExpanded: $isSettledExpanded) {
+                    ThreadListRows(threads: settledThreads, requestDeletion: requestDeletion)
+                }
             }
         }
+        .listStyle(.sidebar)
         .environment(\.sidebarRowSize, .medium) //
         .overlay {
             if !unavailableProviderNames.isEmpty {
@@ -80,7 +68,7 @@ struct ThreadListView: View {
         }
         .safeAreaBar(edge: .bottom) {
             HStack {
-                Button("Compose", systemImage: "square.and.pencil") { appState.showingCompose = true }
+                Button("New Chat", systemImage: "square.and.pencil") { appState.showingCompose = true }
                     .disabled(sessions.isOpening || !integrations.isEnabled)
                 Spacer()
             }

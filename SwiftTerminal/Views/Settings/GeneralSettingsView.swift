@@ -27,7 +27,7 @@ struct GeneralSettingsView: View {
                     }
                 } label: {
                     Text("Font size")
-                    Text("Applies to the main AI terminals)
+                    Text("Applies to the main AI terminals")
                 }
 
                 Picker(selection: $terminalScrollback) {

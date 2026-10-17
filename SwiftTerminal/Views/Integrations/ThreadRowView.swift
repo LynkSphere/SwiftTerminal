@@ -28,19 +28,16 @@ struct ThreadRowView: View {
 
                 Spacer()
 
-                if integrations.settledThreadIDs.contains(thread.id) {
-                    Image(systemName: "checkmark")
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel("Settled")
-                        .help("Settled")
-                } else if thread.status == .processing {
-                    ProgressView()
-                        .controlSize(.mini)
-                        .accessibilityLabel("Processing")
-                } else if let badge {
-                    badge
-                        .font(.caption2)
-                        .accessibilityLabel(thread.status == .waiting ? "Needs input" : "Unread result")
+                if !integrations.settledThreadIDs.contains(thread.id) {
+                    if thread.status == .processing {
+                        ProgressView()
+                            .controlSize(.mini)
+                            .accessibilityLabel("Processing")
+                    } else if let badge {
+                        badge
+                            .font(.caption2)
+                            .accessibilityLabel(thread.status == .waiting ? "Needs input" : "Unread result")
+                    }
                 }
             }
             HStack(spacing: 5) {

@@ -24,7 +24,7 @@ struct TaskDetailView: View {
             .sheet(isPresented: $showingScratchPad) {
                 ScratchPadSheet(workspace: workspace)
             }
-            .navigationTitle(session.thread.title)
+            .navigationTitle(String(session.thread.title.prefix(50)))
             .navigationSubtitle(workspace.directory.replacing(NSHomeDirectory(), with: "~"))
             .environment(workspace.editorPanel)
             .environment(\.showInFileTree) { url in
