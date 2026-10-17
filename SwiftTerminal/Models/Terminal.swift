@@ -15,10 +15,6 @@ enum TerminalProgressState: Int {
 final class Terminal: Identifiable, Hashable, Codable {
     var id: UUID
 
-    /// User-assigned name for this tab. Empty means "unnamed" — the user has not
-    /// set a custom name, so the display falls back to the running process or
-    /// the generic "Terminal" label. Older saves may contain "Terminal" as the
-    /// default rather than an empty string; `displayTitle` handles both forms.
     var title: String
     var currentDirectory: String?
 
@@ -26,8 +22,20 @@ final class Terminal: Identifiable, Hashable, Codable {
     /// Sending the script appends a newline so the shell executes it.
     var runScript: String?
 
+    var pendingStartupCommand: String?
+    var hasExited = false
+
+    @ObservationIgnored
+    var processDelegate: (any LocalProcessTerminalViewDelegate)?
+
+    @ObservationIgnored
+    var onProcessExit: (@MainActor (Int32?) -> Void)?
+
+    @ObservationIgnored
+    var onTitleChange: (@MainActor (String) -> Void)?
+
     /// Whether this saved command is the workspace's default "Run" target (Cmd+R).
-    /// Only meaningful for entries in `Workspace.commands`; ignored for ad-hoc tabs.
+    /// Only meaningful for entries in `Workspace.commands`; unused for tasks.
     var isDefault: Bool = false
 
     /// Name of the current foreground child process, if any. Driven by the
@@ -124,7 +132,7 @@ final class Terminal: Identifiable, Hashable, Codable {
         hasher.combine(id)
     }
 
-    /// Label shown in the tab bar / sidebar. A user-set name wins, followed by
+    /// A user-set name wins, followed by
     /// an active Claude/Codex chat title, the foreground process, and finally
     /// the generic "Terminal" label.
     var displayTitle: String {
@@ -154,18 +162,58 @@ final class Terminal: Identifiable, Hashable, Codable {
     }
 
     func terminate() {
+        // An intentional close must not report a late process exit as task activity.
+        onProcessExit = nil
+        onTitleChange = nil
         if let tv = localProcessTerminalView {
-            let shellPid = tv.process.shellPid
-            if shellPid > 0 {
+            tv.processDelegate = nil
+            tv.onBell = nil
+            if tv.process.running {
+                let pid = tv.process.shellPid
                 for child in childProcesses() {
                     kill(child.pid, SIGHUP)
                 }
+                tv.process.terminate()
+                if pid > 0 {
+                    Task.detached {
+                        await Terminal.reapTerminatedProcess(pid)
+                    }
+                }
             }
-            tv.process.terminate()
+            tv.removeFromSuperview()
         }
         localProcessTerminalView = nil
+        pendingStartupCommand = nil
+        processDelegate = nil
+        hasExited = true
         foregroundProcessName = nil
         reportedTerminalTitle = nil
+        progressState = nil
+        progressValue = nil
+        hasBellNotification = false
+    }
+
+    /// SwiftTerm cancels its child monitor during termination, so we must reap
+    /// the child ourselves. Capture only its PID so cleanup retains no UI state.
+    nonisolated private static func reapTerminatedProcess(_ pid: pid_t) async {
+        let clock = ContinuousClock()
+        var deadline = clock.now + .seconds(1)
+        var sentKill = false
+        while true {
+            var status: Int32 = 0
+            let result = waitpid(pid, &status, WNOHANG)
+            if result == -1, errno == EINTR { continue }
+            guard result == 0 else { return }
+
+            if clock.now >= deadline {
+                guard !sentKill else { return }
+                // A zero waitpid result confirms this is still our live child.
+                kill(pid, SIGKILL)
+                sentKill = true
+                deadline = clock.now + .seconds(1)
+            }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
     }
 
     func increaseFontSize() {

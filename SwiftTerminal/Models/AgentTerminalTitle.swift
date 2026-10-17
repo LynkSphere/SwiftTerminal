@@ -13,7 +13,7 @@ enum AgentTerminalTitle {
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         // Claude prefixes its OSC title with a decorative activity glyph.
-        if executable == "claude", title.first == "✳" {
+        if executable == "claude", let first = title.first, "✳✶✻✽✢·✴".contains(first) {
             title.removeFirst()
             title = title.trimmingCharacters(in: .whitespacesAndNewlines)
         }
@@ -22,7 +22,10 @@ enum AgentTerminalTitle {
               UUID(uuidString: title) == nil,
               title != "Claude Code",
               title != "Codex",
-              title != "OpenAI Codex" else { return nil }
+              title != "OpenAI Codex",
+              title != "New Codex thread",
+              title != "New Claude thread",
+              title != "Claude thread" else { return nil }
 
         return String(title.prefix(160))
     }

@@ -4,17 +4,9 @@ struct ShortcutsSettingsView: View {
     var body: some View {
         Form {
             Section("General") {
-                LabeledContent("Close Tab", value: "⌘ W")
+                LabeledContent("Compose", value: "⌘ N")
                 LabeledContent("Go to File", value: "⌘ P")
                 LabeledContent("Find in Files", value: "⇧⌘ F")
-            }
-
-            Section("Terminal") {
-                LabeledContent("New Tab", value: "⌘ T")
-                LabeledContent("New Tab in Workspace", value: "⌘ N")
-                LabeledContent("Select Previous Tab", value: "⇧⌘ [")
-                LabeledContent("Select Next Tab", value: "⇧⌘ ]")
-                LabeledContent("Clear Terminal", value: "⌘ K")
             }
 
             Section("View") {

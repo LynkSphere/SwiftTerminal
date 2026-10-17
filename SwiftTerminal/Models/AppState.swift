@@ -1,39 +1,39 @@
 import SwiftUI
 
+@MainActor
 @Observable
 final class AppState {
-    var selectedWorkspace: Workspace?
-    var selectedTerminal: Terminal?
-
-    // Drives NavigationSplitView column visibility so we can toggle the
-    // sidebar programmatically (e.g. when the bottom editor panel expands).
+    private(set) var sessions: [String: TaskSession] = [:]
+    private(set) var selectedSession: TaskSession?
+    var showingCompose = false
     var sidebarVisibility: NavigationSplitViewVisibility = .automatic
-
-    // Inspector state
     var showingInspector = true
-
-    // Close tab confirmation
-    var terminalPendingClose: Terminal?
-
-    // Whether archived workspaces are temporarily revealed in the sidebar.
-    var showArchivedWorkspaces = false
-
-    // Workspace whose scratch pad should be opened. WorkspaceDetailView watches
-    // this and presents the sheet when its workspace matches.
-    var scratchPadRequest: Workspace?
-
-    // Set when the user invokes Run on a command that's already running.
-    // ContentView shows a confirmation alert that interrupts then re-runs.
     var pendingRunReplacement: Terminal?
 
-    // MARK: - Split panes
+    var selectedWorkspace: Workspace? { selectedSession?.workspace }
+    var activeTerminal: Terminal? { selectedSession?.terminal }
 
-    /// Per-tab split layout, keyed by the tab's representative `Terminal.id`.
-    /// Absent means an unsplit tab. Session-only; never persisted.
-    var paneTrees: [UUID: PaneNode] = [:]
+    func show(_ session: TaskSession) {
+        sessions[session.id] = session
+        selectedSession = session
+        session.terminal.hasBellNotification = false
+    }
 
-    var focusedPaneID: UUID?
+    func closeSession(_ id: String) {
+        guard let session = sessions.removeValue(forKey: id) else { return }
+        if selectedSession === session {
+            selectedSession = nil
+        }
+        session.terminal.terminate()
+    }
 
-    /// A pane awaiting close confirmation because it has a running child process.
-    var panePendingClose: Terminal?
+    func updateSessions(_ threads: [AgentThread], enabledProviders: [AgentProvider]) {
+        for thread in threads {
+            sessions[thread.id]?.thread = thread
+            sessions[thread.id]?.terminal.title = thread.title
+        }
+        if let selectedSession, !enabledProviders.contains(selectedSession.thread.provider) {
+            self.selectedSession = nil
+        }
+    }
 }

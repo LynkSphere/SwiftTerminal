@@ -16,7 +16,7 @@ struct OnboardingView: View {
                         .font(.title)
                         .fontWeight(.semibold)
 
-                    Text("A native macOS terminal built for vibe coding.")
+                    Text("A native workspace for Codex and Claude tasks.")
                         .font(.title3)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -32,8 +32,8 @@ struct OnboardingView: View {
                 )
                 FeatureRow(
                     icon: "folder.badge.plus",
-                    title: "Project Workspaces",
-                    description: "Add a workspace for each project directory and jump back into context instantly."
+                    title: "Tasks and Projects",
+                    description: "Enable Codex or Claude in Settings, then compose a task in an existing project or add a folder."
                 )
                 FeatureRow(
                     icon: "sidebar.right",

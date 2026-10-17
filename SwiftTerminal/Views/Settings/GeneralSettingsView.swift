@@ -2,8 +2,6 @@ import AppKit
 import SwiftUI
 
 struct GeneralSettingsView: View {
-    @AppStorage("hideTabBarWithSingleTab") private var hideTabBarWithSingleTab = false
-    @AppStorage("hideSettingsButton") private var hideSettingsButton = false
     @AppStorage("editorWrapLines") private var editorWrapLines = true
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage(TerminalProcessRegistry.fontSizeKey) private var terminalFontSize: Double = Double(TerminalProcessRegistry.defaultFontSize)
@@ -13,11 +11,6 @@ struct GeneralSettingsView: View {
 
     var body: some View {
         Form {
-            Section("Appearance") {
-                Toggle("Hide tab bar when only one tab is open", isOn: $hideTabBarWithSingleTab)
-                Toggle("Hide settings button from sidebar", isOn: $hideSettingsButton)
-            }
-
             Section {
                 LabeledContent {
                     HStack {
@@ -48,7 +41,7 @@ struct GeneralSettingsView: View {
                 
                 Toggle(isOn: $terminalUseMetal) {
                     Text("Use Metal rendering")
-                    Text("Only takes effect for new terminal tabs if changed mid-session")
+                    Text("Applies to newly started tasks and inspector terminals")
                 }
             } header: {
                 Text("Terminal")

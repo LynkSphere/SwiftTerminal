@@ -72,7 +72,7 @@ struct CommandTerminalOutputView: View {
             .padding(.top, 5)
             // .frame(height: 36)
 
-            TerminalContainerRepresentable(tab: terminal, appState: appState)
+            TerminalContainerRepresentable(terminal: terminal, appState: appState)
         }
     }
 }

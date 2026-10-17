@@ -4,20 +4,36 @@ import SwiftUI
 struct SwiftTerminalApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
-    @State private var workspaceStore = WorkspaceStore()
-    @State private var appState = AppState()
+    @State private var workspaceStore: WorkspaceStore
+    @State private var appState: AppState
     @State private var updater = UpdaterManager()
+    @State private var integrations: AgentIntegrationStore
+    @State private var sessions: TaskSessionController
+
+    init() {
+        let workspaceStore = WorkspaceStore()
+        let appState = AppState()
+        let integrations = AgentIntegrationStore()
+        _workspaceStore = State(initialValue: workspaceStore)
+        _appState = State(initialValue: appState)
+        _integrations = State(initialValue: integrations)
+        _sessions = State(initialValue: TaskSessionController(
+            integrations: integrations, appState: appState, workspaces: workspaceStore
+        ))
+    }
 
     var body: some Scene {
         Window("SwiftTerminal", id: "swiftterminal") {
             ContentView()
                 .environment(appState)
                 .environment(workspaceStore)
+                .environment(integrations)
+                .environment(sessions)
                 .frame(minWidth: 600, minHeight: 400)
         }
         .defaultSize(width: 900, height: 600)
         .commands {
-            AppCommands(appState: appState, updater: updater)
+            AppCommands(appState: appState, updater: updater, integrations: integrations, sessions: sessions)
         }
 
         WindowGroup("Diff", for: GitCommitDiffSheetItem.self) { $item in
@@ -42,6 +58,7 @@ struct SwiftTerminalApp: App {
         Settings {
             SettingsView()
                 .environment(updater)
+                .environment(integrations)
         }
     }
 }

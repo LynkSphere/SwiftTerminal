@@ -4,3 +4,5 @@ release.sh
 build
 SwiftTerminal.dmg
 .codex/
+.build
+.DS_Store

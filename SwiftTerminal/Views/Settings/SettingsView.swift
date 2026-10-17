@@ -7,6 +7,10 @@ struct SettingsView: View {
                 GeneralSettingsView()
             }
 
+            Tab("Integrations", systemImage: "puzzlepiece.extension") {
+                IntegrationsSettingsView()
+            }
+
             Tab("Updates", systemImage: "arrow.down.circle") {
                 UpdatesSettingsView()
             }
@@ -26,4 +30,5 @@ struct SettingsView: View {
 #Preview {
     SettingsView()
         .environment(UpdaterManager())
+        .environment(AgentIntegrationStore())
 }

@@ -1,0 +1,30 @@
+import Foundation
+
+struct AgentThread: Identifiable, Sendable, Equatable {
+    let sessionID: String
+    let provider: AgentProvider
+    var title: String
+    var directory: String
+    var updatedAt: Date
+    var status: AgentThreadStatus
+    /// A saved provider name takes precedence over a terminal title or prompt preview.
+    var hasProviderTitle = false
+    var readState: CodexReadState?
+    var hasUnreadResult = false
+
+    var id: String { "\(provider.rawValue):\(sessionID)" }
+    var projectName: String { URL(fileURLWithPath: directory).lastPathComponent }
+
+    static func newestFirst(_ lhs: AgentThread, _ rhs: AgentThread) -> Bool {
+        lhs.updatedAt == rhs.updatedAt ? lhs.id < rhs.id : lhs.updatedAt > rhs.updatedAt
+    }
+
+    static func unique(_ threads: [AgentThread]) -> [AgentThread] {
+        var byID: [String: AgentThread] = [:]
+        for thread in threads {
+            if let previous = byID[thread.id], previous.updatedAt > thread.updatedAt { continue }
+            byID[thread.id] = thread
+        }
+        return byID.values.sorted(by: newestFirst)
+    }
+}

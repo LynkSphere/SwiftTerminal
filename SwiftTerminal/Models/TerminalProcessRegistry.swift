@@ -2,12 +2,7 @@ import AppKit
 import Foundation
 import SwiftTerm
 
-/// Owns the live `LocalProcessTerminalView` for each terminal tab.
-///
-/// Keying the views off `Terminal.id` in a static registry decouples shell
-/// process lifetime from the lifetime of any individual `Terminal` instance,
-/// mirroring the pattern `CommandRunner` already uses for command execution
-/// state.
+/// Retains running task and inspector terminal views across navigation.
 enum TerminalProcessRegistry {
     private static var views: [UUID: LocalProcessTerminalView] = [:]
 

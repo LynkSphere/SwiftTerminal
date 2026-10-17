@@ -1,12 +1,11 @@
 import Foundation
 import Observation
-import SwiftUI
 
 /// Persists `Workspace` objects (and their `Terminal` / `CommandEntry`
 /// children) to a JSON file in `~/Library/Application Support/SwiftTerminal/`.
 ///
-/// Mutations through `addWorkspace`/`deleteWorkspace`/`moveWorkspace` save
-/// directly. Property edits made through `Bindable(workspace).name` etc. are
+/// Adding or deleting workspaces schedules a save. Property edits made
+/// through `Bindable(workspace).name` etc. are
 /// caught by an `withObservationTracking` walk that re-arms after every
 /// detected change.
 @MainActor
@@ -90,7 +89,7 @@ final class WorkspaceStore {
         withObservationTracking { [weak self] in
             guard let self else { return }
             // Touch every observable field that can be edited via Bindable
-            // bindings (TextFields, menus). Insertions/removals/reorders go
+            // bindings (TextFields, menus). Insertions and removals go
             // through the explicit CRUD methods below and don't need to be
             // observed here.
             for ws in self.workspaces {
@@ -100,10 +99,6 @@ final class WorkspaceStore {
                 _ = ws.scratchPad
                 _ = ws.isArchived
                 _ = ws.customIconFilename
-                for t in ws.terminals {
-                    _ = t.title
-                    _ = t.currentDirectory
-                }
                 for cmd in ws.commands {
                     _ = cmd.title
                     _ = cmd.runScript
@@ -131,21 +126,8 @@ final class WorkspaceStore {
         for cmd in workspace.commands {
             cmd.terminate()
         }
-        for terminal in workspace.terminals {
-            terminal.terminate()
-        }
         workspace.clearCustomIcon()
         workspaces.removeAll { $0.id == workspace.id }
-        scheduleSave()
-    }
-
-    func moveWorkspaces(from source: IndexSet, to destination: Int) {
-        workspaces.move(fromOffsets: source, toOffset: destination)
-        scheduleSave()
-    }
-
-    func reorderWorkspaces(_ newOrder: [Workspace]) {
-        workspaces = newOrder
         scheduleSave()
     }
 }

@@ -2,25 +2,24 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(AppState.self) private var appState
-    @Environment(WorkspaceStore.self) private var store
+    @Environment(AgentIntegrationStore.self) private var integrations
     @State private var searchText = ""
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var showingOnboarding = false
 
     var body: some View {
         NavigationSplitView(columnVisibility: Bindable(appState).sidebarVisibility) {
-            WorkspaceListView(searchText: searchText)
+            ThreadListView(searchText: searchText)
                 .navigationSplitViewColumnWidth(min: 160, ideal: 200, max: 300)
-                .searchable(text: $searchText, placement: .sidebar, prompt: "Filter workspaces")
+                .searchable(text: $searchText, placement: .sidebar, prompt: "Filter tasks")
         } detail: {
-            if let workspace = appState.selectedWorkspace {
-                WorkspaceDetailView(workspace: workspace)
-                    // .id(workspace.id)
+            if let session = appState.selectedSession {
+                TaskDetailView(session: session)
             } else {
                 ContentUnavailableView(
-                    "No Workspace Selected",
+                    "No Task Selected",
                     systemImage: "sidebar.left",
-                    description: Text("Select a workspace to get started.")
+                    description: Text("Select a task or use Compose to get started.")
                 )
                 .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
             }
@@ -29,7 +28,6 @@ struct ContentView: View {
             if let workspace = appState.selectedWorkspace {
                 InspectorView(workspace: workspace)
                     .environment(workspace.editorPanel)
-                    // .id(workspace.url)
                     .inspectorColumnWidth(min: 240, ideal: 240, max: 360)
             } else {
                 ContentUnavailableView(
@@ -38,6 +36,7 @@ struct ContentView: View {
                 )
             }
         }
+        .modifier(TaskIntegrationModifier())
         .focusedSceneValue(\.editorPanel, appState.selectedWorkspace?.editorPanel)
         .focusedSceneValue(\.isMainWindow, true)
         .sheet(isPresented: $showingOnboarding) {
@@ -73,11 +72,16 @@ struct ContentView: View {
             guard let workspaceID = notification.userInfo?["workspaceID"] as? String,
                   let terminalID = notification.userInfo?["terminalID"] as? String else { return }
 
-            if let workspace = store.workspaces.first(where: { $0.id.uuidString == workspaceID }) {
-                appState.selectedWorkspace = workspace
-                if let terminal = workspace.terminals.first(where: { $0.id.uuidString == terminalID }) {
-                    appState.selectedTerminal = terminal
-                }
+            if let session = appState.sessions.values.first(where: {
+                $0.workspace.id.uuidString == workspaceID && $0.terminal.id.uuidString == terminalID
+            }), integrations.enabledProviders.contains(session.thread.provider) {
+                appState.show(session)
+            } else if let workspace = appState.selectedWorkspace,
+                      workspace.id.uuidString == workspaceID,
+                      let command = workspace.commands.first(where: { $0.id.uuidString == terminalID }) {
+                appState.showingInspector = true
+                workspace.inspectorState.selectedTab = .commands
+                workspace.inspectorState.selectedCommand = command
             }
         }
     }
