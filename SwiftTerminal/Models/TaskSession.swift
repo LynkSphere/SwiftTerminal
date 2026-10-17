@@ -13,13 +13,13 @@ final class TaskSession: Identifiable {
         id = thread.id
         self.thread = thread
         self.workspace = workspace
-        terminal = Terminal(workspace: workspace, title: thread.title, currentDirectory: thread.directory)
+        terminal = Terminal(workspace: workspace, title: thread.title, currentDirectory: thread.directory, isTaskTerminal: true)
         terminal.pendingLaunch = launch
     }
 
     func restart(launch: AgentLaunch) {
         terminal.terminate()
-        terminal = Terminal(workspace: workspace, title: thread.title, currentDirectory: thread.directory)
+        terminal = Terminal(workspace: workspace, title: thread.title, currentDirectory: thread.directory, isTaskTerminal: true)
         terminal.pendingLaunch = launch
     }
 }

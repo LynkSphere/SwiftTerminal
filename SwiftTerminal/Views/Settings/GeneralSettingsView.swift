@@ -6,7 +6,6 @@ struct GeneralSettingsView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage(TerminalProcessRegistry.fontSizeKey) private var terminalFontSize: Double = Double(TerminalProcessRegistry.defaultFontSize)
     @AppStorage(TerminalProcessRegistry.scrollbackKey) private var terminalScrollback: Int = TerminalProcessRegistry.defaultScrollback
-    @AppStorage(TerminalProcessRegistry.useMetalKey) private var terminalUseMetal: Bool = TerminalProcessRegistry.defaultUseMetal
     @AppStorage(EditorFontSize.key) private var editorFontSize: Double = EditorFontSize.default
 
     var body: some View {
@@ -21,13 +20,14 @@ struct GeneralSettingsView: View {
                             ),
                             in: Double(TerminalProcessRegistry.minFontSize)...Double(TerminalProcessRegistry.maxFontSize)
                         )
-                        Text(String(format: "%.1f", terminalFontSize))
+                        Text(terminalFontSize, format: .number.precision(.fractionLength(1)))
                             .font(.subheadline.monospacedDigit())
                             .foregroundStyle(.secondary)
                             .frame(width: 25, alignment: .trailing)
                     }
                 } label: {
                     Text("Font size")
+                    Text("Applies to the main AI terminals)
                 }
 
                 Picker(selection: $terminalScrollback) {
@@ -38,16 +38,11 @@ struct GeneralSettingsView: View {
                     Text("Scrollback")
                     Text("How many lines of history each terminal keeps")
                 }
-                
-                Toggle(isOn: $terminalUseMetal) {
-                    Text("Use Metal rendering")
-                    Text("Applies to newly started tasks and inspector terminals")
-                }
             } header: {
                 Text("Terminal")
             }
             .onChange(of: terminalFontSize) { _, newValue in
-                TerminalProcessRegistry.applyFontSizeToAll(CGFloat(newValue))
+                TerminalProcessRegistry.applyFontSizeToTaskTerminals(CGFloat(newValue))
             }
 
             Section {

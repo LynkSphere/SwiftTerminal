@@ -22,25 +22,6 @@ struct CommandTerminalOutputView: View {
                 Spacer()
 
                 HStack(spacing: 6) {
-                    HStack(spacing: 0) {
-                        Button { terminal.decreaseFontSize() } label: {
-                            Image(systemName: "textformat.size.smaller")
-                        }
-                        .help("Decrease font size")
-
-                        Divider()
-                            .frame(height: 12)
-                            .padding(.horizontal, 4)
-
-                        Button { terminal.increaseFontSize() } label: {
-                            Image(systemName: "textformat.size.larger")
-                        }
-                        .help("Increase font size")
-                    }
-                    .padding(.horizontal, 8)
-                    .frame(height: barHeight)
-                    .background(.secondary.opacity(0.15), in: Capsule())
-
                     Button { terminal.clearTerminal() } label: {
                         Image(systemName: "delete.left")
                             .font(.caption2)

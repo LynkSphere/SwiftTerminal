@@ -18,6 +18,9 @@ final class Terminal: Identifiable, Hashable, Codable {
     var title: String
     var currentDirectory: String?
 
+    /// Task sessions follow the terminal font preference; inspector commands is fixed.
+    let isTaskTerminal: Bool
+
     /// When set, this terminal represents a saved "command" the user can run on demand.
     /// Sending the script appends a newline so the shell executes it.
     var runScript: String?
@@ -70,19 +73,20 @@ final class Terminal: Identifiable, Hashable, Codable {
         get { TerminalProcessRegistry.view(for: id) }
         set {
             if let newValue {
-                TerminalProcessRegistry.register(newValue, for: id)
+                TerminalProcessRegistry.register(newValue, for: id, isTaskTerminal: isTaskTerminal)
             } else {
                 TerminalProcessRegistry.remove(for: id)
             }
         }
     }
 
-    init(workspace: Workspace, title: String = "", currentDirectory: String? = nil, runScript: String? = nil) {
+    init(workspace: Workspace, title: String = "", currentDirectory: String? = nil, runScript: String? = nil, isTaskTerminal: Bool = false) {
         self.id = UUID()
         self.workspace = workspace
         self.title = title
         self.currentDirectory = currentDirectory
         self.runScript = runScript
+        self.isTaskTerminal = isTaskTerminal
     }
 
     // MARK: - Codable
@@ -94,6 +98,8 @@ final class Terminal: Identifiable, Hashable, Codable {
     }
 
     init(from decoder: Decoder) throws {
+        // Only saved inspector commands are persisted.
+        self.isTaskTerminal = false
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try c.decode(UUID.self, forKey: .id)
         if let title = try c.decodeIfPresent(String.self, forKey: .title) {
@@ -218,14 +224,17 @@ final class Terminal: Identifiable, Hashable, Codable {
     }
 
     func increaseFontSize() {
+        guard isTaskTerminal else { return }
         TerminalProcessRegistry.fontSize += 0.5
     }
 
     func decreaseFontSize() {
+        guard isTaskTerminal else { return }
         TerminalProcessRegistry.fontSize -= 0.5
     }
 
     func resetFontSize() {
+        guard isTaskTerminal else { return }
         TerminalProcessRegistry.fontSize = TerminalProcessRegistry.defaultFontSize
     }
 

@@ -94,12 +94,11 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
             }
 
             tv.configureNativeColors()
-            if TerminalProcessRegistry.useMetal {
-                try? tv.setUseMetal(true)
-            }
+            try? tv.setUseMetal(true)
             tv.getTerminal().setCursorStyle(.steadyBlock)
             tv.getTerminal().changeScrollback(TerminalProcessRegistry.scrollback)
-            tv.font = NSFont(descriptor: tv.font.fontDescriptor, size: TerminalProcessRegistry.fontSize) ?? tv.font
+            let fontSize = terminal.isTaskTerminal ? TerminalProcessRegistry.fontSize : TerminalProcessRegistry.commandFontSize
+            tv.font = NSFont(descriptor: tv.font.fontDescriptor, size: fontSize) ?? tv.font
             terminal.localProcessTerminalView = tv
             terminal.processDelegate = self
             terminal.hasExited = false
