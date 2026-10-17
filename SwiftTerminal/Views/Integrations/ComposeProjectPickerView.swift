@@ -60,6 +60,10 @@ struct ComposeProjectPickerView: View {
                     ContentUnavailableView.search(text: model.searchText)
                 }
             }
+            .onChange(of: model.searchText) {
+                workspaceID = projects.first?.id
+                if let workspaceID { proxy.scrollTo(workspaceID, anchor: .top) }
+            }
             .onChange(of: projects.map(\.id)) {
                 workspaceID = model.validSelection(workspaceID, in: projects)
             }
