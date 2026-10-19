@@ -6,7 +6,6 @@ import Foundation
 protocol AgentProviderAdapter: AnyObject {
     var provider: AgentProvider { get }
     var capabilities: AgentCapabilities { get }
-    var activityPolicy: AgentActivityPolicy { get }
     var onEvent: ((AgentEvent) -> Void)? { get set }
 
     func listThreads() async throws -> [AgentThread]
@@ -24,7 +23,6 @@ protocol AgentProviderAdapter: AnyObject {
 
 extension AgentProviderAdapter {
     var capabilities: AgentCapabilities { [] }
-    var activityPolicy: AgentActivityPolicy { .providerTimestamp }
 
     func markUnread(_ thread: AgentThread) async throws -> AgentReadState {
         throw IntegrationError(message: "\(provider.name) does not support marking a thread unread.")

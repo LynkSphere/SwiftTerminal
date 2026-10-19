@@ -4,7 +4,6 @@ import Foundation
 final class ClaudeAgentAdapter: AgentProviderAdapter {
     let provider = AgentProvider.claude
     let capabilities: AgentCapabilities = [.deleteThread]
-    let activityPolicy = AgentActivityPolicy.observedTransitions
     var onEvent: ((AgentEvent) -> Void)?
     // Retained CLI terminals keep using this address even while the integration is hidden.
     private let hooks = ClaudeHookServer()

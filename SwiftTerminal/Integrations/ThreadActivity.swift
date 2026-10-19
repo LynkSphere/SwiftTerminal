@@ -11,21 +11,14 @@ struct ThreadActivity: Codable {
         status = thread.status
     }
 
-    mutating func update(_ source: AgentThread, isViewed: Bool, policy: AgentActivityPolicy, now: Date = .now) -> AgentThread {
+    mutating func update(_ source: AgentThread, isViewed: Bool, now: Date = .now) -> AgentThread {
         var thread = source
         if thread.status == .idle, [.processing, .done].contains(status) {
             thread.status = .done
         }
         let completed = thread.status == .done && status != .done
         let beganWorking = thread.status == .processing && status != .processing
-        let needsInput = thread.status == .waiting && status != .waiting
-        switch policy {
-        case .providerTimestamp:
-            date = source.updatedAt
-        case .observedTransitions:
-            date = max(date, source.updatedAt)
-            if beganWorking || completed || needsInput { date = max(date, now) }
-        }
+        if beganWorking && status != .waiting { date = max(date, now) }
         if completed { unread = true }
         if beganWorking { unread = false }
         if thread.status != .unknown { status = thread.status }

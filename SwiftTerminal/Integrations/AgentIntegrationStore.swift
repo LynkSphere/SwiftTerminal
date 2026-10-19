@@ -240,8 +240,7 @@ final class AgentIntegrationStore {
         var thread = source
         if !thread.hasProviderTitle, let title = terminalTitles[thread.id] { thread.title = title }
         var state = activity[thread.id] ?? ThreadActivity(thread: thread)
-        let result = state.update(thread, isViewed: viewedThreadID == thread.id,
-                                  policy: adapters[thread.provider]?.activityPolicy ?? .providerTimestamp, now: now)
+        let result = state.update(thread, isViewed: viewedThreadID == thread.id, now: now)
         activity[thread.id] = state
         return result
     }
