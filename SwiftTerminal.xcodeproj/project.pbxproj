@@ -19,7 +19,6 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		08D10C4C2F64897100754649 /* SwiftTerminal */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			explicitFolders = (Resources/Integrations,);
 			path = SwiftTerminal;
 			sourceTree = "<group>";
 		};

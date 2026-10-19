@@ -5,6 +5,7 @@ final class ClaudeAgentAdapter: AgentProviderAdapter {
     let provider = AgentProvider.claude
     let capabilities: AgentCapabilities = [.deleteThread]
     var onEvent: ((AgentEvent) -> Void)?
+    private let history = ClaudeSessionHistory()
     private let defaults: UserDefaults
     private var backgroundIDs: [String: String]
     private var backgroundSessions: [String: ClaudeBackgroundSession] = [:]
@@ -21,31 +22,23 @@ final class ClaudeAgentAdapter: AgentProviderAdapter {
     func listThreads() async throws -> [AgentThread] {
         try startWatching()
         try await refreshBackgroundSessions()
-        let history = try Self.parseHistory(await runHistory()).map(withStatus)
+        let history = try await history.listThreads().map(withStatus)
         let listedIDs = Set(history.map(\.sessionID))
         let drafts = backgroundSessions.values.compactMap(\.thread).filter { !listedIDs.contains($0.sessionID) }
         return AgentThread.unique(history + drafts)
     }
 
     func readThread(_ id: String) async throws -> AgentThread? {
-        try Self.parseHistory(await runHistory(arguments: [id])).first.map(withStatus) ?? backgroundSessions[id]?.thread
+        try await history.readThread(id).map(withStatus) ?? backgroundSessions[id]?.thread
     }
 
     func deleteThread(_ thread: AgentThread) async throws {
         try await stopThread(thread)
-        _ = try await runHistory(arguments: ["--delete", thread.sessionID, thread.directory])
+        try await history.deleteThread(thread.sessionID, directory: thread.directory)
         backgroundIDs[thread.sessionID] = nil
         backgroundSessions[thread.sessionID] = nil
         saveBackgroundIDs()
         onEvent?(.threadDeleted(sessionID: thread.sessionID))
-    }
-
-    private func runHistory(arguments: [String] = []) async throws -> Data {
-        guard let helper = Bundle.main.url(forResource: "claude-history", withExtension: "mjs", subdirectory: "Integrations") else {
-            throw IntegrationError(message: "The Claude session helper is missing. Rebuild SwiftTerminal.")
-        }
-        let sdk = try await ClaudeSDK.url()
-        return try await IntegrationProcess.run("node", arguments: [helper.path, sdk.path] + arguments)
     }
 
     func createThread(directory: String) async throws -> AgentThread {
@@ -207,18 +200,4 @@ final class ClaudeAgentAdapter: AgentProviderAdapter {
         return thread
     }
 
-    private static func parseHistory(_ history: Data) throws -> [AgentThread] {
-        guard let rows = try JSONSerialization.jsonObject(with: history) as? [[String: Any]] else {
-            throw IntegrationError(message: "Claude returned invalid session history.")
-        }
-        let threads: [AgentThread] = rows.compactMap { row in
-            guard let id = row["sessionId"] as? String, let directory = row["cwd"] as? String else { return nil }
-            return AgentThread(
-                sessionID: id, provider: .claude, title: row["title"] as? String ?? "Claude thread", directory: directory,
-                updatedAt: Date(timeIntervalSince1970: (row["lastModified"] as? Double ?? 0) / 1000), status: .unknown,
-                hasProviderTitle: row["hasProviderTitle"] as? Bool ?? false
-            )
-        }
-        return AgentThread.unique(threads)
-    }
 }

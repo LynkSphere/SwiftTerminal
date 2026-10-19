@@ -19,7 +19,7 @@ Work on multiple projects simultaneously.
 
 - macOS 26.0+
 
-Claude integration uses your installed Node.js and npm. It reuses an available Claude Agent SDK, or installs a pinned copy in `~/Library/Application Support/SwiftTerminal/Integrations/Claude/` on first use. The SDK is not included in the app, and Xcode builds do not require npm dependencies. Claude Code must be installed separately to open sessions.
+Claude integration requires Claude Code to be installed separately. SwiftTerminal reads local session metadata directly and runs and monitors background sessions through the Claude Code CLI; no Node.js, npm, or Agent SDK installation is required.
 
 
 ## License
