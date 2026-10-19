@@ -96,6 +96,6 @@ final class ClaudeAgentAdapter: AgentProviderAdapter {
                 hasProviderTitle: row["hasProviderTitle"] as? Bool ?? false
             )
         }
-        return Array(AgentThread.unique(threads).prefix(25))
+        return AgentThread.unique(threads)
     }
 }
