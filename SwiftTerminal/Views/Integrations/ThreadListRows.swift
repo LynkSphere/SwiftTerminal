@@ -3,11 +3,13 @@ import SwiftUI
 struct ThreadListRows: View {
     @Environment(AgentIntegrationStore.self) private var integrations
     let threads: [AgentThread]
+    let rowPositions: Namespace.ID
     let requestDeletion: (AgentThread) -> Void
 
     var body: some View {
         ForEach(threads) { thread in
             ThreadRowView(thread: thread)
+                .matchedGeometryEffect(id: thread.id, in: rowPositions, properties: .position)
                 .tag(thread.id)
                 .contextMenu {
                     SettleThreadButton(thread: thread)

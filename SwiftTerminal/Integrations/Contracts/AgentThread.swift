@@ -14,6 +14,7 @@ struct AgentThread: Identifiable, Sendable, Equatable {
 
     nonisolated var id: String { "\(provider.rawValue):\(sessionID)" }
     var projectName: String { URL(fileURLWithPath: directory).lastPathComponent }
+    var needsAttention: Bool { status == .processing || status == .waiting || hasUnreadResult }
 
     nonisolated static func newestFirst(_ lhs: AgentThread, _ rhs: AgentThread) -> Bool {
         lhs.updatedAt == rhs.updatedAt ? lhs.id < rhs.id : lhs.updatedAt > rhs.updatedAt

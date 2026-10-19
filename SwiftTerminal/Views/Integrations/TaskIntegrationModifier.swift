@@ -9,6 +9,7 @@ struct TaskIntegrationModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onChange(of: appState.selectedSession?.id, initial: true) {
+                integrations.setSelectedThread(appState.selectedSession?.id)
                 integrations.setViewedThread(scenePhase == .active ? appState.selectedSession?.id : nil)
             }
             .onChange(of: scenePhase) {
