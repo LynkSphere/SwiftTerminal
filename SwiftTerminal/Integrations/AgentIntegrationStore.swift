@@ -32,8 +32,11 @@ final class AgentIntegrationStore {
     var enabledProviders: [AgentProvider] { providers.filter { enabled.contains($0) } }
     var isEnabled: Bool { !enabled.isEmpty }
     var visibleThreads: [AgentThread] {
-        threads.filter { enabled.contains($0.provider) }
-            .sorted(by: AgentThread.newestFirst)
+        enabledProviders.flatMap { provider in
+            threads.filter { $0.provider == provider }
+                .sorted(by: AgentThread.newestFirst)
+                .prefix(25)
+        }.sorted(by: AgentThread.newestFirst)
     }
 
     init(adapters: [any AgentProviderAdapter], defaults: UserDefaults = .standard) {

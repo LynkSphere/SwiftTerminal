@@ -20,7 +20,7 @@ try {
   }
   const sessionId = process.argv[3];
   const session = sessionId ? await getSessionInfo(sessionId) : undefined;
-  const sessions = sessionId ? (session ? [session] : []) : await listSessions();
+  const sessions = sessionId ? (session ? [session] : []) : await listSessions({ limit: 25 });
   process.stdout.write(JSON.stringify(sessions.map(session => ({
     sessionId: session.sessionId,
     title: session.customTitle || session.summary || session.firstPrompt || 'Claude thread',

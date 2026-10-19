@@ -47,29 +47,20 @@ final class CodexAgentAdapter: AgentProviderAdapter {
 
     func listThreads() async throws -> [AgentThread] {
         try await connect()
-        var threads: [AgentThread] = []
-        var cursor: String?
-        // Settled threads share this history, so stopping after one page hides older tasks.
-        repeat {
-            try Task.checkCancellation()
-            var params: [String: Any] = [
-                "limit": 100, "sortKey": "recency_at", "sortDirection": "desc",
-                "sourceKinds": ["cli", "vscode", "appServer"], "archived": false
-            ]
-            if let cursor { params["cursor"] = cursor }
-            let data = try await request("thread/list", params: params)
-            guard let result = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let rows = result["data"] as? [[String: Any]] else {
-                throw IntegrationError(message: "Codex returned an invalid thread list.")
-            }
-            let readStates = result["readStates"] as? [String: [String: Any]] ?? [:]
-            threads.append(contentsOf: rows.compactMap { row in
-                guard var thread = Self.thread(row) else { return nil }
-                thread.readState = Self.readState(readStates[thread.sessionID])
-                return thread
-            })
-            cursor = result["nextCursor"] as? String
-        } while cursor != nil
+        let data = try await request("thread/list", params: [
+            "limit": 25, "sortKey": "recency_at", "sortDirection": "desc",
+            "sourceKinds": ["cli", "vscode", "appServer"], "archived": false
+        ])
+        guard let result = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let rows = result["data"] as? [[String: Any]] else {
+            throw IntegrationError(message: "Codex returned an invalid thread list.")
+        }
+        let readStates = result["readStates"] as? [String: [String: Any]] ?? [:]
+        let threads: [AgentThread] = rows.compactMap { row in
+            guard var thread = Self.thread(row) else { return nil }
+            thread.readState = Self.readState(readStates[thread.sessionID])
+            return thread
+        }
         return AgentThread.unique(threads)
     }
 
