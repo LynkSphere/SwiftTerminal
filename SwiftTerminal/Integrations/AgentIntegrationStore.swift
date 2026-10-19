@@ -10,6 +10,7 @@ final class AgentIntegrationStore {
     private(set) var errors: [AgentProvider: String] = [:]
     private(set) var isRefreshing = false
     private(set) var deletingThreadIDs: Set<String> = []
+    private(set) var stoppingThreadIDs: Set<String> = []
     private(set) var deletedThreadIDs: Set<String> = []
     var actionError: String?
     private(set) var settledThreadIDs: Set<String>
@@ -28,6 +29,7 @@ final class AgentIntegrationStore {
     @ObservationIgnored private var refreshRequested = false
     @ObservationIgnored private var drafts: [String: AgentThread] = [:]
     @ObservationIgnored private var terminalTitles: [String: String]
+    @ObservationIgnored private var stopTasks: [String: Task<Void, Never>] = [:]
 
     var enabledProviders: [AgentProvider] { providers.filter { enabled.contains($0) } }
     var isEnabled: Bool { !enabled.isEmpty }
@@ -73,7 +75,7 @@ final class AgentIntegrationStore {
     }
 
     func canMarkUnread(_ thread: AgentThread) -> Bool {
-        enabled.contains(thread.provider) && thread.readState != nil && !deletingThreadIDs.contains(thread.id)
+        enabled.contains(thread.provider) && thread.readState != nil && !deletingThreadIDs.contains(thread.id) && !stoppingThreadIDs.contains(thread.id)
             && adapters[thread.provider]?.capabilities.contains(.markUnread) == true
     }
 
@@ -83,7 +85,7 @@ final class AgentIntegrationStore {
 
     func canDelete(_ thread: AgentThread) -> Bool {
         enabled.contains(thread.provider) && supportsDeletion(thread)
-            && !deletingThreadIDs.contains(thread.id) && !deletedThreadIDs.contains(thread.id)
+            && !deletingThreadIDs.contains(thread.id) && !deletedThreadIDs.contains(thread.id) && !stoppingThreadIDs.contains(thread.id)
     }
 
     func deletionMessage(for thread: AgentThread) -> String {
@@ -186,14 +188,37 @@ final class AgentIntegrationStore {
 
     @discardableResult
     func settle(_ thread: AgentThread) -> AgentThread? {
-        guard !deletedThreadIDs.contains(thread.id), !deletingThreadIDs.contains(thread.id) else { return nil }
+        guard !deletedThreadIDs.contains(thread.id), !deletingThreadIDs.contains(thread.id),
+              let adapter = adapters[thread.provider] else { return nil }
         settledThreadIDs.insert(thread.id)
         defaults.set(settledThreadIDs.sorted(), forKey: "integration.settledThreadIDs")
         let draft = drafts.removeValue(forKey: thread.id)
-        adapters[thread.provider]?.forgetThread(thread.sessionID)
         metadataRequests.remove(thread.id)
         revisions[thread.id, default: 0] += 1
         if viewedThreadID == thread.id { viewedThreadID = nil }
+        guard stoppingThreadIDs.insert(thread.id).inserted else { return draft }
+        stopTasks[thread.id] = Task { [weak self] in
+            guard let self else { return }
+            defer {
+                self.stoppingThreadIDs.remove(thread.id)
+                self.stopTasks[thread.id] = nil
+            }
+            do {
+                try await adapter.stopThread(thread)
+                guard !self.deletedThreadIDs.contains(thread.id) else { return }
+                let index = self.threads.firstIndex(where: { $0.id == thread.id })
+                var stopped = index.map { self.threads[$0] } ?? thread
+                stopped.status = .stopped
+                let result = self.reconcile(stopped)
+                if let index { self.threads[index] = result }
+                else { self.threads.append(result) }
+                self.revisions[thread.id, default: 0] += 1
+                self.saveActivity()
+            } catch {
+                if self.settledThreadIDs.contains(thread.id) { self.restore(thread, draft: draft) }
+                self.actionError = "Couldn’t stop this session: \(error.localizedDescription)"
+            }
+        }
         return draft
     }
 
@@ -351,6 +376,7 @@ final class AgentIntegrationStore {
     }
 
     func prepareLaunch(for thread: AgentThread, isNew: Bool = false) async throws -> AgentLaunch {
+        if let stopTask = stopTasks[thread.id] { await stopTask.value }
         let adapter = try enabledAdapter(for: thread.provider)
         let generation = generations[thread.provider, default: 0]
         let intent: AgentLaunchIntent = isNew || drafts[thread.id] != nil ? .create : .resume
@@ -362,14 +388,8 @@ final class AgentIntegrationStore {
 
     func recordProcessExit(threadID: String, code: Int32?) {
         guard !settledThreadIDs.contains(threadID), let index = threads.firstIndex(where: { $0.id == threadID }) else { return }
-        var thread = threads[index]
-        if let code, code != 0 { thread.status = .failed }
-        else if thread.status != .done { thread.status = .stopped }
+        let thread = threads[index]
         adapters[thread.provider]?.didExit(thread)
-        if drafts[threadID] != nil { drafts[threadID] = thread }
-        threads[index] = reconcile(thread)
-        revisions[threadID, default: 0] += 1
-        saveActivity()
     }
 
     private func enabledAdapter(for provider: AgentProvider) throws -> any AgentProviderAdapter {

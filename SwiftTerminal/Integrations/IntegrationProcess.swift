@@ -15,18 +15,18 @@ enum IntegrationProcess {
         return values
     }
 
-    static func make(_ command: String, arguments: [String]) -> Process {
+    static func make(_ command: String, arguments: [String], directory: String? = nil) -> Process {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: shell)
         process.arguments = shellArguments(command: command, arguments: arguments)
         process.environment = environment
-        process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
+        process.currentDirectoryURL = directory.map { URL(fileURLWithPath: $0) } ?? FileManager.default.homeDirectoryForCurrentUser
         process.standardInput = FileHandle.nullDevice
         return process
     }
 
-    static func run(_ command: String, arguments: [String], timeout: Duration = .seconds(15)) async throws -> Data {
-        let process = make(command, arguments: arguments)
+    static func run(_ command: String, arguments: [String], directory: String? = nil, timeout: Duration = .seconds(15)) async throws -> Data {
+        let process = make(command, arguments: arguments, directory: directory)
         let output = Pipe()
         let errors = Pipe()
         process.standardOutput = output

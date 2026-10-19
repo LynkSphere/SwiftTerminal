@@ -71,7 +71,7 @@ final class TaskSessionController {
     }
 
     func settle(_ thread: AgentThread, undoManager: UndoManager? = nil) {
-        guard !integrations.settledThreadIDs.contains(thread.id),
+        guard !isOpening, !integrations.settledThreadIDs.contains(thread.id),
               !integrations.deletingThreadIDs.contains(thread.id), !integrations.deletedThreadIDs.contains(thread.id) else { return }
         let draft = integrations.settle(thread)
         appState.closeSession(thread.id)
@@ -98,6 +98,7 @@ final class TaskSessionController {
     private func canOpen(_ thread: AgentThread) -> Bool {
         integrations.enabledProviders.contains(thread.provider) && !integrations.settledThreadIDs.contains(thread.id)
             && !integrations.deletingThreadIDs.contains(thread.id) && !integrations.deletedThreadIDs.contains(thread.id)
+            && !integrations.stoppingThreadIDs.contains(thread.id)
     }
 
     func delete(_ thread: AgentThread) async {

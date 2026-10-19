@@ -6,13 +6,18 @@ final class CodexAgentAdapter: AgentProviderAdapter {
     let capabilities: AgentCapabilities = [.markUnread, .deleteThread, .deleteDescendants]
     var onEvent: ((AgentEvent) -> Void)?
     private let socket = CodexSocket()
+    private let defaults: UserDefaults
+    private var archivedThreadIDs: Set<String>
+    private var archivingThreadIDs: Set<String> = []
     private var connected = false
     private var connectionTask: Task<Void, Error>?
     private var nextID = 0
     private var pending: [Int: CheckedContinuation<Data, Error>] = [:]
     private var socketPath: String?
 
-    init() {
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        archivedThreadIDs = Set(defaults.stringArray(forKey: "integration.codex.archivedThreadIDs") ?? [])
         socket.onMessage = { [weak self] in self?.receive($0) }
         socket.onClose = { [weak self] in self?.disconnect(error: $0) }
     }
@@ -47,9 +52,16 @@ final class CodexAgentAdapter: AgentProviderAdapter {
 
     func listThreads() async throws -> [AgentThread] {
         try await connect()
+        let active = try await listThreads(archived: false)
+        guard !archivedThreadIDs.isEmpty else { return active }
+        let archived = try await listThreads(archived: true).filter { archivedThreadIDs.contains($0.sessionID) }
+        return AgentThread.unique(active + archived)
+    }
+
+    private func listThreads(archived: Bool) async throws -> [AgentThread] {
         let data = try await request("thread/list", params: [
             "limit": 25, "sortKey": "recency_at", "sortDirection": "desc",
-            "sourceKinds": ["cli", "vscode", "appServer"], "archived": false
+            "sourceKinds": ["cli", "vscode", "appServer"], "archived": archived
         ])
         guard let result = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let rows = result["data"] as? [[String: Any]] else {
@@ -106,6 +118,8 @@ final class CodexAgentAdapter: AgentProviderAdapter {
     func deleteThread(_ thread: AgentThread) async throws {
         try await connect()
         _ = try await request("thread/delete", params: ["threadId": thread.sessionID])
+        archivedThreadIDs.remove(thread.sessionID)
+        saveArchivedThreadIDs()
         onEvent?(.threadDeleted(sessionID: thread.sessionID))
         onEvent?(.listInvalidated)
     }
@@ -115,10 +129,38 @@ final class CodexAgentAdapter: AgentProviderAdapter {
             throw IntegrationError(message: "Invalid Codex session identifier.")
         }
         try await connect()
+        if archivedThreadIDs.contains(thread.sessionID) {
+            _ = try await request("thread/unarchive", params: ["threadId": thread.sessionID])
+            archivedThreadIDs.remove(thread.sessionID)
+            saveArchivedThreadIDs()
+        }
         guard let socketPath else {
             throw IntegrationError(message: "Codex is disconnected. Try again.")
         }
         return AgentLaunch(executable: "codex", arguments: ["--remote", "unix://" + socketPath, "resume", thread.sessionID])
+    }
+
+    func stopThread(_ thread: AgentThread) async throws {
+        guard !archivedThreadIDs.contains(thread.sessionID) else { return }
+        try await connect()
+        archivingThreadIDs.insert(thread.sessionID)
+        defer { archivingThreadIDs.remove(thread.sessionID) }
+        do {
+            _ = try await request("thread/archive", params: ["threadId": thread.sessionID])
+        } catch {
+            if !archivedThreadIDs.contains(thread.sessionID) { throw error }
+        }
+        archivedThreadIDs.insert(thread.sessionID)
+        saveArchivedThreadIDs()
+        onEvent?(.listInvalidated)
+    }
+
+    func didExit(_ thread: AgentThread) {
+        onEvent?(.threadInvalidated(sessionID: thread.sessionID))
+    }
+
+    private func saveArchivedThreadIDs() {
+        defaults.set(archivedThreadIDs.sorted(), forKey: "integration.codex.archivedThreadIDs")
     }
 
     func setEnabled(_ isEnabled: Bool) {
@@ -166,6 +208,15 @@ final class CodexAgentAdapter: AgentProviderAdapter {
                 return
             }
             if ["thread/started", "thread/archived", "thread/unarchived"].contains(method) {
+                if let id = params["threadId"] as? String {
+                    if method == "thread/archived", archivingThreadIDs.contains(id) {
+                        archivedThreadIDs.insert(id)
+                        saveArchivedThreadIDs()
+                    } else if method == "thread/unarchived" {
+                        archivedThreadIDs.remove(id)
+                        saveArchivedThreadIDs()
+                    }
+                }
                 onEvent?(.listInvalidated)
                 return
             }
