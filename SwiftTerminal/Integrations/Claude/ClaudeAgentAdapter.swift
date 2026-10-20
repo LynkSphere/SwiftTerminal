@@ -9,7 +9,7 @@ final class ClaudeAgentAdapter: AgentProviderAdapter {
     private let defaults: UserDefaults
     private var backgroundIDs: [String: String]
     private var backgroundSessions: [String: ClaudeBackgroundSession] = [:]
-    private var watcher: FileSystemWatcher?
+    private var watchers: [FileSystemWatcher] = []
     private var statusTask: Task<Void, Never>?
     private var statusRefreshRequested = false
     private var statusRevision = 0
@@ -83,8 +83,8 @@ final class ClaudeAgentAdapter: AgentProviderAdapter {
 
     func setEnabled(_ isEnabled: Bool) {
         if !isEnabled {
-            watcher?.stop()
-            watcher = nil
+            watchers.forEach { $0.stop() }
+            watchers.removeAll()
             statusTask?.cancel()
         }
     }
@@ -156,18 +156,22 @@ final class ClaudeAgentAdapter: AgentProviderAdapter {
     }
 
     private func startWatching() throws {
-        guard watcher == nil else { return }
+        guard watchers.isEmpty else { return }
         let config = IntegrationProcess.environment["CLAUDE_CONFIG_DIR"].map { URL(fileURLWithPath: $0) }
             ?? FileManager.default.homeDirectoryForCurrentUser.appending(path: ".claude")
-        let jobs = config.appending(path: "jobs")
-        try FileManager.default.createDirectory(at: jobs, withIntermediateDirectories: true)
-        watcher = FileSystemWatcher(url: jobs, latency: 0.3, ignoredSubstrings: []) { [weak self] in
-            Task { @MainActor [weak self] in self?.requestStatusRefresh() }
+        let directories = ["jobs", "sessions"].map { config.appending(path: $0) }
+        for directory in directories {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+        watchers = directories.map { directory in
+            FileSystemWatcher(url: directory, latency: 0.3, ignoredSubstrings: []) { [weak self] in
+                Task { @MainActor [weak self] in self?.requestStatusRefresh() }
+            }
         }
     }
 
     private func requestStatusRefresh() {
-        guard watcher != nil else { return }
+        guard !watchers.isEmpty else { return }
         statusRefreshRequested = true
         guard statusTask == nil else { return }
         statusTask = Task { [weak self] in

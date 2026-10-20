@@ -18,13 +18,15 @@ struct ClaudeBackgroundSession: Decodable, Sendable, Equatable {
     }
 
     var threadStatus: AgentThreadStatus {
+        if status == "busy" { return .processing }
+        if status == "waiting" { return .waiting }
         switch state {
-        case "working": .processing
-        case "done": .done
-        case "failed": .failed
-        case "stopped": .stopped
-        case "blocked": status == "waiting" || waitingFor != nil ? .waiting : .idle
-        default: .unknown
+        case "working": return status == "idle" ? .idle : .processing
+        case "done": return .done
+        case "failed": return .failed
+        case "stopped": return .stopped
+        case "blocked": return waitingFor != nil ? .waiting : .idle
+        default: return .unknown
         }
     }
 
