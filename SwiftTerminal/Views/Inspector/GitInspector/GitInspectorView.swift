@@ -248,7 +248,7 @@ struct GitInspectorView: View {
         let repoName = snapshot.mainRepositoryURL.lastPathComponent
         return Label {
             if snapshot.isLinkedWorktree {
-                Text("\(repoName) (\(snapshot.repositoryRootURL.lastPathComponent))")
+                Text("\(repoName) (\(snapshot.branchName ?? "detached"))")
             } else {
                 Text(repoName)
             }
