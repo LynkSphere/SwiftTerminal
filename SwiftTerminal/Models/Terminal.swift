@@ -2,15 +2,7 @@ import AppKit
 import Observation
 import SwiftTerm
 
-/// Mirrors `SwiftTerm.Terminal.ProgressReportState` so the model layer doesn't
-/// expose the dependency type. Driven by OSC 9;4 (ConEmu progress).
-enum TerminalProgressState: Int {
-    case set = 1
-    case error = 2
-    case indeterminate = 3
-    case pause = 4
-}
-
+@MainActor
 @Observable
 final class Terminal: Identifiable, Hashable, Codable {
     var id: UUID
@@ -35,33 +27,12 @@ final class Terminal: Identifiable, Hashable, Codable {
     @ObservationIgnored
     var onProcessExit: (@MainActor (Int32?) -> Void)?
 
-    @ObservationIgnored
-    var onTitleChange: (@MainActor (String) -> Void)?
-
     /// Whether this saved command is the workspace's default "Run" target (Cmd+R).
     /// Only meaningful for entries in `Workspace.commands`; unused for tasks.
     var isDefault: Bool = false
 
-    /// Name of the current foreground child process, if any. Driven by the
-    /// shell-integration OSC 133 handler installed in `TerminalRepresentable`:
-    /// set on `133;C` (preexec), cleared on `133;D` (precmd).
-    var foregroundProcessName: String?
-
-    /// Most recent OSC 0/1/2 title reported by the foreground program. This is
-    /// session-only and is surfaced only while Claude Code or Codex is active.
-    var reportedTerminalTitle: String?
-
-    /// Exit status of the most recently completed foreground command, surfaced
-    /// by OSC 133;D. Nil before the first command finishes.
+    /// Exit status reported when the terminal process finishes.
     var lastExitCode: Int32?
-
-    /// Most recent OSC 9;4 progress report from the running foreground command
-    /// (ConEmu/Windows-Terminal "progress" spec). Set by the OSC 9 handler in
-    /// `TerminalRepresentable`, cleared on OSC 133;D and on process exit.
-    var progressState: TerminalProgressState?
-
-    /// 0…100 when `progressState == .set` or `.error`; nil otherwise.
-    var progressValue: UInt8?
 
     @ObservationIgnored
     weak var workspace: Workspace?
@@ -139,20 +110,8 @@ final class Terminal: Identifiable, Hashable, Codable {
         hasher.combine(id)
     }
 
-    /// A user-set name wins, followed by
-    /// an active Claude/Codex chat title, the foreground process, and finally
-    /// the generic "Terminal" label.
     var displayTitle: String {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let hasCustomTitle = !trimmed.isEmpty && trimmed != "Terminal"
-        if hasCustomTitle { return trimmed }
-        if let agentTitle = AgentTerminalTitle.displayTitle(
-            reportedTitle: reportedTerminalTitle,
-            foregroundCommand: foregroundProcessName
-        ) {
-            return agentTitle
-        }
-        if let foregroundProcessName, !foregroundProcessName.isEmpty { return foregroundProcessName }
         return trimmed.isEmpty ? "Terminal" : trimmed
     }
 
@@ -165,13 +124,15 @@ final class Terminal: Identifiable, Hashable, Codable {
     }
 
     var hasChildProcess: Bool {
-        foregroundProcessName != nil
+        guard let process = localProcessTerminalView?.process, process.running else { return false }
+        // Query the PTY's foreground job on demand; no injected shell hooks.
+        let foregroundGroup = tcgetpgrp(process.childfd)
+        return foregroundGroup > 0 && foregroundGroup != process.shellPid
     }
 
     func terminate() {
         // An intentional close must not report a late process exit as task activity.
         onProcessExit = nil
-        onTitleChange = nil
         if let tv = localProcessTerminalView {
             tv.processDelegate = nil
             tv.onBell = nil
@@ -193,10 +154,6 @@ final class Terminal: Identifiable, Hashable, Codable {
         pendingLaunch = nil
         processDelegate = nil
         hasExited = true
-        foregroundProcessName = nil
-        reportedTerminalTitle = nil
-        progressState = nil
-        progressValue = nil
         hasBellNotification = false
     }
 

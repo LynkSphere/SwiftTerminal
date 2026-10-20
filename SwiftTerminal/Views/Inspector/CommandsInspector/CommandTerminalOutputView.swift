@@ -14,7 +14,7 @@ struct CommandTerminalOutputView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text(terminal.foregroundProcessName ?? terminal.title)
+                Text(terminal.title)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)

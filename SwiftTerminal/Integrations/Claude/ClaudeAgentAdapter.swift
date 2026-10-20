@@ -77,10 +77,6 @@ final class ClaudeAgentAdapter: AgentProviderAdapter {
         try await refreshBackgroundSessions()
     }
 
-    func title(from reportedTitle: String) -> String? {
-        AgentTerminalTitle.displayTitle(reportedTitle: reportedTitle, foregroundCommand: "claude")
-    }
-
     func didExit(_ thread: AgentThread) {
         requestStatusRefresh()
     }

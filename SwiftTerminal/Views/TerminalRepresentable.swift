@@ -33,17 +33,14 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
         Coordinator()
     }
 
-    /// Weak wrapper so OSC handler closures don't retain the Terminal model.
+    /// Process delegates do not retain the Terminal model.
     final class WeakTerminal {
         weak var value: Terminal?
         init(_ value: Terminal) { self.value = value }
     }
 
     final class Coordinator: NSObject, LocalProcessTerminalViewDelegate {
-        /// SwiftTerm parses OSC 7 (`\e]7;file://host/path\a`) and forwards the
-        /// reported directory here. The shell-integration scripts emit this on
-        /// every prompt and on `chpwd`, so this is the authoritative source for
-        /// the per-terminal `currentDirectory` — no polling required.
+        /// Keep native directory reports for resolving repository file links.
         func hostCurrentDirectoryUpdate(source: SwiftTerm.TerminalView, directory: String?) {
             guard let directory,
                   let local = source as? LocalProcessTerminalView,
@@ -72,7 +69,9 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
             let tv = LocalProcessTerminalView(frame: .zero)
             tv.onBell = { [weak terminal, weak tv, weak appState] in
                 Task { @MainActor in
-                    guard let terminal else { return }
+                    // Agent tasks notify from provider state; their BEL is not
+                    // another completion or question notification.
+                    guard let terminal, !terminal.isTaskTerminal else { return }
                     let isSelected = appState?.activeTerminal === terminal
                     let isVisible = isSelected && (tv?.window != nil)
                     if !isVisible {
@@ -112,36 +111,19 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
                 ?? resolvedWorkingDirectoryPath(from: terminal.workspace?.directory)
                 ?? home
 
-            let plan: ShellIntegration.Plan
-            if let launch {
-                // Use argv, not PTY input: long settings exceed the terminal's canonical
-                // input limit, and shell startup can consume input before its first prompt.
-                plan = ShellIntegration.Plan(
-                    args: IntegrationProcess.shellArguments(command: launch.executable, arguments: launch.arguments), env: [:]
-                )
-                terminal.foregroundProcessName = launch.executable
-            } else {
-                plan = ShellIntegration.plan(forShellPath: shell)
-            }
-
+            let arguments = launch.map {
+                IntegrationProcess.shellArguments(command: $0.executable, arguments: $0.arguments)
+            } ?? []
             var env = launch == nil ? ProcessInfo.processInfo.environment : IntegrationProcess.environment
             env["TERM"] = "xterm-256color"
             env["COLORTERM"] = "truecolor"
-            for (k, v) in plan.env { env[k] = v }
             let environment = env.map { "\($0.key)=\($0.value)" }
-
-            // bash --rcfile only takes effect for non-login shells, so when our
-            // plan injects rc args we must drop the leading-dash login convention.
-            let execName = launch != nil || plan.args.contains("--rcfile") ? shellBasename : "-" + shellBasename
-
+            let execName = launch == nil ? "-" + shellBasename : shellBasename
             tv.processDelegate = self
-
-            installSemanticPromptHandler(on: tv, for: terminal)
-            installProgressReportHandler(on: tv, for: terminal)
 
             tv.startProcess(
                 executable: shell,
-                args: plan.args,
+                args: arguments,
                 environment: environment,
                 execName: execName,
                 currentDirectory: startingDirectory
@@ -156,109 +138,17 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
 
         func sizeChanged(source: LocalProcessTerminalView, newCols: Int, newRows: Int) {}
 
-        func setTerminalTitle(source: LocalProcessTerminalView, title: String) {
-            guard let terminal = viewMap[ObjectIdentifier(source)]?.value else { return }
-            Task { @MainActor [weak terminal] in
-                guard let terminal, terminal.reportedTerminalTitle != title else { return }
-                terminal.reportedTerminalTitle = title
-                terminal.onTitleChange?(title)
-            }
-        }
+        func setTerminalTitle(source: LocalProcessTerminalView, title: String) {}
 
         func processTerminated(source: TerminalView, exitCode: Int32?) {
             guard let local = source as? LocalProcessTerminalView,
                   let terminal = viewMap[ObjectIdentifier(local)]?.value else { return }
             Task { @MainActor in
-                terminal.foregroundProcessName = nil
-                terminal.reportedTerminalTitle = nil
-                terminal.progressState = nil
-                terminal.progressValue = nil
                 terminal.lastExitCode = exitCode
                 terminal.hasExited = true
                 terminal.onProcessExit?(exitCode)
             }
             viewMap.removeValue(forKey: ObjectIdentifier(local))
-        }
-
-        func installSemanticPromptHandler(on view: LocalProcessTerminalView, for terminal: Terminal) {
-            let weakTerminal = WeakTerminal(terminal)
-            view.getTerminal().registerOscHandler(code: 133) { data in
-                let payload = String(bytes: data, encoding: .utf8) ?? ""
-                let verb: String
-                let arg: String
-                if let semi = payload.firstIndex(of: ";") {
-                    verb = String(payload[..<semi])
-                    arg = String(payload[payload.index(after: semi)...])
-                } else {
-                    verb = payload
-                    arg = ""
-                }
-                switch verb {
-                case "C":
-                    let name = arg.trimmingCharacters(in: .whitespacesAndNewlines)
-                    let value = name.isEmpty ? "(running)" : name
-                    Task { @MainActor in
-                        guard let terminal = weakTerminal.value else { return }
-                        terminal.reportedTerminalTitle = nil
-                        if terminal.foregroundProcessName != value {
-                            terminal.foregroundProcessName = value
-                        }
-                    }
-                case "D":
-                    let exit = Int32(arg.trimmingCharacters(in: .whitespacesAndNewlines))
-                    Task { @MainActor in
-                        guard let terminal = weakTerminal.value else { return }
-                        terminal.foregroundProcessName = nil
-                        terminal.reportedTerminalTitle = nil
-                        terminal.lastExitCode = exit
-                        terminal.progressState = nil
-                        terminal.progressValue = nil
-                    }
-                default:
-                    break  // 133;A (prompt-start) and 133;B (prompt-end) ignored
-                }
-            }
-        }
-
-        /// Registers an OSC 9;4 (ConEmu progress report) handler. Payload shape:
-        ///   `9;4;<state>[;<progress>]` where state is 0=remove, 1=set,
-        ///   2=error, 3=indeterminate, 4=pause; progress is 0…100.
-        /// Preempts SwiftTerm's built-in `oscProgressReport` (which would
-        /// otherwise render a thin bar at the terminal's bottom edge); we want
-        /// to surface progress in the inspector instead.
-        func installProgressReportHandler(on view: LocalProcessTerminalView, for terminal: Terminal) {
-            let weakTerminal = WeakTerminal(terminal)
-            view.getTerminal().registerOscHandler(code: 9) { data in
-                let payload = String(bytes: data, encoding: .utf8) ?? ""
-                // Only `4;…` is a progress report; ignore other OSC 9 forms.
-                let parts = payload.split(separator: ";", omittingEmptySubsequences: false).map(String.init)
-                guard parts.first == "4", parts.count >= 2,
-                      let rawState = Int(parts[1]) else { return }
-
-                let progress: UInt8? = {
-                    guard parts.count >= 3, let raw = Int(parts[2]) else { return nil }
-                    return UInt8(max(0, min(raw, 100)))
-                }()
-
-                Task { @MainActor in
-                    guard let terminal = weakTerminal.value else { return }
-                    if rawState == 0 {  // remove
-                        terminal.progressState = nil
-                        terminal.progressValue = nil
-                        return
-                    }
-                    guard let state = TerminalProgressState(rawValue: rawState) else { return }
-                    terminal.progressState = state
-                    switch state {
-                    case .set, .error:
-                        terminal.progressValue = progress ?? terminal.progressValue ?? 0
-                    case .indeterminate:
-                        terminal.progressValue = nil
-                    case .pause:
-                        terminal.progressValue = progress ?? terminal.progressValue
-                    }
-                }
-            }
         }
 
         /// SwiftTerm reposts link activation (click on an OSC 8 hyperlink or an

@@ -15,6 +15,7 @@ final class TaskSessionController {
         self.integrations = integrations
         self.appState = appState
         self.workspaces = workspaces
+        integrations.onAttention = AppDelegate.sendThreadNotification
     }
 
     func compose(provider: AgentProvider, workspace: Workspace) async -> Bool {
@@ -121,11 +122,6 @@ final class TaskSessionController {
 
     private func observeTerminal(of session: TaskSession) {
         let terminal = session.terminal
-        terminal.onTitleChange = { [weak self, weak session, weak terminal] title in
-            guard let self, let session, session.terminal === terminal, !session.terminal.hasExited,
-                  self.appState.sessions[session.id] === session else { return }
-            self.integrations.recordTerminalTitle(title, threadID: session.id)
-        }
         terminal.onProcessExit = { [weak self, weak session, weak terminal] code in
             guard let self, let session, session.terminal === terminal,
                   self.appState.sessions[session.id] === session else { return }

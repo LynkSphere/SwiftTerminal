@@ -17,6 +17,7 @@ final class AgentIntegrationStore {
     private(set) var prioritySelectionID: String?
     private var enabled: Set<AgentProvider>
     private var activity: [String: ThreadActivity]
+    @ObservationIgnored var onAttention: ((AgentThread) -> Void)?
     @ObservationIgnored private var viewedThreadID: String?
     @ObservationIgnored private var selectedThreadID: String?
 
@@ -30,7 +31,6 @@ final class AgentIntegrationStore {
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
     @ObservationIgnored private var refreshRequested = false
     @ObservationIgnored private var drafts: [String: AgentThread] = [:]
-    @ObservationIgnored private var terminalTitles: [String: String]
     @ObservationIgnored private var stopTasks: [String: Task<Void, Never>] = [:]
 
     var enabledProviders: [AgentProvider] { providers.filter { enabled.contains($0) } }
@@ -48,7 +48,6 @@ final class AgentIntegrationStore {
         self.adapters = Dictionary(uniqueKeysWithValues: adapters.map { ($0.provider, $0) })
         providers = adapters.map(\.provider)
         enabled = Set(providers.filter { defaults.bool(forKey: $0.settingsKey) })
-        terminalTitles = defaults.dictionary(forKey: "integration.terminalTitles") as? [String: String] ?? [:]
         settledThreadIDs = Set(defaults.stringArray(forKey: "integration.settledThreadIDs") ?? [])
         activity = defaults.data(forKey: "integration.threadActivity")
             .flatMap { try? JSONDecoder().decode([String: ThreadActivity].self, from: $0) } ?? [:]
@@ -116,12 +115,10 @@ final class AgentIntegrationStore {
         threads.removeAll { $0.id == id }
         drafts[id] = nil
         activity[id] = nil
-        terminalTitles[id] = nil
         metadataRequests.remove(id)
         settledThreadIDs.remove(id)
         revisions[id, default: 0] += 1
         if viewedThreadID == id { viewedThreadID = nil }
-        defaults.set(terminalTitles, forKey: "integration.terminalTitles")
         defaults.set(settledThreadIDs.sorted(), forKey: "integration.settledThreadIDs")
         saveActivity()
     }
@@ -271,8 +268,7 @@ final class AgentIntegrationStore {
     }
 
     private func reconcile(_ source: AgentThread, now: Date = .now) -> AgentThread {
-        var thread = source
-        if !thread.hasProviderTitle, let title = terminalTitles[thread.id] { thread.title = title }
+        let thread = source
         var state = activity[thread.id] ?? ThreadActivity(thread: thread)
         let result = state.update(thread, isViewed: viewedThreadID == thread.id, now: now)
         // Keep the selected task in Priority even when viewing clears its unread result.
@@ -281,23 +277,16 @@ final class AgentIntegrationStore {
             prioritySelectionID = thread.id
         }
         activity[thread.id] = state
-        return result
-    }
-
-    func recordTerminalTitle(_ reportedTitle: String, threadID: String) {
-        guard !settledThreadIDs.contains(threadID),
-              let index = threads.firstIndex(where: { $0.id == threadID }),
-              enabled.contains(threads[index].provider),
-              let title = adapters[threads[index].provider]?.title(from: reportedTitle),
-              terminalTitles[threadID] != title else { return }
-        terminalTitles[threadID] = title
-        defaults.set(terminalTitles, forKey: "integration.terminalTitles")
-        if !threads[index].hasProviderTitle {
-            threads[index].title = title
-            if drafts[threadID] != nil { drafts[threadID] = threads[index] }
-            revisions[threadID, default: 0] += 1
+        // Initial history and reconnect snapshots establish a baseline; only
+        // an observed transition should ask for the user's attention.
+        if let previous = threads.first(where: { $0.id == thread.id }),
+           previous.status != .unknown, previous.status != result.status,
+           result.status == .done || result.status == .waiting,
+           enabled.contains(thread.provider), !settledThreadIDs.contains(thread.id),
+           !deletingThreadIDs.contains(thread.id), !deletedThreadIDs.contains(thread.id) {
+            onAttention?(result)
         }
-        requestMetadata(threadID)
+        return result
     }
 
     private func saveActivity() {

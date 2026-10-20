@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @Environment(AppState.self) private var appState
     @Environment(AgentIntegrationStore.self) private var integrations
+    @Environment(TaskSessionController.self) private var sessions
     @State private var searchText = ""
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var showingOnboarding = false
@@ -69,6 +70,11 @@ struct ContentView: View {
             Text("\"\(command.title)\" is currently running. Replacing will stop it and start a new instance.")
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToSession)) { notification in
+            if let threadID = notification.userInfo?["threadID"] as? String,
+               let thread = integrations.threads.first(where: { $0.id == threadID }) {
+                Task { await sessions.open(thread) }
+                return
+            }
             guard let workspaceID = notification.userInfo?["workspaceID"] as? String,
                   let terminalID = notification.userInfo?["terminalID"] as? String else { return }
 

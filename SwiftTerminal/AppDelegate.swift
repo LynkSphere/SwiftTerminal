@@ -36,7 +36,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let userInfo = response.notification.request.content.userInfo
-        if let workspaceID = userInfo["workspaceID"] as? String,
+        if let threadID = userInfo["threadID"] as? String {
+            NotificationCenter.default.post(
+                name: .navigateToSession,
+                object: nil,
+                userInfo: ["threadID": threadID]
+            )
+        } else if let workspaceID = userInfo["workspaceID"] as? String,
            let terminalID = userInfo["terminalID"] as? String {
             NotificationCenter.default.post(
                 name: .navigateToSession,
@@ -67,6 +73,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             trigger: nil
         )
         UNUserNotificationCenter.current().add(request)
+    }
+
+    static func sendThreadNotification(_ thread: AgentThread) {
+        let content = UNMutableNotificationContent()
+        content.title = thread.projectName.isEmpty ? thread.provider.name : thread.projectName
+        content.body = "\(thread.title) — \(thread.status == .waiting ? "Needs your input" : "Done")"
+        content.sound = .default
+        content.userInfo = ["threadID": thread.id]
+        let request = UNNotificationRequest(
+            identifier: "thread:\(thread.id)",
+            content: content,
+            trigger: nil
+        )
+        UNUserNotificationCenter.current().add(request)
+        bounceDockIcon()
+        if !NSApplication.shared.isActive { showBadge() }
     }
 
     static func bounceDockIcon() {

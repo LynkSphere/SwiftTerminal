@@ -15,7 +15,6 @@ protocol AgentProviderAdapter: AnyObject {
     func stopThread(_ thread: AgentThread) async throws
     func markUnread(_ thread: AgentThread) async throws -> AgentReadState
     func deleteThread(_ thread: AgentThread) async throws
-    func title(from reportedTitle: String) -> String?
     func didExit(_ thread: AgentThread)
     /// Suspend background work when hidden, preserving resources needed by retained terminals.
     func setEnabled(_ isEnabled: Bool)
@@ -32,7 +31,6 @@ extension AgentProviderAdapter {
         throw IntegrationError(message: "\(provider.name) does not support deleting a thread.")
     }
 
-    func title(from reportedTitle: String) -> String? { nil }
     func didExit(_ thread: AgentThread) {}
     func setEnabled(_ isEnabled: Bool) {}
 }
