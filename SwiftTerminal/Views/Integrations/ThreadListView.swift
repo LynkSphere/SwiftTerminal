@@ -8,17 +8,13 @@ struct ThreadListView: View {
     let searchText: String
     @State private var threadToDelete: AgentThread?
     @State private var showingDeleteConfirmation = false
-<<<<<<< HEAD
     @SceneStorage("threadList.todayExpanded") private var isTodayExpanded = true
     @SceneStorage("threadList.yesterdayExpanded") private var isYesterdayExpanded = true
     @SceneStorage("threadList.earlierExpanded") private var isEarlierExpanded = true
     @Namespace private var rowPositions
-=======
     @State private var threadToRename: AgentThread?
     @State private var showingRename = false
     @State private var renamedTitle = ""
-    @State private var isSettledExpanded = false
->>>>>>> 32da6e5 (Rename chats from the sidebar)
 
     private var threads: [AgentThread] {
         integrations.visibleThreads.filter {
@@ -34,7 +30,6 @@ struct ThreadListView: View {
     }
 
     var body: some View {
-<<<<<<< HEAD
         TimelineView(.everyMinute) { context in
             let groups = ThreadListGroup.groups(
                 threads: threads,
@@ -50,27 +45,13 @@ struct ThreadListView: View {
                 ForEach(groups) { group in
                     if group.section == .priority {
                         Section(group.section.rawValue) {
-                            ThreadListRows(threads: group.threads, rowPositions: rowPositions, requestDeletion: requestDeletion)
+                            ThreadListRows(threads: group.threads, rowPositions: rowPositions, requestDeletion: requestDeletion, requestRename: requestRename)
                         }
                     } else {
                         Section(group.section.rawValue, isExpanded: expansion(for: group.section)) {
-                            ThreadListRows(threads: group.threads, rowPositions: rowPositions, requestDeletion: requestDeletion)
+                            ThreadListRows(threads: group.threads, rowPositions: rowPositions, requestDeletion: requestDeletion, requestRename: requestRename)
                         }
                     }
-=======
-        let regularThreads = threads.filter { !integrations.settledThreadIDs.contains($0.id) }
-        let settledThreads = threads.filter { integrations.settledThreadIDs.contains($0.id) }
-
-        List(selection: Binding<String?>(get: { appState.selectedSession?.id }, set: { id in
-            guard let thread = threads.first(where: { $0.id == id }) else { return }
-            Task { await sessions.open(thread) }
-        })) {
-            ThreadListRows(threads: regularThreads, requestDeletion: requestDeletion, requestRename: requestRename)
-
-            if !settledThreads.isEmpty {
-                Section("Settled", isExpanded: $isSettledExpanded) {
-                    ThreadListRows(threads: settledThreads, requestDeletion: requestDeletion, requestRename: requestRename)
->>>>>>> 32da6e5 (Rename chats from the sidebar)
                 }
             }
             .animation(reduceMotion ? nil : .smooth, value: groups.map { [$0.section.rawValue] + $0.threads.map(\.id) })

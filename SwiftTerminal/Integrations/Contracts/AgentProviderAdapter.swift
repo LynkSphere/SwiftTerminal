@@ -32,14 +32,10 @@ extension AgentProviderAdapter {
         throw IntegrationError(message: "\(provider.name) does not support deleting a thread.")
     }
 
-<<<<<<< HEAD
-=======
     func renameThread(_ thread: AgentThread, to title: String) async throws {
         throw IntegrationError(message: "\(provider.name) does not support renaming a thread.")
     }
 
-    func title(from reportedTitle: String) -> String? { nil }
->>>>>>> 32da6e5 (Rename chats from the sidebar)
     func didExit(_ thread: AgentThread) {}
     func setEnabled(_ isEnabled: Bool) {}
 }
