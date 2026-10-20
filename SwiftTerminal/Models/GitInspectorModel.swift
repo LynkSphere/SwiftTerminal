@@ -220,12 +220,12 @@ final class GitInspectorModel {
         }
     }
 
-    func branches(snapshot: GitRepositoryStatusSnapshot) async -> [GitBranchInfo] {
+    func branches(snapshot: GitRepositoryStatusSnapshot) async -> GitBranchListing {
         do {
             return try await GitRepository.shared.allBranchesDetailed(at: snapshot.repositoryRootURL)
         } catch {
             errorMessage = error.localizedDescription
-            return []
+            return GitBranchListing()
         }
     }
 
@@ -260,6 +260,18 @@ final class GitInspectorModel {
     func deleteBranch(_ name: String, force: Bool, snapshot: GitRepositoryStatusSnapshot) async -> Bool {
         await perform(successLabel: "Deleted branch \(name)") {
             try await GitRepository.shared.deleteBranch(name, force: force, at: snapshot.repositoryRootURL)
+        }
+    }
+
+    func deleteWorktree(_ worktree: GitWorktreeInfo, snapshot: GitRepositoryStatusSnapshot) async -> Bool {
+        await perform(successLabel: "Deleted worktree \(worktree.displayName)") {
+            try await GitRepository.shared.deleteWorktree(at: worktree.path, in: snapshot.repositoryRootURL)
+        }
+    }
+
+    func convertWorktreeToBranch(_ worktree: GitWorktreeInfo, snapshot: GitRepositoryStatusSnapshot) async -> Bool {
+        await perform(successLabel: "Converted worktree to branch \(worktree.branch ?? worktree.displayName)") {
+            try await GitRepository.shared.convertWorktreeToBranch(at: worktree.path, in: snapshot.repositoryRootURL)
         }
     }
 

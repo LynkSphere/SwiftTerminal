@@ -460,7 +460,7 @@ actor GitRepository {
         try await self._runBranchListDetailed(at: repositoryRootURL)
     }
 
-    func allBranchesDetailed(at repositoryRootURL: URL) async throws -> [GitBranchInfo] {
+    func allBranchesDetailed(at repositoryRootURL: URL) async throws -> GitBranchListing {
         try await self._runAllBranchListDetailed(at: repositoryRootURL)
     }
 
@@ -469,6 +469,70 @@ actor GitRepository {
     }
 
     // MARK: - Worktrees
+
+    func removeWorktree(at worktreeURL: URL, in repositoryRootURL: URL) async throws {
+        let worktree = try await removableWorktree(at: worktreeURL, in: repositoryRootURL)
+        try await self.executor.execute(GitRemoveWorktreeCommand(worktreeURL: worktree.path), at: repositoryRootURL)
+    }
+
+    func deleteWorktree(at worktreeURL: URL, in repositoryRootURL: URL) async throws {
+        let worktree = try await removableWorktree(at: worktreeURL, in: repositoryRootURL)
+        if let branch = worktree.branch {
+            let worktrees = try await self.worktrees(at: repositoryRootURL)
+            guard !worktrees.contains(where: { $0.branch == branch && $0.path != worktree.path }) else {
+                throw GitError.commandFailed(command: "git worktree remove", message: "This branch is also checked out in another worktree.")
+            }
+        }
+        try await removeWorktree(at: worktree.path, in: repositoryRootURL)
+        if let branch = worktree.branch {
+            do {
+                try await deleteBranch(branch, force: true, at: repositoryRootURL)
+            } catch {
+                throw GitError.commandFailed(command: "git branch -D", message: "The worktree folder was removed, but branch \"\(branch)\" could not be deleted. \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func convertWorktreeToBranch(at worktreeURL: URL, in repositoryRootURL: URL) async throws {
+        let worktree = try await removableWorktree(at: worktreeURL, in: repositoryRootURL)
+        guard let branch = worktree.branch,
+              let main = try await self.worktrees(at: repositoryRootURL).first(where: { $0.isMain && !$0.isBare }) else {
+            throw GitError.commandFailed(command: "git switch", message: "Conversion requires a branch and a main checkout.")
+        }
+        for root in [worktree.path, main.path] {
+            let status = try await self.executor.execute(GitStatusCommand(), at: root)
+            guard status.entries.isEmpty else {
+                throw GitError.commandFailed(command: "git switch", message: "Commit or stash changes in both the worktree and main checkout before converting.")
+            }
+        }
+        do {
+            try await self.executor.execute(GitSwitchCommand(branch: branch, ignoreOtherWorktrees: true), at: main.path)
+            try await removeWorktree(at: worktree.path, in: main.path)
+        } catch {
+            let removalError = error
+            guard let previousRef = main.branch ?? main.head else { throw removalError }
+            do {
+                try await self.executor.execute(GitSwitchCommand(branch: previousRef, detach: main.branch == nil), at: main.path)
+            } catch {
+                throw GitError.commandFailed(command: "git switch", message: "The worktree could not be removed and the main checkout could not be restored. \(removalError.localizedDescription) \(error.localizedDescription)")
+            }
+            throw removalError
+        }
+    }
+
+    private func removableWorktree(at worktreeURL: URL, in repositoryRootURL: URL) async throws -> GitWorktreeInfo {
+        let resolvedURL = worktreeURL.standardizedFileURL.resolvingSymlinksInPath()
+        let worktrees = try await self.worktrees(at: repositoryRootURL)
+        guard let worktree = worktrees.first(where: {
+            $0.path.standardizedFileURL.resolvingSymlinksInPath() == resolvedURL
+        }) else {
+            throw GitError.commandFailed(command: "git worktree remove", message: "This worktree no longer exists.")
+        }
+        if let reason = worktree.deletionUnavailableReason {
+            throw GitError.commandFailed(command: "git worktree remove", message: reason)
+        }
+        return worktree
+    }
 
     /// Lists every worktree of the repository, flagging the one whose root matches
     /// `repositoryRootURL` as `isCurrent` so callers can tell "here" from "elsewhere".
@@ -714,6 +778,13 @@ struct GitWorktreeInfo: Equatable, Hashable, Identifiable, Sendable {
 
     var id: String { path.path }
     var displayName: String { path.lastPathComponent }
+
+    nonisolated var deletionUnavailableReason: String? {
+        if isMain || isBare { return "The main worktree cannot be deleted." }
+        if isCurrent { return "Switch to another worktree before deleting this one." }
+        if isLocked { return "Unlock this worktree before deleting it." }
+        return nil
+    }
 }
 
 struct GitUnpushedCommit: Equatable, Identifiable {
@@ -737,7 +808,8 @@ struct GitBranchInfo: Equatable, Hashable, Identifiable {
     var isMerged: Bool
     var upstream: String?
     var isRemote: Bool = false
-    var id: String { name }
+    var isMergedIntoCurrentBranch: Bool = false
+    var id: String { "\(isRemote ? "remote" : "local")/\(name)" }
 }
 
 struct GitStashEntry: Equatable, Hashable, Identifiable {
@@ -974,7 +1046,14 @@ private struct GitLocalBranchesCommand: GitCommand {
 
 private struct GitSwitchCommand: GitCommand {
     let branch: String
-    var arguments: [String] { ["switch", branch] }
+    var ignoreOtherWorktrees = false
+    var detach = false
+    var arguments: [String] {
+        var arguments = ["switch"]
+        if ignoreOtherWorktrees { arguments.append("--ignore-other-worktrees") }
+        if detach { arguments.append("--detach") }
+        return arguments + [branch]
+    }
     func parse(output: String) throws { }
 }
 
@@ -1146,18 +1225,53 @@ extension GitRepository {
         async let mergedRaw = self.executor.execute(GitMergedBranchesRawCommand(), at: repositoryRootURL)
         let all = try await allRaw
         let merged = Set(try await mergedRaw)
-        return all.map { GitBranchInfo(name: $0.name, isCurrent: $0.isCurrent, isMerged: merged.contains($0.name), upstream: $0.upstream) }
+        return all.map {
+            GitBranchInfo(name: $0.name, isCurrent: $0.isCurrent, isMerged: merged.contains($0.name), upstream: $0.upstream,
+                          isMergedIntoCurrentBranch: merged.contains($0.name))
+        }
     }
 
-    fileprivate func _runAllBranchListDetailed(at repositoryRootURL: URL) async throws -> [GitBranchInfo] {
+    fileprivate func _runAllBranchListDetailed(at repositoryRootURL: URL) async throws -> GitBranchListing {
         async let localTask = self._runBranchListDetailed(at: repositoryRootURL)
         async let remotesRaw = self.executor.execute(GitRemoteBranchesRawCommand(), at: repositoryRootURL)
+        async let worktreesTask = self.worktrees(at: repositoryRootURL)
+        async let targetTask = self.executor.execute(GitDefaultBranchCommand(), at: repositoryRootURL)
         let local = try await localTask
         let remotes = (try? await remotesRaw) ?? []
         let remoteBranches = remotes.map {
             GitBranchInfo(name: $0, isCurrent: false, isMerged: false, upstream: nil, isRemote: true)
         }
-        return local + remoteBranches
+        var listing = GitBranchListing(branches: local + remoteBranches, worktrees: try await worktreesTask)
+        for index in listing.branches.indices {
+            listing.branches[index].isMerged = false
+        }
+        guard let target = try await targetTask else { return listing }
+        let targetName = target.ref.hasPrefix("refs/remotes/")
+            ? String(target.ref.dropFirst("refs/remotes/".count)) : target.branch
+        listing.mergeTarget = targetName
+        let merged = Set(try await self.executor.execute(
+            GitMergedBranchesRawCommand(target: target.ref, includeRemotes: true), at: repositoryRootURL
+        ))
+        for index in listing.branches.indices {
+            let branch = listing.branches[index]
+            let isTarget = branch.name == (branch.isRemote ? targetName : target.branch)
+            listing.branches[index].isMerged = !isTarget && merged.contains(branch.name)
+        }
+        for worktree in listing.worktrees where !worktree.isBare {
+            if let branch = worktree.branch {
+                if listing.branches.contains(where: { !$0.isRemote && $0.name == branch && $0.isMerged }) {
+                    listing.mergedWorktreePaths.insert(worktree.path)
+                }
+            } else if let head = worktree.head {
+                let result = try await self.executor.runWithExitCode(
+                    arguments: ["merge-base", "--is-ancestor", head, target.ref], at: repositoryRootURL
+                )
+                if result.exitCode == 0 {
+                    listing.mergedWorktreePaths.insert(worktree.path)
+                }
+            }
+        }
+        return listing
     }
 }
 
@@ -1166,7 +1280,7 @@ private struct GitRangeFilesCommand: GitCommand {
     let head: String
 
     var arguments: [String] {
-        ["diff", "--name-status", "\(base)...\(head)"]
+        ["diff", "--name-status", base, head, "--"]
     }
 
     func parse(output: String) throws -> [(status: Character, path: String)] {
@@ -1200,13 +1314,15 @@ private struct GitRangeAheadBehindCommand: GitCommand {
 
 private struct GitRemoteBranchesRawCommand: GitCommand {
     var arguments: [String] {
-        ["branch", "--remotes", "--list", "--format=%(refname:short)"]
+        ["for-each-ref", "--format=%(refname:short)%00%(symref)", "refs/remotes"]
     }
 
     func parse(output: String) throws -> [String] {
-        output.split(separator: "\n", omittingEmptySubsequences: true)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty && !$0.contains(" -> ") && $0.contains("/") }
+        output.split(separator: "\n", omittingEmptySubsequences: true).compactMap { line in
+            let parts = line.split(separator: "\0", omittingEmptySubsequences: false)
+            guard parts.count == 2, parts[1].isEmpty else { return nil }
+            return String(parts[0])
+        }
     }
 }
 
@@ -1229,8 +1345,11 @@ private struct GitAllBranchesRawCommand: GitCommand {
 }
 
 private struct GitMergedBranchesRawCommand: GitCommand {
+    var target: String = "HEAD"
+    var includeRemotes = false
+
     var arguments: [String] {
-        ["branch", "--list", "--merged", "HEAD", "--format=%(refname:short)"]
+        ["branch", includeRemotes ? "--all" : "--list", "--merged", target, "--format=%(refname:short)"]
     }
 
     func parse(output: String) throws -> [String] {

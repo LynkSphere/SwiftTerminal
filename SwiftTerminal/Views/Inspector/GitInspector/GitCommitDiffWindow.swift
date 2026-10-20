@@ -6,6 +6,7 @@ struct GitCommitDiffWindow: View {
     @State private var files: [GitChangedFile] = []
     @State private var isLoading = false
     @State private var selection: GitChangedFile?
+    @State private var loadError: String?
 
     private var shortHash: String {
         String(item.hash.prefix(7))
@@ -13,7 +14,7 @@ struct GitCommitDiffWindow: View {
 
     private var navTitle: String {
         if let range = item.range {
-            return "\(range.base) … \(range.head)"
+            return "\(range.base) → \(range.head)"
         }
         return "Changes in \(shortHash)"
     }
@@ -24,11 +25,17 @@ struct GitCommitDiffWindow: View {
                 if isLoading {
                     ProgressView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let loadError {
+                    ContentUnavailableView(
+                        "Unable to Load Changes",
+                        systemImage: "exclamationmark.triangle",
+                        description: Text(loadError)
+                    )
                 } else if files.isEmpty {
                     ContentUnavailableView(
                         "No Changes",
                         systemImage: "doc.richtext",
-                        description: Text("Nothing to show here.")
+                        description: Text(item.range == nil ? "Nothing to show here." : "These branches have the same committed contents.")
                     )
                 } else {
                     List(files, id: \.self, selection: $selection) { file in
@@ -98,6 +105,7 @@ struct GitCommitDiffWindow: View {
     }
 
     private func load() async {
+        loadError = nil
         if let preloaded = item.preloadedFiles {
             files = preloaded
             selection = selection ?? preloaded.first
@@ -105,15 +113,21 @@ struct GitCommitDiffWindow: View {
         }
         isLoading = true
         defer { isLoading = false }
-        let loaded: [GitChangedFile]
-        if let range = item.range {
-            loaded = (try? await GitRepository.shared.changedFiles(base: range.base, head: range.head, at: item.repositoryRootURL)) ?? []
-        } else if let stashIndex = item.stashIndex {
-            loaded = (try? await GitRepository.shared.stashChangedFiles(index: stashIndex, at: item.repositoryRootURL)) ?? []
-        } else {
-            loaded = (try? await GitRepository.shared.changedFiles(forCommit: item.hash, at: item.repositoryRootURL)) ?? []
+        do {
+            let loaded: [GitChangedFile]
+            if let range = item.range {
+                loaded = try await GitRepository.shared.changedFiles(base: range.base, head: range.head, at: item.repositoryRootURL)
+            } else if let stashIndex = item.stashIndex {
+                loaded = try await GitRepository.shared.stashChangedFiles(index: stashIndex, at: item.repositoryRootURL)
+            } else {
+                loaded = try await GitRepository.shared.changedFiles(forCommit: item.hash, at: item.repositoryRootURL)
+            }
+            files = loaded
+            selection = loaded.first
+        } catch {
+            files = []
+            selection = nil
+            loadError = error.localizedDescription
         }
-        files = loaded
-        selection = selection ?? loaded.first
     }
 }

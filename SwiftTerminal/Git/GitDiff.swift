@@ -12,7 +12,7 @@ enum GitDiffStage: Hashable, Codable {
             case .staged: "Staged Changes"
             case .unstaged: "Changes"
             case .commit(let hash): "Commit \(String(hash.prefix(7)))"
-            case .range(let base, let head): "\(base)…\(head)"
+            case .range(let base, let head): "\(base) → \(head)"
         }
     }
 }
@@ -476,7 +476,7 @@ struct GitDiffCommand: GitCommand {
                 // rather than the combined diff that `git show` emits for merge commits.
                 ["show", "-m", "--first-parent", "--format=", "--no-color", "--no-ext-diff", hash, "--", reference.repositoryRelativePath]
             case .range(let base, let head):
-                ["diff", "--no-color", "--no-ext-diff", "\(base)...\(head)", "--", reference.repositoryRelativePath]
+                ["diff", "--no-color", "--no-ext-diff", base, head, "--", reference.repositoryRelativePath]
         }
     }
 
@@ -495,7 +495,7 @@ struct GitFullContextDiffCommand: GitCommand {
             case .commit(let hash):
                 ["show", "-m", "--first-parent", "--format=", "--no-color", "--no-ext-diff", "-U99999", hash, "--", reference.repositoryRelativePath]
             case .range(let base, let head):
-                ["diff", "--no-color", "--no-ext-diff", "-U99999", "\(base)...\(head)", "--", reference.repositoryRelativePath]
+                ["diff", "--no-color", "--no-ext-diff", "-U99999", base, head, "--", reference.repositoryRelativePath]
         }
     }
 

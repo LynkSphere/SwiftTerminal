@@ -106,11 +106,11 @@ struct GitCommitDiffSheetItem: Identifiable, Hashable, Codable {
     /// When set, this represents a stash; the sheet will load its file list
     /// via `git stash show` and individual file diffs via the stash ref.
     let stashIndex: Int?
-    /// When set, this represents a branch-to-branch comparison (three-dot diff).
+    /// When set, this compares the committed contents of two branches.
     /// `hash` carries head; `message` carries the title text.
     let range: GitBranchRange?
     var id: String {
-        if let range { return "range:\(range.base)...\(range.head)" }
+        if let range { return "range:\(range.base)..\(range.head)" }
         if let stashIndex { return "stash:\(stashIndex)" }
         return hash
     }
