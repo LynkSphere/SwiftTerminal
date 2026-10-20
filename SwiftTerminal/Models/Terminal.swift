@@ -135,18 +135,11 @@ final class Terminal: Identifiable, Hashable, Codable {
         onProcessExit = nil
         if let tv = localProcessTerminalView {
             tv.processDelegate = nil
-            tv.onBell = nil
             if tv.process.running {
-                let pid = tv.process.shellPid
                 for child in childProcesses() {
                     kill(child.pid, SIGHUP)
                 }
-                tv.process.terminate()
-                if pid > 0 {
-                    Task.detached {
-                        await Terminal.reapTerminatedProcess(pid)
-                    }
-                }
+                tv.terminate()
             }
             tv.removeFromSuperview()
         }
@@ -155,29 +148,6 @@ final class Terminal: Identifiable, Hashable, Codable {
         processDelegate = nil
         hasExited = true
         hasBellNotification = false
-    }
-
-    /// SwiftTerm cancels its child monitor during termination, so we must reap
-    /// the child ourselves. Capture only its PID so cleanup retains no UI state.
-    nonisolated private static func reapTerminatedProcess(_ pid: pid_t) async {
-        let clock = ContinuousClock()
-        var deadline = clock.now + .seconds(1)
-        var sentKill = false
-        while true {
-            var status: Int32 = 0
-            let result = waitpid(pid, &status, WNOHANG)
-            if result == -1, errno == EINTR { continue }
-            guard result == 0 else { return }
-
-            if clock.now >= deadline {
-                guard !sentKill else { return }
-                // A zero waitpid result confirms this is still our live child.
-                kill(pid, SIGKILL)
-                sentKill = true
-                deadline = clock.now + .seconds(1)
-            }
-            try? await Task.sleep(for: .milliseconds(50))
-        }
     }
 
     func increaseFontSize() {
@@ -197,7 +167,7 @@ final class Terminal: Identifiable, Hashable, Codable {
 
     func clearTerminal() {
         guard let tv = localProcessTerminalView else { return }
-        tv.getTerminal().resetToInitialState()
+        tv.resetToInitialState()
         tv.send(txt: "\u{0C}")
     }
 

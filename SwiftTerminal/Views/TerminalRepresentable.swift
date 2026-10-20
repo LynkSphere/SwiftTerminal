@@ -24,7 +24,9 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
             terminalView = coordinator.createTerminalView(for: terminal, appState: appState)
         }
 
-        terminalView.processDelegate = terminal.processDelegate
+        if terminalView.processDelegate !== terminal.processDelegate {
+            terminalView.processDelegate = terminal.processDelegate
+        }
 
         container.host(terminalView)
     }
@@ -59,6 +61,8 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
             }
         }
 
+        private weak var appState: AppState?
+
         private var viewMap: [ObjectIdentifier: WeakTerminal] = [:]
 
         func register(_ view: LocalProcessTerminalView, for terminal: Terminal) {
@@ -66,38 +70,23 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
         }
 
         func createTerminalView(for terminal: Terminal, appState: AppState) -> LocalProcessTerminalView {
+            self.appState = appState
             let tv = LocalProcessTerminalView(frame: .zero)
-            tv.onBell = { [weak terminal, weak tv, weak appState] in
-                Task { @MainActor in
-                    // Agent tasks notify from provider state; their BEL is not
-                    // another completion or question notification.
-                    guard let terminal, !terminal.isTaskTerminal else { return }
-                    let isSelected = appState?.activeTerminal === terminal
-                    let isVisible = isSelected && (tv?.window != nil)
-                    if !isVisible {
-                        terminal.hasBellNotification = true
-                    }
-                    AppDelegate.bounceDockIcon()
-                    if !NSApplication.shared.isActive {
-                        AppDelegate.showBadge()
-                    }
-                    if let workspaceID = terminal.workspace?.id {
-                        AppDelegate.sendNotification(
-                            workspaceID: workspaceID,
-                            terminalID: terminal.id,
-                            workspaceName: terminal.workspace?.name,
-                            terminalName: terminal.displayTitle
-                        )
-                    }
+            tv.nativeForegroundColor = NSColor(name: nil) { appearance in
+                if appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua {
+                    return NSColor(white: 0.90, alpha: 1)
                 }
+                return .labelColor
             }
-
-            tv.configureNativeColors()
-            try? tv.setUseMetal(true)
-            tv.getTerminal().setCursorStyle(.steadyBlock)
-            tv.getTerminal().changeScrollback(TerminalProcessRegistry.scrollback)
+            tv.nativeBackgroundColor = .windowBackgroundColor
+            tv.backgroundOpacity = 0
+            // Agent attention comes from provider state, so discard their bells.
+            tv.bellStyle = terminal.isTaskTerminal ? .none : .sound
+            tv.setCursorStyle(.steadyBlock)
+            tv.changeScrollback(TerminalProcessRegistry.scrollback)
             let fontSize = terminal.isTaskTerminal ? TerminalProcessRegistry.fontSize : TerminalProcessRegistry.commandFontSize
             tv.font = NSFont(descriptor: tv.font.fontDescriptor, size: fontSize) ?? tv.font
+            try? tv.setUseMetal(true)
             terminal.localProcessTerminalView = tv
             terminal.processDelegate = self
             terminal.hasExited = false
@@ -134,11 +123,38 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
             return tv
         }
 
+        func bell(source: SwiftTerm.TerminalView) {
+            guard let local = source as? LocalProcessTerminalView,
+                  let terminal = viewMap[ObjectIdentifier(local)]?.value,
+                  !terminal.isTaskTerminal else { return }
+            let isSelected = appState?.activeTerminal === terminal
+            if !isSelected || source.window == nil {
+                terminal.hasBellNotification = true
+            }
+            AppDelegate.bounceDockIcon()
+            if !NSApplication.shared.isActive {
+                AppDelegate.showBadge()
+            }
+            if let workspaceID = terminal.workspace?.id {
+                AppDelegate.sendNotification(
+                    workspaceID: workspaceID,
+                    terminalID: terminal.id,
+                    workspaceName: terminal.workspace?.name,
+                    terminalName: terminal.displayTitle
+                )
+            }
+        }
+
         // MARK: - LocalProcessTerminalViewDelegate
 
         func sizeChanged(source: LocalProcessTerminalView, newCols: Int, newRows: Int) {}
 
         func setTerminalTitle(source: LocalProcessTerminalView, title: String) {}
+
+        func processFailedToStart(source: SwiftTerm.TerminalView, error: LocalProcessError) {
+            // SwiftTerm displays the launch error; retire the app session too.
+            processTerminated(source: source, exitCode: nil)
+        }
 
         func processTerminated(source: TerminalView, exitCode: Int32?) {
             guard let local = source as? LocalProcessTerminalView,

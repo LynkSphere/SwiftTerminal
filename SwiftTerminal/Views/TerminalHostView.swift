@@ -21,7 +21,7 @@ final class TerminalHostView: NSView {
         }
 
         terminalView.translatesAutoresizingMaskIntoConstraints = true
-        terminalView.autoresizingMask = [.width, .height]
+        terminalView.autoresizingMask = []
         if terminalChanged {
             claimTerminalViewIfVisible()
         } else {
@@ -86,7 +86,11 @@ final class TerminalHostView: NSView {
                 window.makeFirstResponder(terminalView)
             }
         }
-        terminalView.frame = bounds
+        // Padding belongs to the host rather than the engine's grid or renderer.
+        let frame = bounds.insetBy(dx: min(6, bounds.width / 2), dy: min(6, bounds.height / 2))
+        if terminalView.frame != frame {
+            terminalView.frame = frame
+        }
     }
 
     private func releaseCurrentTerminalView() {
