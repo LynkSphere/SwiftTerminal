@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 /// Local history only: live agent state comes from Claude's background sessions.
@@ -67,6 +68,27 @@ actor ClaudeSessionHistory {
         guard let file = locate(id), let metadata = try metadata(for: file) else { return nil }
         locations[id] = file.url
         return thread(file, metadata: metadata)
+    }
+
+    func renameThread(_ id: String, to proposedTitle: String, directory: String) throws {
+        guard UUID(uuidString: id) != nil else { throw IntegrationError(message: "Invalid Claude session identifier.") }
+        let title = proposedTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else { throw IntegrationError(message: "Enter a name for this chat.") }
+        guard let file = locate(id), let metadata = try metadata(for: file) else {
+            throw IntegrationError(message: "This Claude chat needs saved history before it can be renamed. Send a prompt first.")
+        }
+        guard URL(fileURLWithPath: metadata.directory).standardizedFileURL.resolvingSymlinksInPath()
+            == URL(fileURLWithPath: directory).standardizedFileURL.resolvingSymlinksInPath() else {
+            throw IntegrationError(message: "The Claude session's project directory changed. Refresh and try again.")
+        }
+        var record = try JSONSerialization.data(withJSONObject: ["type": "custom-title", "sessionId": id, "customTitle": title])
+        record.append(10)
+        let descriptor = open(file.url.path, O_WRONLY | O_APPEND | O_NOFOLLOW)
+        guard descriptor >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+        defer { try? handle.close() }
+        try handle.write(contentsOf: record)
+        cache[file.url] = nil
     }
 
     func deleteThread(_ id: String, directory: String) throws {

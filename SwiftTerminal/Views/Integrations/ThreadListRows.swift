@@ -5,6 +5,7 @@ struct ThreadListRows: View {
     let threads: [AgentThread]
     let rowPositions: Namespace.ID
     let requestDeletion: (AgentThread) -> Void
+    let requestRename: (AgentThread) -> Void
 
     var body: some View {
         ForEach(threads) { thread in
@@ -13,6 +14,11 @@ struct ThreadListRows: View {
                 .tag(thread.id)
                 .contextMenu {
                     SettleThreadButton(thread: thread)
+
+                    Divider()
+
+                    RenameThreadButton(thread: thread) { requestRename(thread) }
+
                     if integrations.canMarkUnread(thread) {
                         MarkThreadUnreadButton(thread: thread)
                     }

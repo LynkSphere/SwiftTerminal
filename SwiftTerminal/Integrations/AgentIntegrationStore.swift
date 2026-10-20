@@ -11,6 +11,7 @@ final class AgentIntegrationStore {
     private(set) var isRefreshing = false
     private(set) var deletingThreadIDs: Set<String> = []
     private(set) var stoppingThreadIDs: Set<String> = []
+    private(set) var renamingThreadIDs: Set<String> = []
     private(set) var deletedThreadIDs: Set<String> = []
     var actionError: String?
     private(set) var settledThreadIDs: Set<String>
@@ -84,9 +85,45 @@ final class AgentIntegrationStore {
         adapters[thread.provider]?.capabilities.contains(.deleteThread) == true
     }
 
+    func canRename(_ thread: AgentThread) -> Bool {
+        enabled.contains(thread.provider) && adapters[thread.provider]?.capabilities.contains(.renameThread) == true
+            && !deletedThreadIDs.contains(thread.id) && !deletingThreadIDs.contains(thread.id)
+            && !stoppingThreadIDs.contains(thread.id) && !renamingThreadIDs.contains(thread.id)
+    }
+
+    @discardableResult
+    func renameThread(_ thread: AgentThread, to proposedTitle: String) async -> Bool {
+        let title = proposedTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else {
+            actionError = "Enter a name for this chat."
+            return false
+        }
+        guard canRename(thread), let adapter = adapters[thread.provider] else { return false }
+        let generation = generations[thread.provider, default: 0]
+        renamingThreadIDs.insert(thread.id)
+        revisions[thread.id, default: 0] += 1
+        defer { renamingThreadIDs.remove(thread.id) }
+        do {
+            try await adapter.renameThread(thread, to: title)
+            guard isCurrent(thread.provider, generation: generation), !deletedThreadIDs.contains(thread.id),
+                  let index = threads.firstIndex(where: { $0.id == thread.id }) else { return false }
+            threads[index].title = title
+            threads[index].hasProviderTitle = true
+            if drafts[thread.id] != nil { drafts[thread.id] = threads[index] }
+            revisions[thread.id, default: 0] += 1
+            return true
+        } catch {
+            if isCurrent(thread.provider, generation: generation), !deletedThreadIDs.contains(thread.id) {
+                actionError = error.localizedDescription
+            }
+            return false
+        }
+    }
+
     func canDelete(_ thread: AgentThread) -> Bool {
         enabled.contains(thread.provider) && supportsDeletion(thread)
             && !deletingThreadIDs.contains(thread.id) && !deletedThreadIDs.contains(thread.id) && !stoppingThreadIDs.contains(thread.id)
+            && !renamingThreadIDs.contains(thread.id)
     }
 
     func deletionMessage(for thread: AgentThread) -> String {
@@ -161,7 +198,7 @@ final class AgentIntegrationStore {
     }
 
     private func refreshMetadata(_ id: String) async {
-        guard let original = threads.first(where: { $0.id == id }), enabled.contains(original.provider),
+        guard !renamingThreadIDs.contains(id), let original = threads.first(where: { $0.id == id }), enabled.contains(original.provider),
               let adapter = adapters[original.provider] else { return }
         let generation = generations[original.provider, default: 0]
         let revision = revisions[id, default: 0]
@@ -187,7 +224,7 @@ final class AgentIntegrationStore {
 
     @discardableResult
     func settle(_ thread: AgentThread) -> AgentThread? {
-        guard !deletedThreadIDs.contains(thread.id), !deletingThreadIDs.contains(thread.id),
+        guard !deletedThreadIDs.contains(thread.id), !deletingThreadIDs.contains(thread.id), !renamingThreadIDs.contains(thread.id),
               let adapter = adapters[thread.provider] else { return nil }
         settledThreadIDs.insert(thread.id)
         defaults.set(settledThreadIDs.sorted(), forKey: "integration.settledThreadIDs")

@@ -3,7 +3,7 @@ import Foundation
 @MainActor
 final class CodexAgentAdapter: AgentProviderAdapter {
     let provider = AgentProvider.codex
-    let capabilities: AgentCapabilities = [.markUnread, .deleteThread, .deleteDescendants]
+    let capabilities: AgentCapabilities = [.markUnread, .deleteThread, .deleteDescendants, .renameThread]
     var onEvent: ((AgentEvent) -> Void)?
     private let socket = CodexSocket()
     private let defaults: UserDefaults
@@ -113,6 +113,11 @@ final class CodexAgentAdapter: AgentProviderAdapter {
         _ = try await request("thread/name/set", params: ["threadId": thread.sessionID, "name": "New Codex thread"])
         _ = try await request("thread/unsubscribe", params: ["threadId": thread.sessionID])
         return thread
+    }
+
+    func renameThread(_ thread: AgentThread, to title: String) async throws {
+        try await connect()
+        _ = try await request("thread/name/set", params: ["threadId": thread.sessionID, "name": title])
     }
 
     func deleteThread(_ thread: AgentThread) async throws {

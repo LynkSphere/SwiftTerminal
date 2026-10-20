@@ -72,7 +72,7 @@ final class TaskSessionController {
     }
 
     func settle(_ thread: AgentThread, undoManager: UndoManager? = nil) {
-        guard !isOpening, !integrations.settledThreadIDs.contains(thread.id),
+        guard !isOpening, !integrations.settledThreadIDs.contains(thread.id), !integrations.renamingThreadIDs.contains(thread.id),
               !integrations.deletingThreadIDs.contains(thread.id), !integrations.deletedThreadIDs.contains(thread.id) else { return }
         let draft = integrations.settle(thread)
         appState.closeSession(thread.id)

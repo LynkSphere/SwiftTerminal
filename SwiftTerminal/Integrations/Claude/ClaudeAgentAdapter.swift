@@ -3,7 +3,7 @@ import Foundation
 @MainActor
 final class ClaudeAgentAdapter: AgentProviderAdapter {
     let provider = AgentProvider.claude
-    let capabilities: AgentCapabilities = [.deleteThread]
+    let capabilities: AgentCapabilities = [.deleteThread, .renameThread]
     var onEvent: ((AgentEvent) -> Void)?
     private let history = ClaudeSessionHistory()
     private let defaults: UserDefaults
@@ -30,6 +30,10 @@ final class ClaudeAgentAdapter: AgentProviderAdapter {
 
     func readThread(_ id: String) async throws -> AgentThread? {
         try await history.readThread(id).map(withStatus) ?? backgroundSessions[id]?.thread
+    }
+
+    func renameThread(_ thread: AgentThread, to title: String) async throws {
+        try await history.renameThread(thread.sessionID, to: title, directory: thread.directory)
     }
 
     func deleteThread(_ thread: AgentThread) async throws {

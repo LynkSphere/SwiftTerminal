@@ -11,13 +11,13 @@ struct SettleThreadButton: View {
             Button("Restore Thread", systemImage: "arrow.uturn.backward") {
                 sessions.restore(thread, undoManager: undoManager)
             }
-            .disabled(sessions.isOpening || integrations.deletingThreadIDs.contains(thread.id) || integrations.stoppingThreadIDs.contains(thread.id))
+            .disabled(sessions.isOpening || integrations.deletingThreadIDs.contains(thread.id) || integrations.stoppingThreadIDs.contains(thread.id) || integrations.renamingThreadIDs.contains(thread.id))
         } else {
             Button("Settle Thread", systemImage: "checkmark") {
                 sessions.settle(thread, undoManager: undoManager)
             }
             .tint(.green)
-            .disabled(sessions.isOpening || integrations.deletingThreadIDs.contains(thread.id) || integrations.stoppingThreadIDs.contains(thread.id))
+            .disabled(sessions.isOpening || integrations.deletingThreadIDs.contains(thread.id) || integrations.stoppingThreadIDs.contains(thread.id) || integrations.renamingThreadIDs.contains(thread.id))
         }
     }
 }
