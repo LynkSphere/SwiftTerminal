@@ -403,6 +403,7 @@ final class AgentIntegrationStore {
 
     func prepareLaunch(for thread: AgentThread, isNew: Bool = false) async throws -> AgentLaunch {
         if let stopTask = stopTasks[thread.id] { await stopTask.value }
+        try Task.checkCancellation()
         let adapter = try enabledAdapter(for: thread.provider)
         let generation = generations[thread.provider, default: 0]
         let intent: AgentLaunchIntent = isNew || drafts[thread.id] != nil ? .create : .resume

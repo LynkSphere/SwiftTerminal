@@ -14,8 +14,20 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 160, ideal: 200, max: 300)
                 .searchable(text: $searchText, placement: .sidebar, prompt: "Filter tasks")
         } detail: {
-            if let session = appState.selectedSession {
+            if let openingThreadID = sessions.openingThreadID, openingThreadID == appState.selectedThreadID {
+                ProgressView("Opening task…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let session = appState.selectedSession {
                 TaskDetailView(session: session)
+            } else if let error = sessions.openError,
+                      let thread = integrations.threads.first(where: { $0.id == appState.selectedThreadID }) {
+                ContentUnavailableView {
+                    Label("Couldn’t Open Task", systemImage: "exclamationmark.circle")
+                } description: {
+                    Text(error)
+                } actions: {
+                    Button("Retry") { sessions.open(thread) }
+                }
             } else {
                 ContentUnavailableView(
                     "No Task Selected",
@@ -72,7 +84,7 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .navigateToSession)) { notification in
             if let threadID = notification.userInfo?["threadID"] as? String,
                let thread = integrations.threads.first(where: { $0.id == threadID }) {
-                Task { await sessions.open(thread) }
+                sessions.open(thread)
                 return
             }
             guard let workspaceID = notification.userInfo?["workspaceID"] as? String,

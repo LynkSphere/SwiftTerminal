@@ -10,7 +10,7 @@ struct TaskTerminalView: View {
             .safeAreaInset(edge: .bottom) {
                 if session.terminal.hasExited {
                     Button("Resume Task", systemImage: "play") {
-                        Task { await sessions.open(session.thread) }
+                        sessions.open(session.thread)
                     }
                     .disabled(sessions.isOpening)
                     .padding()

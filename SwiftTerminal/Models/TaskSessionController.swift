@@ -6,7 +6,12 @@ import SwiftUI
 @MainActor
 @Observable
 final class TaskSessionController {
-    private(set) var isOpening = false
+    private var isComposing = false
+    private(set) var openingThreadID: String?
+    private(set) var openError: String?
+    @ObservationIgnored private var openingTask: Task<Void, Never>?
+
+    var isOpening: Bool { isComposing || openingThreadID != nil }
 
     private let integrations: AgentIntegrationStore
     private let appState: AppState
@@ -21,8 +26,8 @@ final class TaskSessionController {
 
     func compose(provider: AgentProvider, workspace: Workspace) async -> Bool {
         guard !isOpening, integrations.enabledProviders.contains(provider) else { return false }
-        isOpening = true
-        defer { isOpening = false }
+        isComposing = true
+        defer { isComposing = false }
         do {
             try validateDirectory(workspace.directory)
             let thread = try await integrations.createThread(provider: provider, directory: workspace.directory)
@@ -42,33 +47,47 @@ final class TaskSessionController {
         }
     }
 
-    func open(_ thread: AgentThread) async {
-        guard !isOpening, canOpen(thread) else { return }
-        isOpening = true
-        defer { isOpening = false }
+    func open(_ thread: AgentThread) {
+        guard !isComposing, canOpen(thread), openingThreadID != thread.id else { return }
+        openingTask?.cancel()
+        openingTask = nil
+        openingThreadID = nil
+        openError = nil
+        appState.selectThread(thread.id)
         if let session = appState.sessions[thread.id], !session.terminal.hasExited {
             session.thread = thread
             appState.show(session)
             integrations.setViewedThread(thread.id)
             return
         }
-        do {
-            try validateDirectory(thread.directory)
-            let launch = try await integrations.prepareLaunch(for: thread)
-            try Task.checkCancellation()
-            guard canOpen(thread) else { return }
-            let workspace = workspace(for: thread.directory)
-            if let session = appState.sessions[thread.id] {
-                session.thread = thread
-                session.restart(launch: launch)
-                observeTerminal(of: session)
-                appState.show(session)
-            } else {
-                launchSession(thread, configuration: launch, workspace: workspace)
+        openingThreadID = thread.id
+        openingTask = Task {
+            defer {
+                if !Task.isCancelled {
+                    openingThreadID = nil
+                    openingTask = nil
+                }
             }
-        } catch is CancellationError {
-        } catch {
-            integrations.actionError = error.localizedDescription
+            do {
+                try validateDirectory(thread.directory)
+                let launch = try await integrations.prepareLaunch(for: thread)
+                try Task.checkCancellation()
+                guard canOpen(thread), appState.selectedThreadID == thread.id else { return }
+                let workspace = workspace(for: thread.directory)
+                if let session = appState.sessions[thread.id] {
+                    session.thread = thread
+                    session.restart(launch: launch)
+                    observeTerminal(of: session)
+                    appState.show(session)
+                } else {
+                    launchSession(thread, configuration: launch, workspace: workspace)
+                }
+            } catch is CancellationError {
+            } catch {
+                guard !Task.isCancelled, appState.selectedThreadID == thread.id else { return }
+                openError = error.localizedDescription
+                if appState.selectedSession != nil { integrations.actionError = error.localizedDescription }
+            }
         }
     }
 
@@ -103,9 +122,8 @@ final class TaskSessionController {
     }
 
     private func canOpen(_ thread: AgentThread) -> Bool {
-        integrations.enabledProviders.contains(thread.provider) && !integrations.settledThreadIDs.contains(thread.id)
+        integrations.enabledProviders.contains(thread.provider)
             && !integrations.deletingThreadIDs.contains(thread.id) && !integrations.deletedThreadIDs.contains(thread.id)
-            && !integrations.stoppingThreadIDs.contains(thread.id)
     }
 
     func delete(_ thread: AgentThread) async {

@@ -35,7 +35,8 @@ struct ComposeThreadView: View {
                     workspaces: store.workspaces,
                     workspaceID: $workspaceID,
                     model: projectPicker,
-                    onSubmit: openTask
+                    onSubmit: openTask,
+                    onDelete: store.deleteWorkspace
                 )
             }
             .disabled(sessions.isOpening)

@@ -5,6 +5,7 @@ struct ComposeProjectPickerView: View {
     @Binding var workspaceID: UUID?
     @Bindable var model: ComposeProjectPickerModel
     let onSubmit: () -> Void
+    let onDelete: (Workspace) -> Void
     @State private var didInitialScroll = false
     @FocusState private var isProjectListFocused: Bool
 
@@ -28,6 +29,17 @@ struct ComposeProjectPickerView: View {
                     }
                     .padding(.leading, 8)
                     .tag(workspace.id)
+                    .contextMenu {
+                        Button("Delete Project", systemImage: "trash", role: .destructive) {
+                            onDelete(workspace)
+                        }
+                    }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button("Delete Project", systemImage: "trash", role: .destructive) {
+                            onDelete(workspace)
+                        }
+                        .labelStyle(.iconOnly)
+                    }
                 }
             }
             .contentMargins(10, for: .scrollContent)

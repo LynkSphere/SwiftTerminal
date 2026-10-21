@@ -29,9 +29,9 @@ struct ThreadListView: View {
         let regularThreads = threads.filter { !integrations.settledThreadIDs.contains($0.id) }
         let settledThreads = threads.filter { integrations.settledThreadIDs.contains($0.id) }
 
-        List(selection: Binding<String?>(get: { appState.selectedSession?.id }, set: { id in
+        List(selection: Binding<String?>(get: { appState.selectedThreadID }, set: { id in
             guard let thread = threads.first(where: { $0.id == id }) else { return }
-            Task { await sessions.open(thread) }
+            sessions.open(thread)
         })) {
             ThreadListRows(threads: regularThreads, requestDeletion: requestDeletion, requestRename: requestRename)
 
