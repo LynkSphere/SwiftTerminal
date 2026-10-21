@@ -71,15 +71,9 @@ struct TerminalContainerRepresentable: NSViewRepresentable {
 
         func createTerminalView(for terminal: Terminal, appState: AppState) -> LocalProcessTerminalView {
             self.appState = appState
-            let tv = LocalProcessTerminalView(frame: .zero)
-            tv.nativeForegroundColor = NSColor(name: nil) { appearance in
-                if appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua {
-                    return NSColor(white: 0.90, alpha: 1)
-                }
-                return .labelColor
-            }
-            tv.nativeBackgroundColor = .windowBackgroundColor
-            tv.backgroundOpacity = 0
+            let tv = AppTerminalView(frame: .zero)
+            // Install colors and theme reporting before any shell, agent, or command starts.
+            tv.applyAppearance()
             // Agent attention comes from provider state, so discard their bells.
             tv.bellStyle = terminal.isTaskTerminal ? .none : .sound
             tv.setCursorStyle(.steadyBlock)
