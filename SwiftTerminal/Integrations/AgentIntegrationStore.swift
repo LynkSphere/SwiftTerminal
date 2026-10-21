@@ -15,12 +15,10 @@ final class AgentIntegrationStore {
     private(set) var deletedThreadIDs: Set<String> = []
     var actionError: String?
     private(set) var settledThreadIDs: Set<String>
-    private(set) var prioritySelectionID: String?
     private var enabled: Set<AgentProvider>
     private var activity: [String: ThreadActivity]
     @ObservationIgnored var onAttention: ((AgentThread) -> Void)?
     @ObservationIgnored private var viewedThreadID: String?
-    @ObservationIgnored private var selectedThreadID: String?
 
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let adapters: [AgentProvider: any AgentProviderAdapter]
@@ -289,14 +287,7 @@ final class AgentIntegrationStore {
         }
     }
 
-    func setSelectedThread(_ id: String?) {
-        guard selectedThreadID != id else { return }
-        selectedThreadID = id
-        prioritySelectionID = threads.first { $0.id == id && $0.needsAttention }?.id
-    }
-
     func setViewedThread(_ id: String?) {
-        if let id { setSelectedThread(id) }
         viewedThreadID = id
         guard let index = threads.firstIndex(where: { $0.id == id }) else { return }
         activity[threads[index].id]?.markRead(threads[index])
@@ -308,11 +299,6 @@ final class AgentIntegrationStore {
         let thread = source
         var state = activity[thread.id] ?? ThreadActivity(thread: thread)
         let result = state.update(thread, isViewed: viewedThreadID == thread.id, now: now)
-        // Keep the selected task in Priority even when viewing clears its unread result.
-        let completed = thread.status == .done && threads.first(where: { $0.id == thread.id })?.status != .done
-        if selectedThreadID == thread.id, thread.needsAttention || result.needsAttention || completed {
-            prioritySelectionID = thread.id
-        }
         activity[thread.id] = state
         // Initial history and reconnect snapshots establish a baseline; only
         // an observed transition should ask for the user's attention.

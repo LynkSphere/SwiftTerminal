@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SwiftUI
 
 /// Coordinates local task processes and selection independently of provider history.
 @MainActor
@@ -74,8 +75,11 @@ final class TaskSessionController {
     func settle(_ thread: AgentThread, undoManager: UndoManager? = nil) {
         guard !isOpening, !integrations.settledThreadIDs.contains(thread.id), !integrations.renamingThreadIDs.contains(thread.id),
               !integrations.deletingThreadIDs.contains(thread.id), !integrations.deletedThreadIDs.contains(thread.id) else { return }
-        let draft = integrations.settle(thread)
-        appState.closeSession(thread.id)
+        let draft = withAnimation {
+            let draft = integrations.settle(thread)
+            appState.closeSession(thread.id)
+            return draft
+        }
         undoManager?.registerUndo(withTarget: self) { [weak undoManager] controller in
             controller.restore(thread, draft: draft, undoManager: undoManager)
         }
@@ -87,7 +91,9 @@ final class TaskSessionController {
     func restore(_ thread: AgentThread, draft: AgentThread? = nil, undoManager: UndoManager? = nil) {
         guard integrations.settledThreadIDs.contains(thread.id),
               !integrations.deletingThreadIDs.contains(thread.id), !integrations.deletedThreadIDs.contains(thread.id) else { return }
-        integrations.restore(thread, draft: draft)
+        withAnimation {
+            integrations.restore(thread, draft: draft)
+        }
         undoManager?.registerUndo(withTarget: self) { [weak undoManager] controller in
             controller.settle(thread, undoManager: undoManager)
         }
