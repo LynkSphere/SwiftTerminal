@@ -12,7 +12,7 @@ struct ContentView: View {
         NavigationSplitView(columnVisibility: Bindable(appState).sidebarVisibility) {
             ThreadListView(searchText: searchText)
                 .navigationSplitViewColumnWidth(min: 160, ideal: 200, max: 300)
-                .searchable(text: $searchText, placement: .sidebar, prompt: "Filter tasks")
+                .searchable(text: $searchText, placement: .sidebar, prompt: "Filter tasks or projects")
         } detail: {
             if let openingThreadID = sessions.openingThreadID, openingThreadID == appState.selectedThreadID {
                 ProgressView("Opening task…")

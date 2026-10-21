@@ -13,9 +13,11 @@ struct ThreadListView: View {
     @State private var renamedTitle = ""
 
     private var threads: [AgentThread] {
-        integrations.visibleThreads.filter {
-            searchText.isEmpty || $0.title.localizedStandardContains(searchText) || $0.directory.localizedStandardContains(searchText)
-        }
+        integrations.visibleThreads(matching: searchText)
+    }
+
+    private var isSearching: Bool {
+        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private var unavailableProviderNames: String {
@@ -36,8 +38,14 @@ struct ThreadListView: View {
             ThreadListRows(threads: regularThreads, requestDeletion: requestDeletion, requestRename: requestRename)
 
             if !settledThreads.isEmpty {
-                Section("Settled", isExpanded: $isSettledExpanded.animation()) {
-                    ThreadListRows(threads: settledThreads, requestDeletion: requestDeletion, requestRename: requestRename)
+                if isSearching {
+                    Section("Settled") {
+                        ThreadListRows(threads: settledThreads, requestDeletion: requestDeletion, requestRename: requestRename)
+                    }
+                } else {
+                    Section("Settled", isExpanded: $isSettledExpanded.animation()) {
+                        ThreadListRows(threads: settledThreads, requestDeletion: requestDeletion, requestRename: requestRename)
+                    }
                 }
             }
         }
@@ -65,7 +73,7 @@ struct ThreadListView: View {
                 } else if integrations.isRefreshing {
                     ProgressView("Loading threads…")
                 } else {
-                    ContentUnavailableView(searchText.isEmpty ? "No Tasks" : "No Results", systemImage: "bubble.left.and.bubble.right", description: Text("Use Compose to start a task."))
+                    ContentUnavailableView(isSearching ? "No Results" : "No Tasks", systemImage: "bubble.left.and.bubble.right", description: Text("Use Compose to start a task."))
                 }
             }
         }

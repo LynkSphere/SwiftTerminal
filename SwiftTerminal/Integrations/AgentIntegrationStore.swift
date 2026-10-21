@@ -34,9 +34,15 @@ final class AgentIntegrationStore {
 
     var enabledProviders: [AgentProvider] { providers.filter { enabled.contains($0) } }
     var isEnabled: Bool { !enabled.isEmpty }
-    var visibleThreads: [AgentThread] {
-        enabledProviders.flatMap { provider in
-            threads.filter { $0.provider == provider }
+    func visibleThreads(matching searchText: String) -> [AgentThread] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return enabledProviders.flatMap { provider in
+            threads.filter {
+                $0.provider == provider && (query.isEmpty
+                    || $0.title.localizedStandardContains(query)
+                    || $0.projectName.localizedStandardContains(query)
+                    || $0.directory.localizedStandardContains(query))
+            }
                 .sorted(by: AgentThread.newestFirst)
                 .prefix(25)
         }.sorted(by: AgentThread.newestFirst)
